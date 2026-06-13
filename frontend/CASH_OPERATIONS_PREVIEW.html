@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cash Operations Module Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f8fafc; }
+        .module-container { height: 100vh; }
+        .operation-node { 
+            border: 2px solid #dcfce7;
+            background-color: #f0fdf4;
+        }
+        .operation-node-icon {
+            background-color: #dcfce7;
+            color: #16a34a;
+        }
+        .arrow-line {
+            stroke: #cbd5e1;
+            stroke-width: 2;
+        }
+        .arrow-head {
+            fill: #cbd5e1;
+        }
+        .report-item:hover {
+            background-color: #fed7aa;
+            color: #F97316;
+        }
+        .banner-gradient {
+            background: linear-gradient(to right, #059669, #10b981);
+        }
+        .cta-button {
+            background-color: #1e293b;
+            color: white;
+        }
+        .cta-button:hover {
+            background-color: #0f172a;
+        }
+    </style>
+</head>
+<body class="m-0 p-0">
+    <div class="module-container flex flex-col bg-slate-100">
+        <!-- Main Content Area -->
+        <div class="flex flex-1 overflow-hidden gap-4 p-4">
+            <!-- LEFT PANEL (70%) -->
+            <div class="w-7/10 rounded-lg border border-e2e8f0 bg-white shadow-md flex flex-col overflow-hidden">
+                <!-- Workflow Header -->
+                <div class="border-b border-e2e8f0 p-6 pb-4">
+                    <h2 class="text-lg font-semibold text-text">NGHIỆP VỤ TIỀN MẶT</h2>
+                </div>
+
+                <!-- Workflow Diagram -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-8">
+                    <!-- Thu tiền Node -->
+                    <div class="flex items-center gap-4">
+                        <div class="flex-1">
+                            <div class="operation-node px-4 py-3 rounded-lg flex items-center gap-3">
+                                <div class="operation-node-icon h-10 w-10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-file-alt"></i>
+                                    <i class="fas fa-coins ml-1"></i>
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-slate-800">Thu tiền</div>
+                                    <div class="text-xs font-bold text-green-600">THU</div>
+                                </div>
+                                <div class="ml-auto">
+                                    <button class="p-1 hover:bg-green-100 rounded">
+                                        <i class="fas fa-chevron-down text-green-600 text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <svg class="w-12 h-12" viewBox="0 0 48 48">
+                            <path d="M 0 24 L 40 24" class="arrow-line"/>
+                            <path d="M 36 20 L 44 24 L 36 28" class="arrow-head"/>
+                        </svg>
+                    </div>
+
+                    <!-- Center - Kiểm kê quỹ -->
+                    <div class="flex justify-end">
+                        <div class="w-1/2">
+                            <div class="operation-node px-4 py-3 rounded-lg flex items-center gap-3">
+                                <div class="operation-node-icon h-10 w-10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-slate-800">Kiểm kê quỹ</div>
+                                    <div class="text-xs font-bold text-green-600">AUDIT</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chi tiền Node -->
+                    <div class="flex items-center gap-4">
+                        <div class="flex-1">
+                            <div class="operation-node px-4 py-3 rounded-lg flex items-center gap-3">
+                                <div class="operation-node-icon h-10 w-10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-file-alt"></i>
+                                    <i class="fas fa-coins ml-1"></i>
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-slate-800">Chi tiền</div>
+                                    <div class="text-xs font-bold text-green-600">CHI</div>
+                                </div>
+                                <div class="ml-auto">
+                                    <button class="p-1 hover:bg-green-100 rounded">
+                                        <i class="fas fa-chevron-down text-green-600 text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <svg class="w-12 h-12" viewBox="0 0 48 48">
+                            <path d="M 0 24 L 40 24" class="arrow-line"/>
+                            <path d="M 36 20 L 44 24 L 36 28" class="arrow-head"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Bottom Navigation -->
+                <div class="border-t border-e2e8f0">
+                    <div class="flex items-center justify-start gap-2 px-4 py-3">
+                        <button class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-orange-50 hover:text-orange-600">
+                            <i class="fas fa-users text-lg"></i>
+                            <span class="hidden sm:inline">Khách hàng</span>
+                        </button>
+                        <button class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-orange-50 hover:text-orange-600">
+                            <i class="fas fa-building text-lg"></i>
+                            <span class="hidden sm:inline">Nhà cung cấp</span>
+                        </button>
+                        <button class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-orange-50 hover:text-orange-600">
+                            <i class="fas fa-user-check text-lg"></i>
+                            <span class="hidden sm:inline">Nhân viên</span>
+                        </button>
+                        <button class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-orange-50 hover:text-orange-600">
+                            <i class="fas fa-cog text-lg"></i>
+                            <span class="hidden sm:inline">Tùy chọn</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL (30%) -->
+            <div class="w-3/10 rounded-lg border border-e2e8f0 bg-white shadow-md flex flex-col overflow-hidden">
+                <!-- Reports Header -->
+                <div class="border-b border-e2e8f0 p-6 pb-4">
+                    <h2 class="text-lg font-semibold text-text">BÁO CÁO</h2>
+                </div>
+
+                <!-- Reports List -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-2">
+                    <button class="report-item w-full text-left px-2 py-2 rounded-md text-sm text-slate-800 transition-colors flex items-start gap-2">
+                        <span class="text-slate-400 mt-1">•</span>
+                        <span>Bảng kê số dư tiền theo ngày</span>
+                    </button>
+                    <button class="report-item w-full text-left px-2 py-2 rounded-md text-sm text-slate-800 transition-colors flex items-start gap-2">
+                        <span class="text-slate-400 mt-1">•</span>
+                        <span>Dòng tiền</span>
+                    </button>
+                    <button class="report-item w-full text-left px-2 py-2 rounded-md text-sm text-slate-800 transition-colors flex items-start gap-2">
+                        <span class="text-slate-400 mt-1">•</span>
+                        <span>S03a1-DNN: Sổ nhật ký thu tiền</span>
+                    </button>
+                    <button class="report-item w-full text-left px-2 py-2 rounded-md text-sm text-slate-800 transition-colors flex items-start gap-2">
+                        <span class="text-slate-400 mt-1">•</span>
+                        <span>Sổ kế toán chi tiết quỹ tiền mặt</span>
+                    </button>
+                    <button class="report-item w-full text-left px-2 py-2 rounded-md text-sm text-slate-800 transition-colors flex items-start gap-2">
+                        <span class="text-slate-400 mt-1">•</span>
+                        <span>S03a2-DNN: Sổ nhật ký chi tiền</span>
+                    </button>
+                </div>
+
+                <!-- All Reports Link -->
+                <div class="border-t border-e2e8f0 p-6 pt-3">
+                    <a href="#" class="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1">
+                        Tất cả báo cáo
+                        <i class="fas fa-external-link-alt text-xs"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM BANNER -->
+        <div class="flex-shrink-0 px-4 pb-4">
+            <div class="banner-gradient rounded-lg px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p class="text-sm sm:text-base font-medium text-white">
+                    AMIS Quy trình — Phê duyệt và tự động hóa quy trình chi tiền, tạm ứng
+                </p>
+                <button class="cta-button rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap hover:bg-slate-900 transition-colors">
+                    Kết nối ngay
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Demo interactivity
+        document.querySelectorAll('.report-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                alert('Báo cáo: ' + btn.textContent.trim());
+            });
+        });
+    </script>
+</body>
+</html>

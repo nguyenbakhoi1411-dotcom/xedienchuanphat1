@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #f97316;
+  --color-primary-strong: #ea580c;
+  --color-background: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #fff7ed;
+  --color-text: #172033;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --focus-ring: 0 0 0 3px rgba(249, 115, 22, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #f8fafc;
+}
+
+@layer components {
+  .erp-card {
+    @apply rounded-lg border border-border bg-white shadow-soft;
+  }
+
+  .erp-section {
+    @apply rounded-lg border border-border bg-white shadow-soft;
+  }
+
+  .erp-section-header {
+    @apply flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .erp-input {
+    @apply h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text shadow-sm outline-none transition;
+  }
+
+  .erp-input:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  .erp-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: var(--focus-ring);
+  }
+
+  .erp-input:disabled,
+  .erp-input[readonly] {
+    @apply cursor-not-allowed bg-slate-50 text-slate-500;
+  }
+
+  .erp-label {
+    @apply text-sm font-medium text-slate-700;
+  }
+
+  .erp-required::after {
+    content: " *";
+    color: #dc2626;
+  }
+
+  .erp-error {
+    @apply mt-1 block text-xs font-medium text-red-600;
+  }
+
+  .erp-table-wrap {
+    @apply overflow-x-auto;
+  }
+
+  .erp-table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+
+  .erp-table thead {
+    @apply bg-slate-50 text-xs uppercase tracking-normal text-slate-500;
+  }
+
+  .erp-table th {
+    @apply whitespace-nowrap px-4 py-3 font-semibold;
+  }
+
+  .erp-table td {
+    @apply px-4 py-3 align-middle;
+  }
+
+  .erp-table tbody {
+    @apply divide-y divide-border;
+  }
+
+  .erp-table tbody tr {
+    @apply transition-colors;
+  }
+
+  .erp-table tbody tr:hover {
+    @apply bg-orange-50/60;
+  }
+
+  .erp-badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+  }
+
+  .erp-toolbar {
+    @apply flex flex-col gap-3 border-b border-border bg-white px-4 py-4 lg:flex-row lg:items-center lg:justify-between;
+  }
+
+  .erp-action-icon {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-orange-50 hover:text-primary focus-visible:outline-primary;
+  }
+}

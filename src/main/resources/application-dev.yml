@@ -1,0 +1,70 @@
+# ============================================================
+# Dev Profile — H2 in-memory (mode PostgreSQL), seed demo data
+# Chạy: ./mvnw spring-boot:run  (mặc định dùng profile này)
+# ============================================================
+spring:
+  datasource:
+    url: jdbc:h2:mem:warrantydb;MODE=PostgreSQL;DATABASE_TO_UPPER=false
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      # ddl-auto=update CHỈ dùng trong dev — KHÔNG bao giờ dùng ở production
+      ddl-auto: update
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: always
+      data-locations: >-
+        classpath:db/schema-management-reports.sql,
+        classpath:db/schema-notifications.sql,
+        classpath:db/schema-operations.sql,
+        classpath:db/seed-chuanphat-bms.sql
+      continue-on-error: false
+  flyway:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+
+app:
+  ai:
+    enabled: ${AI_ENABLED:true}
+    mode: ${AI_MODE:mock}
+  security:
+    bootstrap-admin:
+      # Dev: bật sẵn admin mặc định để tiện phát triển
+      enabled: ${BOOTSTRAP_ADMIN_ENABLED:true}
+      username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:Admin@123}
+      email: ${BOOTSTRAP_ADMIN_EMAIL:admin@chuanphat.vn}
+      phone: ${BOOTSTRAP_ADMIN_PHONE:0909000001}
+      full-name: ${BOOTSTRAP_ADMIN_FULL_NAME:Admin Chuan Phat}
+    cors:
+      # Dev: cho phép tất cả localhost/LAN để tiện phát triển
+      allowed-origin-patterns: >-
+        ${CORS_ALLOWED_ORIGIN_PATTERNS:
+        http://localhost:*,
+        http://127.0.0.1:*,
+        http://192.168.*:*,
+        http://10.*:*,
+        http://172.16.*:*,
+        http://172.17.*:*,
+        http://172.18.*:*,
+        http://172.19.*:*,
+        http://172.20.*:*,
+        http://172.21.*:*,
+        http://172.22.*:*,
+        http://172.23.*:*,
+        http://172.24.*:*,
+        http://172.25.*:*,
+        http://172.26.*:*,
+        http://172.27.*:*,
+        http://172.28.*:*,
+        http://172.29.*:*,
+        http://172.30.*:*,
+        http://172.31.*:*}
+    jwt:
+      # Dev secret — THAY BẰNG SECRET THỰC TRƯỚC KHI PRODUCTION
+      secret: ${JWT_SECRET:dev-only-change-before-production-64-character-secret}

@@ -1,0 +1,86 @@
+# ========================
+# Java / Maven (Backend)
+# ========================
+target/
+*.iml
+*.class
+.mvn/wrapper/maven-wrapper.jar
+hs_err_pid*
+
+# ========================
+# Frontend / Node
+# ========================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/build/
+frontend/tsconfig.tsbuildinfo
+node_modules/
+.next/
+out/
+dist/
+build/
+tsconfig.tsbuildinfo
+
+# ========================
+# IDE
+# ========================
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+.project
+.classpath
+.settings/
+
+# ========================
+# Runtime / Deploy
+# ========================
+.runtime/
+backups/
+
+# ========================
+# Logs (root & frontend)
+# ========================
+*.log
+*.err.log
+*.out.log
+*.wmi.log
+logs/
+
+# ========================
+# Archive
+# ========================
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# ========================
+# Environment — KHÔNG commit secrets
+# ========================
+.env
+.env.local
+.env.production
+.env.staging
+.env.*.local
+
+# ========================
+# OS
+# ========================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ========================
+# Temp / cache
+# ========================
+*.tmp
+*.temp
+.cache/
