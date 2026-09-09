@@ -64,12 +64,12 @@ CREATE INDEX IF NOT EXISTS idx_crm_alerts_customer   ON crm_alerts(customer_id) 
 CREATE INDEX IF NOT EXISTS idx_crm_alerts_type_date  ON crm_alerts(alert_type, created_at DESC);
 
 -- 5. Permissions for new features
-INSERT INTO permissions (name, description) VALUES
-    ('CRM_CUSTOMER_VIEW',       'Xem danh sách khách hàng'),
-    ('CRM_CUSTOMER_EDIT',       'Chỉnh sửa khách hàng'),
-    ('CRM_LEAD_VIEW',           'Xem lead'),
-    ('CRM_LEAD_EDIT',           'Thêm/sửa lead'),
-    ('CRM_ALERT_VIEW',          'Xem cảnh báo CRM'),
-    ('CRM_ALERT_DISMISS',       'Đóng cảnh báo CRM'),
-    ('CRM_360_VIEW',            'Xem Customer 360')
-ON CONFLICT (name) DO NOTHING;
+INSERT INTO permissions (code, module, action) VALUES
+    ('CRM_CUSTOMER_VIEW',       'CRM_CUSTOMER', 'VIEW'),
+    ('CRM_CUSTOMER_EDIT',       'CRM_CUSTOMER', 'EDIT'),
+    ('CRM_LEAD_VIEW',           'CRM_LEAD',     'VIEW'),
+    ('CRM_LEAD_EDIT',           'CRM_LEAD',     'EDIT'),
+    ('CRM_ALERT_VIEW',          'CRM_ALERT',    'VIEW'),
+    ('CRM_ALERT_DISMISS',       'CRM_ALERT',    'DISMISS'),
+    ('CRM_360_VIEW',            'CRM',          'VIEW_360')
+ON CONFLICT (code) DO NOTHING;
