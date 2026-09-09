@@ -34,7 +34,7 @@ jobs:
         run: docker version
 
       - name: Run security guard tests
-        run: ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
+        run: bash ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
 
       - name: Upload Surefire reports
         if: always()
