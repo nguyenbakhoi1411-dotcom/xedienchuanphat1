@@ -1,0 +1,44 @@
+name: Security Guard Tests
+
+on:
+  push:
+    branches:
+      - security-role-guard-split
+  pull_request:
+    paths:
+      - "pom.xml"
+      - "src/main/java/**"
+      - "src/main/resources/**"
+      - "src/test/java/com/chuanphat/warranty/security/**"
+      - "src/test/java/com/chuanphat/warranty/PostgresIntegrationTest.java"
+      - ".github/workflows/security-guard-tests.yml"
+  workflow_dispatch:
+
+jobs:
+  security-guard-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Show Docker version
+        run: docker version
+
+      - name: Run security guard tests
+        run: ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
+
+      - name: Upload Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-security-guard-tests
+          path: target/surefire-reports/
