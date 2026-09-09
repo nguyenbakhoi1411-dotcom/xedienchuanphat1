@@ -33,8 +33,11 @@ jobs:
       - name: Show Docker version
         run: docker version
 
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
       - name: Run security guard tests
-        run: bash ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
+        run: ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
 
       - name: Upload Surefire reports
         if: always()
