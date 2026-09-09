@@ -37,7 +37,17 @@ jobs:
         run: chmod +x mvnw
 
       - name: Run security guard tests
-        run: ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
+        shell: bash
+        run: |
+          set +e
+          ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
+          status=$?
+          if [ "$status" -ne 0 ] && [ -d target/surefire-reports ]; then
+            echo "::group::Surefire failure reports"
+            find target/surefire-reports -maxdepth 1 -type f -name "*.txt" -print -exec sed -n '1,220p' {} \;
+            echo "::endgroup::"
+          fi
+          exit "$status"
 
       - name: Upload Surefire reports
         if: always()
