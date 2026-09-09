@@ -97,6 +97,7 @@ class InventoryServiceBusinessTest {
         ArgumentCaptor<InventoryTransaction> transactionCaptor = ArgumentCaptor.forClass(InventoryTransaction.class);
         verify(transactionRepository).save(transactionCaptor.capture());
         assertThat(transactionCaptor.getValue().getType()).isEqualTo(InventoryTransactionType.EXPORT);
+        assertThat(transactionCaptor.getValue().getCreatedBy()).isEqualTo("system");
     }
 
     private Product product(Long id) {

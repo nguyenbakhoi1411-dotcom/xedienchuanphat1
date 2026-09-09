@@ -359,6 +359,8 @@ public class AccountingLedgerService {
     private JournalEntry buildJournalEntry(JournalEntryRequest request, String createdBy) {
         JournalEntry entry = new JournalEntry();
         entry.setEntryDate(request.entryDate());
+        entry.setAccountingYear(request.entryDate().getYear());
+        entry.setAccountingMonth(request.entryDate().getMonthValue());
         entry.setReferenceType(request.referenceType());
         entry.setReferenceId(request.referenceId());
         entry.setDescription(request.description());

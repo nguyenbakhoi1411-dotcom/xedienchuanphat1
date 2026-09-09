@@ -63,6 +63,9 @@ public class InventoryTransaction {
     @Column(length = 500)
     private String note;
 
+    @Column(length = 120)
+    private String createdBy;
+
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -95,5 +98,7 @@ public class InventoryTransaction {
     public void setReferenceNo(String referenceNo) { this.referenceNo = referenceNo; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 }
