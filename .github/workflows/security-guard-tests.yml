@@ -46,6 +46,11 @@ jobs:
             echo "::group::Surefire failure reports"
             find target/surefire-reports -maxdepth 1 -type f -name "*.txt" -print -exec sed -n '1,220p' {} \;
             echo "::endgroup::"
+            report="$(find target/surefire-reports -maxdepth 1 -type f -name "*.txt" -print -quit)"
+            if [ -n "$report" ]; then
+              message="$(sed -n '1,120p' "$report" | python3 -c "import sys; s=sys.stdin.read(); print(s.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))")"
+              echo "::error title=Surefire failure report::$message"
+            fi
           fi
           exit "$status"
 
