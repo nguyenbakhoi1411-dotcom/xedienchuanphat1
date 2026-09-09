@@ -17,12 +17,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_journal_entries_entry_code
 -- 2. JournalEntryLine — thêm trường
 -- ========================
 ALTER TABLE journal_entry_lines
+    ADD COLUMN IF NOT EXISTS journal_entry_id BIGINT,
+    ADD COLUMN IF NOT EXISTS account_id BIGINT,
     ADD COLUMN IF NOT EXISTS customer_id   BIGINT,
     ADD COLUMN IF NOT EXISTS supplier_id   BIGINT,
     ADD COLUMN IF NOT EXISTS product_id    BIGINT,
     ADD COLUMN IF NOT EXISTS branch_id     BIGINT,
     ADD COLUMN IF NOT EXISTS cost_center_id BIGINT,
     ADD COLUMN IF NOT EXISTS tax_amount    NUMERIC(18,2) DEFAULT 0;
+
+UPDATE journal_entry_lines
+SET journal_entry_id = entry_id
+WHERE journal_entry_id IS NULL
+  AND entry_id IS NOT NULL;
+
+UPDATE journal_entry_lines line
+SET account_id = account.id
+FROM chart_of_accounts account
+WHERE line.account_id IS NULL
+  AND line.account_code = account.account_code;
 
 -- ========================
 -- 3. TaxInvoice — hóa đơn VAT (đầu vào / đầu ra)
