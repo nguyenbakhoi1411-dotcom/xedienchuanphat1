@@ -101,6 +101,28 @@ CREATE TABLE IF NOT EXISTS payables (
     CONSTRAINT chk_payable_status CHECK (status IN ('OPEN','PARTIAL','PAID','OVERDUE','CANCELLED'))
 );
 
+ALTER TABLE payables
+    ADD COLUMN IF NOT EXISTS payable_code VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS branch_id BIGINT,
+    ADD COLUMN IF NOT EXISTS source_id BIGINT,
+    ADD COLUMN IF NOT EXISTS original_amount NUMERIC(14,2),
+    ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS remaining_amount NUMERIC(14,2),
+    ADD COLUMN IF NOT EXISTS invoice_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    ADD COLUMN IF NOT EXISTS note VARCHAR(500),
+    ADD COLUMN IF NOT EXISTS created_by VARCHAR(120),
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+UPDATE payables
+SET original_amount = COALESCE(original_amount, debit_amount, 0),
+    remaining_amount = COALESCE(remaining_amount, debit_amount, 0),
+    invoice_date = COALESCE(invoice_date, transaction_date, CURRENT_DATE),
+    note = COALESCE(note, description)
+WHERE original_amount IS NULL
+   OR remaining_amount IS NULL
+   OR note IS NULL;
+
 -- ── 6. Chi tiet tung lan thanh toan cong no ─────────────────────
 CREATE TABLE IF NOT EXISTS payable_payments (
     id              BIGSERIAL PRIMARY KEY,
