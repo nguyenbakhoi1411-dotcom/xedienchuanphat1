@@ -34,10 +34,10 @@ app:
     mode: ${AI_MODE:mock}
   security:
     bootstrap-admin:
-      # Dev: bật sẵn admin mặc định để tiện phát triển
-      enabled: ${BOOTSTRAP_ADMIN_ENABLED:true}
+      # Dev: set BOOTSTRAP_ADMIN_ENABLED=true and BOOTSTRAP_ADMIN_* locally if needed.
+      enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
       username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
-      password: ${BOOTSTRAP_ADMIN_PASSWORD:Admin@123}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
       email: ${BOOTSTRAP_ADMIN_EMAIL:admin@chuanphat.vn}
       phone: ${BOOTSTRAP_ADMIN_PHONE:0909000001}
       full-name: ${BOOTSTRAP_ADMIN_FULL_NAME:Admin Chuan Phat}
@@ -66,5 +66,5 @@ app:
         http://172.30.*:*,
         http://172.31.*:*}
     jwt:
-      # Dev secret — THAY BẰNG SECRET THỰC TRƯỚC KHI PRODUCTION
-      secret: ${JWT_SECRET:dev-only-change-before-production-64-character-secret}
+      # Dev-only placeholder. Set JWT_SECRET locally for shared environments.
+      secret: ${JWT_SECRET:CHANGE_ME_DEV_ONLY_LOCAL_JWT_SECRET_NOT_FOR_SHARED_ENVIRONMENTS}

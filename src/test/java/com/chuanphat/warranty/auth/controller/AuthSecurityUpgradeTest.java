@@ -22,7 +22,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "app.security.bootstrap-admin.enabled=true",
+        "app.security.bootstrap-admin.username=admin",
+        "app.security.bootstrap-admin.password=TEST_ONLY_ADMIN_PASSWORD",
+        "app.security.bootstrap-admin.email=admin@chuanphat.vn",
+        "app.security.bootstrap-admin.full-name=Admin Chuan Phat"
+})
 @AutoConfigureMockMvc
 class AuthSecurityUpgradeTest {
     @Autowired
@@ -37,7 +43,7 @@ class AuthSecurityUpgradeTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "identifier", "admin",
-                                "password", "Admin@123",
+                                "password", "TEST_ONLY_ADMIN_PASSWORD",
                                 "rememberMe", false
                         ))))
                 .andExpect(status().isOk())
