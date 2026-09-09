@@ -1,7 +1,6 @@
 package com.chuanphat.warranty.core.service;
 
 import com.chuanphat.warranty.common.dto.PageResponse;
-import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.dto.SupplierDto;
 import com.chuanphat.warranty.core.dto.SupplierRequest;
 import com.chuanphat.warranty.core.entity.Supplier;
@@ -12,13 +11,15 @@ import com.chuanphat.warranty.core.repository.SupplierRepository;
 import com.chuanphat.warranty.exception.BusinessException;
 import com.chuanphat.warranty.exception.ConflictException;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * SupplierService — CRUD + cong no NCC.
+ * SupplierService — CRUD + cong no NCC + search autocomplete.
  */
 @Service
 @Transactional
@@ -51,20 +52,40 @@ public class SupplierService {
         return SupplierDto.from(findById(id));
     }
 
+    /** Autocomplete: tim theo ten / MST / ma NCC */
+    @Transactional(readOnly = true)
+    public List<SupplierDto> search(String q) {
+        if (q == null || q.isBlank()) {
+            var pageable = PageRequest.of(0, 10, Sort.by("name"));
+            return supplierRepo.findAll(pageable)
+                    .stream().map(SupplierDto::from).collect(Collectors.toList());
+        }
+        return supplierRepo.findTop10ByStatusAndNameContainingIgnoreCaseOrCodeContainingIgnoreCaseOrTaxCodeContaining(
+                RecordStatus.ACTIVE, q, q, q)
+                .stream().map(SupplierDto::from).collect(Collectors.toList());
+    }
+
     // ── CREATE / UPDATE ────────────────────────────────────────────
 
     public SupplierDto create(SupplierRequest req) {
-        if (supplierRepo.existsByCodeIgnoreCase(req.code())) {
-            throw new ConflictException("Mã NCC đã tồn tại: " + req.code());
-        }
         Supplier s = new Supplier();
+        // Tu sinh ma NCC neu khong truyen
+        String code = req.code();
+        if (code == null || code.isBlank()) {
+            code = generateSupplierCode();
+        } else if (supplierRepo.existsByCodeIgnoreCase(code)) {
+            throw new ConflictException("Mã NCC đã tồn tại: " + code);
+        }
+        s.setCode(code);
         applyRequest(s, req);
         return SupplierDto.from(supplierRepo.save(s));
     }
 
     public SupplierDto update(Long id, SupplierRequest req) {
         Supplier s = findById(id);
-        if (!s.getCode().equalsIgnoreCase(req.code()) && supplierRepo.existsByCodeIgnoreCase(req.code())) {
+        if (req.code() != null && !req.code().isBlank()
+                && !s.getCode().equalsIgnoreCase(req.code())
+                && supplierRepo.existsByCodeIgnoreCase(req.code())) {
             throw new ConflictException("Mã NCC đã tồn tại: " + req.code());
         }
         applyRequest(s, req);
@@ -74,6 +95,12 @@ public class SupplierService {
     public SupplierDto deactivate(Long id) {
         Supplier s = findById(id);
         s.setStatus(RecordStatus.INACTIVE);
+        return SupplierDto.from(supplierRepo.save(s));
+    }
+
+    public SupplierDto activate(Long id) {
+        Supplier s = findById(id);
+        s.setStatus(RecordStatus.ACTIVE);
         return SupplierDto.from(supplierRepo.save(s));
     }
 
@@ -97,16 +124,24 @@ public class SupplierService {
     // ── PRIVATE ────────────────────────────────────────────────────
 
     private void applyRequest(Supplier s, SupplierRequest req) {
-        s.setCode(req.code());
         s.setName(req.name());
+        s.setTenVietTat(req.tenVietTat());
         s.setTaxCode(req.taxCode());
         s.setPhone(req.phone());
         s.setEmail(req.email());
         s.setWebsite(req.website());
         s.setAddress(req.address());
+        s.setTinhThanh(req.tinhThanh());
         s.setContactPerson(req.contactPerson());
+        s.setChucVuNguoiLH(req.chucVuNguoiLH());
+        s.setDienThoaiNguoiLH(req.dienThoaiNguoiLH());
+        s.setEmailNguoiLH(req.emailNguoiLH());
+        s.setSoTaiKhoanNH(req.soTaiKhoanNH());
+        s.setTenNganHang(req.tenNganHang());
+        s.setChiNhanhNH(req.chiNhanhNH());
         s.setCreditLimit(req.creditLimit() != null ? req.creditLimit() : BigDecimal.ZERO);
         s.setPaymentTermsDays(req.paymentTermsDays() > 0 ? req.paymentTermsDays() : 30);
+        if (req.phuongThucTT() != null) s.setPhuongThucTT(req.phuongThucTT());
         s.setRating(req.rating());
         s.setNotes(req.notes());
         if (req.groupId() != null) {
@@ -116,8 +151,15 @@ public class SupplierService {
         }
     }
 
+    private String generateSupplierCode() {
+        // Lay max sequence tu ma hien co
+        long maxSeq = supplierRepo.count() + 1;
+        return String.format("NCC-%04d", maxSeq);
+    }
+
     public Supplier findById(Long id) {
         return supplierRepo.findById(id)
                 .orElseThrow(() -> new BusinessException("Không tìm thấy nhà cung cấp: " + id));
     }
 }
+

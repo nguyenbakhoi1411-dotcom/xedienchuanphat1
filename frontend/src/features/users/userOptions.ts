@@ -34,7 +34,7 @@ export const permissionModules: Array<{ value: PermissionModule; label: string }
   { value: "products", label: "San pham" },
   { value: "inventory", label: "Kho" },
   { value: "sales", label: "Ban hang" },
-  { value: "invoice", label: "Hoa don" },
+  { value: "invoice", label: "Hóa đơn" },
   { value: "customers", label: "Khach hang" },
   { value: "warranty", label: "Bao hanh" },
   { value: "suppliers", label: "Nha cung cap" },

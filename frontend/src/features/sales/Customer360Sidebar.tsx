@@ -24,8 +24,8 @@ interface Props {
 }
 
 /**
- * Customer360Sidebar — hien thi lich su 360 cua khach hang duoc chon.
- * Mo ra khi click vao ten khach hang tren POS.
+ * Customer360Sidebar — hiển thị lịch sử 360 của khách hàng được chọn.
+ * Mở ra khi click vào tên khách hàng trên POS.
  */
 export function Customer360Sidebar({ customer, onClose }: Props) {
   const { data: info, isLoading } = useQuery({

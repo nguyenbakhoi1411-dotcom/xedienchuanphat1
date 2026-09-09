@@ -43,7 +43,7 @@ class ErpPermissionControllerTest {
                                         Map.of("branchId", 1, "accessLevel", "MANAGE"),
                                         Map.of("branchId", 2, "accessLevel", "VIEW")
                                 ),
-                                "roles", List.of("SALES", "WAREHOUSE"),
+                                "roles", List.of("SALES_STAFF", "WAREHOUSE_STAFF"),
                                 "status", "ACTIVE",
                                 "password", "ChangeMe@123"
                         ))))
@@ -71,7 +71,7 @@ class ErpPermissionControllerTest {
     void userCannotReadAnotherBranchInventory() throws Exception {
         mockMvc.perform(get("/api/inventory/stocks")
                         .param("branchId", "2")
-                        .with(user("sales1").authorities(
+                        .with(user("sales").authorities(
                                 new SimpleGrantedAuthority("ROLE_USER"),
                                 new SimpleGrantedAuthority("INVENTORY_VIEW")
                         )))

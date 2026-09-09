@@ -68,6 +68,19 @@ public class GoodsIssue {
 
     private OffsetDateTime issuedAt;
 
+    /** Bổ sung AMIS fields */
+    @Column(length = 120)
+    private String receiverName; // Người nhận
+
+    @Column(length = 120)
+    private String salesPerson; // Nhân viên bán hàng
+
+    @Column(length = 255)
+    private String deliveryAddress; // Địa điểm giao hàng
+
+    @Column(length = 80)
+    private String customerCode; // Mã khách hàng
+
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -99,6 +112,16 @@ public class GoodsIssue {
     public void setIssuedBy(String issuedBy) { this.issuedBy = issuedBy; }
     public OffsetDateTime getIssuedAt() { return issuedAt; }
     public void setIssuedAt(OffsetDateTime issuedAt) { this.issuedAt = issuedAt; }
+
+    public String getReceiverName() { return receiverName; }
+    public void setReceiverName(String receiverName) { this.receiverName = receiverName; }
+    public String getSalesPerson() { return salesPerson; }
+    public void setSalesPerson(String salesPerson) { this.salesPerson = salesPerson; }
+    public String getDeliveryAddress() { return deliveryAddress; }
+    public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
+    public String getCustomerCode() { return customerCode; }
+    public void setCustomerCode(String customerCode) { this.customerCode = customerCode; }
+
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public List<GoodsIssueItem> getItems() { return items; }
     public void addItem(GoodsIssueItem item) { items.add(item); item.setGoodsIssue(this); }

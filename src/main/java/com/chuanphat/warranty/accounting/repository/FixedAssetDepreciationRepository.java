@@ -20,4 +20,6 @@ public interface FixedAssetDepreciationRepository extends JpaRepository<FixedAss
 
     @Query("SELECT COALESCE(SUM(d.amount), 0) FROM FixedAssetDepreciation d WHERE d.asset.id = :assetId")
     java.math.BigDecimal sumTotalByAsset(@Param("assetId") Long assetId);
+
+    long countByAsset_Id(Long assetId);
 }

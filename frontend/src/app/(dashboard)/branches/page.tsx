@@ -72,7 +72,7 @@ export default function BranchesPage() {
             className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-orange-100"
           />
         </div>
-        <p className="text-sm text-slate-500">{data ? `${data.totalItems} chi nhanh` : "Dang tai du lieu"}</p>
+        <p className="text-sm text-slate-500">{data ? `${data.totalItems} chi nhanh` : "Đang tải dữ liệu"}</p>
       </section>
 
       <BranchTable

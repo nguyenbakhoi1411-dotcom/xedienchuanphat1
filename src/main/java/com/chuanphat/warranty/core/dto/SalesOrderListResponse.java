@@ -25,6 +25,10 @@ public record SalesOrderListResponse(
         OffsetDateTime reservationUntil,
         OffsetDateTime createdAt,
         String note,
+        String deliveryStatus,
+        String ecommercePlatform,
+        String shopName,
+        String storeCode,
         long itemCount
 ) {
     public SalesOrderListResponse(
@@ -45,6 +49,10 @@ public record SalesOrderListResponse(
             OffsetDateTime reservationUntil,
             OffsetDateTime createdAt,
             String note,
+            String deliveryStatus,
+            String ecommercePlatform,
+            String shopName,
+            String storeCode,
             long itemCount
     ) {
         this(
@@ -66,6 +74,10 @@ public record SalesOrderListResponse(
                 reservationUntil,
                 createdAt,
                 note,
+                deliveryStatus,
+                ecommercePlatform,
+                shopName,
+                storeCode,
                 itemCount
         );
     }

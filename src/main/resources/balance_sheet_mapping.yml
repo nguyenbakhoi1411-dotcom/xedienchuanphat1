@@ -1,0 +1,70 @@
+chỉ_tiêu:
+  - ma: "110"
+    ten: "Tiền và các khoản tương đương tiền"
+    cong_tk_no: ["111", "112", "113"]
+    cong_tk_co: []
+  - ma: "131"
+    ten: "Phải thu ngắn hạn của khách hàng"
+    cong_tk_no: ["131"]
+    cong_tk_co: []
+    chi_lay_du: "NO"
+  - ma: "132"
+    ten: "Trả trước cho người bán ngắn hạn"
+    cong_tk_no: ["331"]
+    cong_tk_co: []
+    chi_lay_du: "NO"
+  - ma: "133"
+    ten: "Phải thu nội bộ ngắn hạn"
+    cong_tk_no: ["1362", "1363"]
+    cong_tk_co: []
+  - ma: "136"
+    ten: "Phải thu ngắn hạn khác"
+    cong_tk_no: ["1385", "1388"]
+    cong_tk_co: []
+  - ma: "141"
+    ten: "Hàng tồn kho"
+    cong_tk_no: ["151", "152", "153", "154", "155", "156", "157", "158"]
+    cong_tk_co: []
+  - ma: "211"
+    ten: "Tài sản cố định hữu hình"
+    cong_tk_no: ["211"]
+    cong_tk_co: []
+  - ma: "212"
+    ten: "Giá trị hao mòn lũy kế"
+    cong_tk_no: []
+    cong_tk_co: ["2141"] # Hao mòn là số âm trên báo cáo
+  - ma: "270"
+    ten: "TỔNG CỘNG TÀI SẢN"
+    cong_tk_no: []
+    cong_tk_co: []
+    # Đây là chỉ tiêu tính tổng, ta sẽ code logic sum các mã 100 đến 269
+  - ma: "311"
+    ten: "Phải trả người bán ngắn hạn"
+    cong_tk_no: []
+    cong_tk_co: ["331"]
+    chi_lay_du: "CO"
+  - ma: "312"
+    ten: "Người mua trả tiền trước ngắn hạn"
+    cong_tk_no: []
+    cong_tk_co: ["131"]
+    chi_lay_du: "CO"
+  - ma: "313"
+    ten: "Thuế và các khoản phải nộp Nhà nước"
+    cong_tk_no: []
+    cong_tk_co: ["333"]
+  - ma: "314"
+    ten: "Phải trả người lao động"
+    cong_tk_no: []
+    cong_tk_co: ["334"]
+  - ma: "411"
+    ten: "Vốn góp của chủ sở hữu"
+    cong_tk_no: []
+    cong_tk_co: ["4111"]
+  - ma: "421"
+    ten: "Lợi nhuận sau thuế chưa phân phối"
+    cong_tk_no: []
+    cong_tk_co: ["421"]
+  - ma: "440"
+    ten: "TỔNG CỘNG NGUỒN VỐN"
+    cong_tk_no: []
+    cong_tk_co: []

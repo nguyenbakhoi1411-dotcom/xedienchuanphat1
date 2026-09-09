@@ -44,8 +44,43 @@ public class PurchaseOrder {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    /** Tien hang (chua CK, chua thue) */
+    @Column(nullable = false, precision = 18, scale = 0)
+    private BigDecimal tongTienHang = BigDecimal.ZERO;
+
+    /** Tong chiet khau */
+    @Column(nullable = false, precision = 18, scale = 0)
+    private BigDecimal tongChietKhau = BigDecimal.ZERO;
+
+    /** Tong thue GTGT */
+    @Column(nullable = false, precision = 18, scale = 0)
+    private BigDecimal tongThueGtgt = BigDecimal.ZERO;
+
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal paidAmount = BigDecimal.ZERO;
+
+    /** CASH | BANK | DEBT */
+    @Column(length = 10)
+    private String hinhThucTT = "DEBT";
+
+    /** Ngay den han thanh toan */
+    private LocalDate hanThanhToan;
+
+    /** UNPAID | PARTIAL | PAID */
+    @Column(length = 20)
+    private String trangThaiThanhToan = "UNPAID";
+
+    /** Nguoi phu trach don mua */
+    @Column(length = 255)
+    private String nguoiPhuTrach;
+
+    /** Dia chi nhan hang */
+    @Column(columnDefinition = "TEXT")
+    private String diaChiGiaoHang;
+
+    /** Duong dan file hoa don NCC */
+    @Column(length = 500)
+    private String fileHoaDonNcc;
 
     /** Han muc tu dong duyet (vuot muc nay can PENDING_APPROVAL) */
     @Column(nullable = false, precision = 14, scale = 2)
@@ -116,10 +151,28 @@ public class PurchaseOrder {
     public void setPurchaseDate(LocalDate purchaseDate) { this.purchaseDate = purchaseDate; }
     public LocalDate getExpectedDelivery() { return expectedDelivery; }
     public void setExpectedDelivery(LocalDate expectedDelivery) { this.expectedDelivery = expectedDelivery; }
+    public BigDecimal getTongTienHang() { return tongTienHang; }
+    public void setTongTienHang(BigDecimal v) { this.tongTienHang = v == null ? BigDecimal.ZERO : v; }
+    public BigDecimal getTongChietKhau() { return tongChietKhau; }
+    public void setTongChietKhau(BigDecimal v) { this.tongChietKhau = v == null ? BigDecimal.ZERO : v; }
+    public BigDecimal getTongThueGtgt() { return tongThueGtgt; }
+    public void setTongThueGtgt(BigDecimal v) { this.tongThueGtgt = v == null ? BigDecimal.ZERO : v; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+    public String getHinhThucTT() { return hinhThucTT; }
+    public void setHinhThucTT(String v) { this.hinhThucTT = v; }
+    public LocalDate getHanThanhToan() { return hanThanhToan; }
+    public void setHanThanhToan(LocalDate v) { this.hanThanhToan = v; }
+    public String getTrangThaiThanhToan() { return trangThaiThanhToan; }
+    public void setTrangThaiThanhToan(String v) { this.trangThaiThanhToan = v; }
+    public String getNguoiPhuTrach() { return nguoiPhuTrach; }
+    public void setNguoiPhuTrach(String v) { this.nguoiPhuTrach = v; }
+    public String getDiaChiGiaoHang() { return diaChiGiaoHang; }
+    public void setDiaChiGiaoHang(String v) { this.diaChiGiaoHang = v; }
+    public String getFileHoaDonNcc() { return fileHoaDonNcc; }
+    public void setFileHoaDonNcc(String v) { this.fileHoaDonNcc = v; }
     public BigDecimal getApprovalThreshold() { return approvalThreshold; }
     public void setApprovalThreshold(BigDecimal approvalThreshold) { this.approvalThreshold = approvalThreshold; }
     public String getNote() { return note; }
@@ -154,4 +207,21 @@ public class PurchaseOrder {
     public boolean isSerialsCreated() { return serialsCreated; }
     public void setSerialsCreated(boolean serialsCreated) { this.serialsCreated = serialsCreated; }
     public List<PurchaseOrderItem> getItems() { return items; }
+
+    /** Tinh lai trang_thai_thanh_toan sau khi thanh toan */
+    public void recalcPaymentStatus() {
+        if (paidAmount == null || paidAmount.compareTo(BigDecimal.ZERO) == 0) {
+            this.trangThaiThanhToan = "UNPAID";
+        } else if (paidAmount.compareTo(totalAmount) >= 0) {
+            this.trangThaiThanhToan = "PAID";
+        } else {
+            this.trangThaiThanhToan = "PARTIAL";
+        }
+    }
+
+    public BigDecimal getConLaiPhaiTra() {
+        BigDecimal paid = paidAmount == null ? BigDecimal.ZERO : paidAmount;
+        BigDecimal total = totalAmount == null ? BigDecimal.ZERO : totalAmount;
+        return total.subtract(paid).max(BigDecimal.ZERO);
+    }
 }

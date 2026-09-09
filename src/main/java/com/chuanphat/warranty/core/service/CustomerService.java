@@ -67,6 +67,30 @@ public class CustomerService {
         return customerRepository.findById(id).orElseThrow(() -> new NotFoundException("Customer not found: " + id));
     }
 
+    @Transactional
+    public void delete(Long id) {
+        Customer customer = get(id);
+        branchSecurity.requireBranchAccess(customer.getBranchId());
+        if (salesOrderRepository.countByCustomerId(id) > 0) {
+            throw new BusinessException("Cannot delete customer with existing sales orders");
+        }
+        customer.setStatus(RecordStatus.DELETED);
+        customerRepository.save(customer);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<CustomerDto> searchSimple(String keyword) {
+        Long scopedBranchId = branchSecurity.scopedBranchId(null, false);
+        String search = keyword == null ? "" : keyword;
+        PageRequest limit = PageRequest.of(0, 10);
+        if (scopedBranchId == null) {
+            return customerRepository.findByStatusNotAndFullNameContainingIgnoreCase(RecordStatus.DELETED, search, limit)
+                    .map(CustomerDto::from).toList();
+        }
+        return customerRepository.findByStatusNotAndBranchIdAndFullNameContainingIgnoreCase(RecordStatus.DELETED, scopedBranchId, search, limit)
+                .map(CustomerDto::from).toList();
+    }
+
     // ── Customer 360 ──
 
     /**
@@ -133,5 +157,24 @@ public class CustomerService {
         customer.setBirthday(request.birthday());
         customer.setTier(request.tier() == null ? CustomerTier.NEW : request.tier());
         customer.setStatus(request.status() == null ? RecordStatus.ACTIVE : request.status());
+
+        customer.setOrganization(request.isOrganization());
+        customer.setSupplier(request.isSupplier());
+        customer.setInternal(request.isInternal());
+        customer.setTaxUnitCode(request.taxUnitCode());
+        customer.setWebsite(request.website());
+        customer.setCustomerGroup(request.customerGroup());
+        customer.setSalesEmployee(request.salesEmployee());
+        customer.setContactTitle(request.contactTitle());
+        customer.setContactName(request.contactName());
+        customer.setContactEmail(request.contactEmail());
+        customer.setContactMobilePhone(request.contactMobilePhone());
+        customer.setLegalRepresentative(request.legalRepresentative());
+        customer.setInvoiceRecipientName(request.invoiceRecipientName());
+        customer.setInvoiceRecipientEmail(request.invoiceRecipientEmail());
+        customer.setInvoiceRecipientPhone(request.invoiceRecipientPhone());
+        customer.setBankAccountNumber(request.bankAccountNumber());
+        customer.setBankName(request.bankName());
+        customer.setBankBranch(request.bankBranch());
     }
 }

@@ -29,7 +29,7 @@ type CustomerDetailDrawerProps = {
 const tabs: Array<{ value: DetailTab; label: string }> = [
   { value: "info", label: "Thong tin" },
   { value: "purchases", label: "Lich su mua hang" },
-  { value: "payments", label: "Thanh toan & no" },
+  { value: "payments", label: "Thanh toán & no" },
   { value: "warranty", label: "Bao hanh/sua chua" },
   { value: "notes", label: "Ghi chu" },
   { value: "reminders", label: "Nhac lich" },
@@ -58,7 +58,7 @@ export function CustomerDetailDrawer({
         <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-text">{customer?.fullName ?? "Chi tiet khach hang"}</h2>
-            <p className="mt-1 text-sm text-slate-500">{customer?.phone ?? "Dang tai du lieu"}</p>
+            <p className="mt-1 text-sm text-slate-500">{customer?.phone ?? "Đang tải dữ liệu"}</p>
           </div>
           <button className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-orange-50 hover:text-primary" onClick={onClose}>
             <X className="h-5 w-5" />
@@ -139,7 +139,7 @@ function InfoTab({ customer }: { customer: CustomerDetail }) {
 
 function PurchaseTab({ customer }: { customer: CustomerDetail }) {
   if (customer.purchases.length === 0) return <EmptyState title="Chua co lich su mua hang" />;
-  return <SimpleTable headers={["Hoa don", "Ngay", "San pham", "Serial", "So tien", "Trang thai"]} rows={customer.purchases.map((item) => [item.invoiceNo ?? "-", item.purchaseDate ?? "-", item.productName ?? "-", item.serialNumber ?? "-", formatCurrency(item.amount), item.paymentStatus ?? "-"])} />;
+  return <SimpleTable headers={["Hóa đơn", "Ngay", "San pham", "Serial", "So tien", "Trang thai"]} rows={customer.purchases.map((item) => [item.invoiceNo ?? "-", item.purchaseDate ?? "-", item.productName ?? "-", item.serialNumber ?? "-", formatCurrency(item.amount), item.paymentStatus ?? "-"])} />;
 }
 
 function WarrantyTab({ customer }: { customer: CustomerDetail }) {
@@ -159,7 +159,7 @@ function PaymentTab({ customer }: { customer: CustomerDetail }) {
         <InfoCard label="Cong no hien tai" value={formatCurrency(customer.debtAmount)} />
         <InfoCard label="Canh bao" value={customer.overdueDebtWarning ? "Khach co no qua han/can thu" : "Binh thuong"} />
       </div>
-      {rows.length === 0 ? <EmptyState title="Chua co lich su thanh toan" /> : <SimpleTable headers={["Don hang", "Ngay", "Phuong thuc", "So tien", "Tham chieu"]} rows={rows} />}
+      {rows.length === 0 ? <EmptyState title="Chua co lich su thanh toan" /> : <SimpleTable headers={["Đơn hàng", "Ngay", "Phuong thuc", "So tien", "Tham chieu"]} rows={rows} />}
     </div>
   );
 }

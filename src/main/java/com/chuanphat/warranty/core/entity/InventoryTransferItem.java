@@ -14,7 +14,7 @@ public class InventoryTransferItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "transfer_id", nullable = false)
     private Long transferId;
 
     @ManyToOne(fetch = FetchType.LAZY)

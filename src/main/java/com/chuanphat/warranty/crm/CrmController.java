@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/crm")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class CrmController {
     private final CrmService service;
 
@@ -184,3 +185,4 @@ public class CrmController {
         return service.reports();
     }
 }
+

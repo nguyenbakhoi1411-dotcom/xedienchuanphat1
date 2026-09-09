@@ -41,6 +41,12 @@ public record SalesOrderResponse(
         boolean accountingRecorded,
         boolean stockIssued,
         boolean warrantyCreated,
+        
+        String deliveryStatus,
+        String ecommercePlatform,
+        String shopName,
+        String storeCode,
+
         List<SalesOrderItemResponse> items
 ) {
     public static SalesOrderResponse from(SalesOrder order) {
@@ -73,6 +79,10 @@ public record SalesOrderResponse(
                 order.isAccountingRecorded(),
                 order.isStockIssued(),
                 order.isWarrantyCreated(),
+                order.getDeliveryStatus(),
+                order.getEcommercePlatform(),
+                order.getShopName(),
+                order.getStoreCode(),
                 order.getItems().stream().map(SalesOrderItemResponse::from).toList()
         );
     }

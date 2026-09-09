@@ -1,60 +1,61 @@
-import axios from "axios";
-import {
-  clearAccessToken,
-  getAccessToken,
-  getRefreshToken,
-  isRememberedSession,
-  saveAccessToken
-} from "@/lib/auth/token";
+import axios from 'axios';
+import { getAccessToken, clearAccessToken } from '@/lib/auth/token';
 
-export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080",
-  timeout: 20_000
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+const axiosInstance = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 15000,
 });
 
-api.interceptors.request.use((config) => {
-  const token = getAccessToken();
+// ── Request interceptor: đính kèm JWT token vào mỗi request ──
+axiosInstance.interceptors.request.use(
+  (config) => {
+    if (typeof window !== 'undefined') {
+      const token = getAccessToken();
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
-});
-
-api.interceptors.response.use(
+// ── Response interceptor: xử lý lỗi 401 ──
+axiosInstance.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  (error) => {
+    if (axios.isAxiosError(error)) {
+      // Nếu 401 và không phải đang call login → xóa token + redirect về login
+      if (
+        error.response?.status === 401 &&
+        typeof window !== 'undefined' &&
+        !error.config?.url?.includes('/api/auth/login')
+      ) {
+        clearAccessToken();
+        // Chỉ redirect nếu chưa ở trang login
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
 
-    if (
-      error.response?.status !== 401 ||
-      originalRequest?._retry ||
-      originalRequest?.url?.includes("/api/auth/refresh")
-    ) {
-      return Promise.reject(error);
+      // Không có response = không kết nối được server
+      if (!error.response) {
+        return Promise.reject(
+          new Error(
+            `Không thể kết nối máy chủ (${BASE_URL}). ` +
+            `Vui lòng kiểm tra Backend đã khởi động chưa.`
+          )
+        );
+      }
     }
-
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) {
-      clearAccessToken();
-      return Promise.reject(error);
-    }
-
-    originalRequest._retry = true;
-
-    try {
-      const response = await axios.post<{ accessToken: string }>(
-        `${api.defaults.baseURL}/api/auth/refresh`,
-        { refreshToken },
-        { timeout: 20_000 }
-      );
-      saveAccessToken(response.data.accessToken, isRememberedSession());
-      originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
-      return api(originalRequest);
-    } catch (refreshError) {
-      clearAccessToken();
-      return Promise.reject(refreshError);
-    }
+    return Promise.reject(error);
   }
 );
+
+export const api = axiosInstance;
+export default axiosInstance;

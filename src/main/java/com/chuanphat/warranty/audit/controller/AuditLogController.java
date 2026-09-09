@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/audit-logs")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class AuditLogController {
     private final AuditLogService auditLogService;
 
@@ -65,3 +66,4 @@ public class AuditLogController {
                 .body(content);
     }
 }
+

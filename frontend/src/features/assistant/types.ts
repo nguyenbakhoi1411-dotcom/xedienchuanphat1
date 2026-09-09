@@ -39,4 +39,5 @@ export type AssistantMessage = {
   role: "user" | "assistant";
   text: string;
   response?: AssistantResponse;
+  timestamp?: Date;
 };

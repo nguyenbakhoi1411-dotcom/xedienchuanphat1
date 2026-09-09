@@ -1,5 +1,6 @@
 export type AccountingTab =
   | "overview"
+  | "general_operations"
   | "accounts"
   | "journal"
   | "receipts"
@@ -7,9 +8,11 @@ export type AccountingTab =
   | "debts"
   | "reports"
   | "cashflow"
-  | "tax-invoices"
   | "expenses"
   | "fixed-assets"
+  | "cost-centers"
+  | "recurring-journals"
+  | "tax-invoices"
   | "vat-report";
 
 export type PaymentMethod = "CASH" | "BANK_TRANSFER" | "CARD" | "E_WALLET" | "INSTALLMENT";
@@ -372,3 +375,24 @@ export type CreateFixedAssetPayload = {
   supplierName?: string;
   note?: string;
 };
+
+export type OpeningBalanceRow = {
+  id?: number;
+  periodId: number;
+  accountCode: string;
+  customerId?: number | null;
+  customerName?: string | null;
+  supplierId?: number | null;
+  supplierName?: string | null;
+  debitBalance: number;
+  creditBalance: number;
+  note?: string | null;
+  branchId: number;
+  createdBy?: string;
+  lockedAt?: string | null;
+};
+
+export type OpeningBalanceLockPayload = {
+  periodId: number;
+};
+

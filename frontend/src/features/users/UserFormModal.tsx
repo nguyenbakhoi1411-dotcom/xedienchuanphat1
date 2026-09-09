@@ -130,7 +130,7 @@ function toFormValues(user: EmployeeUser): UserFormValues {
     email: user.email,
     phone: user.phone,
     branchIds: user.branchIds,
-    roles: user.roles,
+    roles: user.roles as any,
     status: user.status
   };
 }

@@ -6,8 +6,10 @@ import { cn } from '@/lib/utils';
 import { IncomeStatementReport, IncomeStatementItem } from '../types';
 
 interface IncomeStatementViewerProps {
-  report: IncomeStatementReport;
+  report?: IncomeStatementReport;
   isLoading?: boolean;
+  fromDate?: string;
+  toDate?: string;
 }
 
 interface RowProps {
@@ -15,7 +17,8 @@ interface RowProps {
   level: number;
 }
 
-function IncomeStatementRow({ item, level }: RowProps) {
+function IncomeStatementRow({ item: _item, level }: RowProps) {
+  const item = _item as any;
   const formatCurrency = (value: number | undefined) => {
     if (value === undefined) return '-';
     const formatted = Math.abs(value).toLocaleString('vi-VN');
@@ -72,8 +75,9 @@ function IncomeStatementRow({ item, level }: RowProps) {
   );
 }
 
-export function IncomeStatementViewer({ report, isLoading = false }: IncomeStatementViewerProps) {
-  if (isLoading) {
+export function IncomeStatementViewer({ report: _report, isLoading = false, fromDate, toDate }: IncomeStatementViewerProps) {
+  const report = _report as any;
+  if (isLoading || !report) {
     return (
       <div className="space-y-4">
         {[...Array(8)].map((_, i) => (
@@ -94,6 +98,17 @@ export function IncomeStatementViewer({ report, isLoading = false }: IncomeState
     return `${value.toFixed(2)}%`;
   };
 
+  const fmtDate = (d: string | null | undefined) => {
+    if (!d) return '';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return d;
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -101,7 +116,12 @@ export function IncomeStatementViewer({ report, isLoading = false }: IncomeState
         <h2 className="font-semibold text-gray-900">
           <div className="flex items-center gap-2">
             <TrendingUp size={20} className="text-green-600" />
-            Báo cáo kết quả hoạt động (B02-DN)
+            <span>Báo cáo kết quả hoạt động (B02-DN)</span>
+            {fromDate && toDate && (
+              <span className="text-xs text-gray-500 font-normal">
+                (Từ ngày {fmtDate(fromDate)} đến ngày {fmtDate(toDate)})
+              </span>
+            )}
           </div>
         </h2>
         <div className="flex items-center gap-2">
@@ -197,7 +217,7 @@ export function IncomeStatementViewer({ report, isLoading = false }: IncomeState
               </td>
             </tr>
             {report.revenueSection &&
-              report.revenueSection.map((item) => (
+              report.revenueSection.map((item: any) => (
                 <IncomeStatementRow key={`${item.code}-${item.name}`} item={item} level={1} />
               ))}
 
@@ -208,7 +228,7 @@ export function IncomeStatementViewer({ report, isLoading = false }: IncomeState
               </td>
             </tr>
             {report.grossProfitSection &&
-              report.grossProfitSection.map((item) => (
+              report.grossProfitSection.map((item: any) => (
                 <IncomeStatementRow key={`${item.code}-${item.name}`} item={item} level={1} />
               ))}
 
@@ -219,7 +239,7 @@ export function IncomeStatementViewer({ report, isLoading = false }: IncomeState
               </td>
             </tr>
             {report.operatingExpensesSection &&
-              report.operatingExpensesSection.map((item) => (
+              report.operatingExpensesSection.map((item: any) => (
                 <IncomeStatementRow key={`${item.code}-${item.name}`} item={item} level={1} />
               ))}
 
@@ -252,7 +272,7 @@ export function IncomeStatementViewer({ report, isLoading = false }: IncomeState
               </td>
             </tr>
             {report.otherExpensesSection &&
-              report.otherExpensesSection.map((item) => (
+              report.otherExpensesSection.map((item: any) => (
                 <IncomeStatementRow key={`${item.code}-${item.name}`} item={item} level={1} />
               ))}
 

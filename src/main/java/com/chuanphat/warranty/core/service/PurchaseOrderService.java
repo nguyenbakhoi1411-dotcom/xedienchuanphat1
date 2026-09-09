@@ -12,8 +12,11 @@ import com.chuanphat.warranty.core.repository.PurchaseOrderRepository;
 import com.chuanphat.warranty.core.repository.ProductRepository;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -40,15 +43,18 @@ public class PurchaseOrderService {
     private final ProductRepository productRepo;
     private final SupplierService supplierService;
     private final BranchSecurity branchSecurity;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     public PurchaseOrderService(PurchaseOrderRepository poRepo,
                                 ProductRepository productRepo,
                                 SupplierService supplierService,
-                                BranchSecurity branchSecurity) {
+                                BranchSecurity branchSecurity,
+                                org.springframework.context.ApplicationEventPublisher eventPublisher) {
         this.poRepo = poRepo;
         this.productRepo = productRepo;
         this.supplierService = supplierService;
         this.branchSecurity = branchSecurity;
+        this.eventPublisher = eventPublisher;
     }
 
     // ── QUERY ──────────────────────────────────────────────────────
@@ -74,6 +80,21 @@ public class PurchaseOrderService {
         return PurchaseOrderDto.from(findById(id));
     }
 
+    /** Don mua co han thanh toan da qua + chua thanh toan du */
+    @Transactional(readOnly = true)
+    public List<PurchaseOrderDto> getOverduePayments(Long branchId) {
+        Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        List<PurchaseOrder> list;
+        if (scopedBranchId != null) {
+            list = poRepo.findByBranchIdAndHanThanhToanBeforeAndTrangThaiThanhToanNot(
+                    scopedBranchId, LocalDate.now(), "PAID");
+        } else {
+            list = poRepo.findByHanThanhToanBeforeAndTrangThaiThanhToanNot(
+                    LocalDate.now(), "PAID");
+        }
+        return list.stream().map(PurchaseOrderDto::from).toList();
+    }
+
     // ── CREATE ─────────────────────────────────────────────────────
 
     public PurchaseOrderDto create(PurchaseOrderRequest req) {
@@ -88,21 +109,63 @@ public class PurchaseOrderService {
         po.setPurchaseDate(req.purchaseDate() != null ? req.purchaseDate() : LocalDate.now());
         po.setExpectedDelivery(req.expectedDelivery());
         po.setNote(req.note());
+        po.setNguoiPhuTrach(req.nguoiPhuTrach() != null ? req.nguoiPhuTrach() : currentUsername());
+        po.setDiaChiGiaoHang(req.diaChiGiaoHang());
         po.setCreatedBy(currentUsername());
 
-        BigDecimal total = BigDecimal.ZERO;
+        // Hinh thuc thanh toan
+        String hinhThucTT = req.hinhThucTT() != null ? req.hinhThucTT() : "DEBT";
+        po.setHinhThucTT(hinhThucTT);
+
+        // Han thanh toan: lay tu request hoac tinh tu paymentTermsDays cua NCC
+        if (req.paymentTermsDays() != null && req.paymentTermsDays() > 0) {
+            po.setHanThanhToan(po.getPurchaseDate().plusDays(req.paymentTermsDays()));
+        } else if (supplier.getPaymentTermsDays() > 0) {
+            po.setHanThanhToan(po.getPurchaseDate().plusDays(supplier.getPaymentTermsDays()));
+        }
+
+        // Tinh toan tong tien
+        BigDecimal tongTienHang = BigDecimal.ZERO;
+        BigDecimal tongChietKhau = BigDecimal.ZERO;
+        BigDecimal tongThueGtgt = BigDecimal.ZERO;
+        BigDecimal tongThanhTien = BigDecimal.ZERO;
+
+        int thuTu = 0;
         for (var itemReq : req.items()) {
+            thuTu++;
             var product = productRepo.findById(itemReq.productId())
                     .orElseThrow(() -> new BusinessException("Không tìm thấy sản phẩm: " + itemReq.productId()));
+
             PurchaseOrderItem item = new PurchaseOrderItem();
             item.setProduct(product);
+            item.setTenSanPham(itemReq.tenSanPham() != null ? itemReq.tenSanPham() : product.getProductName());
+            item.setDonViTinh(itemReq.donViTinh());
             item.setQuantity(itemReq.quantity());
             item.setUnitCost(itemReq.unitCost());
-            item.setLineTotal(itemReq.unitCost().multiply(BigDecimal.valueOf(itemReq.quantity())));
+            item.setChietKhauPhanTram(itemReq.chietKhauPhanTram() != null ? itemReq.chietKhauPhanTram() : BigDecimal.ZERO);
+            item.setThueGtgtPhanTram(itemReq.thueGtgtPhanTram() != null ? itemReq.thueGtgtPhanTram() : BigDecimal.ZERO);
+            item.setThuTu(itemReq.thuTu() > 0 ? itemReq.thuTu() : thuTu);
+            item.calcLineTotal();
+
+            // Tinh tung phan
+            BigDecimal base = itemReq.unitCost().multiply(BigDecimal.valueOf(itemReq.quantity()));
+            BigDecimal ck = base.multiply(item.getChietKhauPhanTram()).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+            BigDecimal afterDiscount = base.subtract(ck);
+            BigDecimal vatAmount = afterDiscount.multiply(item.getThueGtgtPhanTram()).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+
+            tongTienHang = tongTienHang.add(base);
+            tongChietKhau = tongChietKhau.add(ck);
+            tongThueGtgt = tongThueGtgt.add(vatAmount);
+            tongThanhTien = tongThanhTien.add(item.getLineTotal());
+
             po.addItem(item);
-            total = total.add(item.getLineTotal());
         }
-        po.setTotalAmount(total);
+
+        po.setTongTienHang(tongTienHang);
+        po.setTongChietKhau(tongChietKhau);
+        po.setTongThueGtgt(tongThueGtgt);
+        po.setTotalAmount(tongThanhTien);
+
         return PurchaseOrderDto.from(poRepo.save(po));
     }
 
@@ -135,7 +198,12 @@ public class PurchaseOrderService {
         po.setStatus(PurchaseOrderStatus.APPROVED);
         po.setApprovedAt(OffsetDateTime.now());
         po.setApprovedBy(currentUsername());
-        return PurchaseOrderDto.from(poRepo.save(po));
+        PurchaseOrder savedPo = poRepo.save(po);
+
+        // Bắn sự kiện để module kế toán tự động sinh Hóa đơn Mua vào
+        eventPublisher.publishEvent(new com.chuanphat.warranty.core.event.PurchaseOrderReceivedEvent(savedPo.getId()));
+
+        return PurchaseOrderDto.from(savedPo);
     }
 
     // ── REJECT ─────────────────────────────────────────────────────
@@ -165,6 +233,32 @@ public class PurchaseOrderService {
         po.setCancelledAt(OffsetDateTime.now());
         po.setCancelledBy(currentUsername());
         po.setCancelReason(reason);
+        return PurchaseOrderDto.from(poRepo.save(po));
+    }
+
+    // ── PAY (ghi nhan thanh toan NCC truc tiep tu don mua) ────────
+
+    public PurchaseOrderDto pay(Long id, BigDecimal amount) {
+        PurchaseOrder po = findById(id);
+        branchSecurity.requireBranchAccess(po.getBranchId());
+
+        if (po.getStatus() == PurchaseOrderStatus.DRAFT || po.getStatus() == PurchaseOrderStatus.CANCELLED) {
+            throw new BusinessException("Không thể thanh toán đơn ở trạng thái " + po.getStatus().name());
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Số tiền thanh toán phải lớn hơn 0");
+        }
+        BigDecimal conLai = po.getConLaiPhaiTra();
+        if (amount.compareTo(conLai) > 0) {
+            throw new BusinessException("Số tiền thanh toán (" + amount + ") vượt quá số còn lại (" + conLai + ")");
+        }
+
+        BigDecimal newPaid = (po.getPaidAmount() == null ? BigDecimal.ZERO : po.getPaidAmount()).add(amount);
+        po.setPaidAmount(newPaid);
+        po.recalcPaymentStatus();
+        // NCC debt update
+        supplierService.decreaseDebt(po.getSupplier().getId(), amount);
+
         return PurchaseOrderDto.from(poRepo.save(po));
     }
 
@@ -201,8 +295,9 @@ public class PurchaseOrderService {
     }
 
     private String generatePoNo() {
+        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         int seq = poRepo.findMaxPoSeq() + 1;
-        return String.format("DH-%05d", seq);
+        return String.format("DH-%s-%03d", date, seq);
     }
 
     private String currentUsername() {

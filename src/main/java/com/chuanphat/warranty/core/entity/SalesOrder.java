@@ -112,6 +112,11 @@ public class SalesOrder {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean voucherConsumed = false;
 
+    @Column(length = 50) private String ecommercePlatform;
+    @Column(length = 100) private String shopName;
+    @Column(length = 50) private String storeCode;
+    @Column(length = 50) private String deliveryStatus;
+
     // ── Discount Approval ──
     /** Nguong giam gia toi da (%) cho phep ma khong can duyet. Default 5%. */
     @Column(nullable = false, precision = 5, scale = 2)
@@ -187,6 +192,14 @@ public class SalesOrder {
     public void setVatAmount(BigDecimal vatAmount) { this.vatAmount = vatAmount; }
     public Long getTaxInvoiceId() { return taxInvoiceId; }
     public void setTaxInvoiceId(Long taxInvoiceId) { this.taxInvoiceId = taxInvoiceId; }
+    public String getEcommercePlatform() { return ecommercePlatform; }
+    public void setEcommercePlatform(String ecommercePlatform) { this.ecommercePlatform = ecommercePlatform; }
+    public String getShopName() { return shopName; }
+    public void setShopName(String shopName) { this.shopName = shopName; }
+    public String getStoreCode() { return storeCode; }
+    public void setStoreCode(String storeCode) { this.storeCode = storeCode; }
+    public String getDeliveryStatus() { return deliveryStatus; }
+    public void setDeliveryStatus(String deliveryStatus) { this.deliveryStatus = deliveryStatus; }
     // Discount Approval
     public BigDecimal getMaxDiscountPct() { return maxDiscountPct; }
     public void setMaxDiscountPct(BigDecimal maxDiscountPct) { this.maxDiscountPct = maxDiscountPct; }

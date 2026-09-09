@@ -27,14 +27,14 @@ export function CustomerSelectModal({
   onClose
 }: CustomerSelectModalProps) {
   return (
-    <Modal open={open} title="Chon khach hang" description="Tim theo ten hoac so dien thoai." size="md" onClose={onClose}>
+    <Modal open={open} title="Chọn khách hàng" description="Tìm theo tên hoặc số điện thoại." size="md" onClose={onClose}>
       <div className="space-y-4">
         <div className="flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3">
           <Search className="h-4 w-4 text-slate-400" />
           <input
             value={keyword}
             onChange={(event) => onKeywordChange(event.target.value)}
-            placeholder="Ten khach hang hoac so dien thoai"
+            placeholder="Tên khách hàng hoặc số điện thoại"
             className="w-full border-0 bg-transparent text-sm outline-none"
           />
         </div>
@@ -44,7 +44,7 @@ export function CustomerSelectModal({
             {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-16" />)}
           </div>
         ) : !customers || customers.length === 0 ? (
-          <EmptyState title="Khong co khach hang" description="Thu tu khoa tim kiem khac." />
+          <EmptyState title="Không có khách hàng" description="Thử từ khóa tìm kiếm khác." />
         ) : (
           <div className="space-y-2">
             {customers.map((customer) => (
@@ -59,7 +59,7 @@ export function CustomerSelectModal({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold text-text">{customer.name}</span>
-                  <span className="block text-sm text-slate-500">{customer.phone} - No {formatCurrency(customer.debtAmount)}</span>
+                  <span className="block text-sm text-slate-500">{customer.phone} - Nợ {formatCurrency(customer.debtAmount)}</span>
                 </span>
               </button>
             ))}

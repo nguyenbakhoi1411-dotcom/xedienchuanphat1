@@ -8,9 +8,11 @@ import com.chuanphat.warranty.core.service.PayableService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/payables")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class PayableController {
 
     private final PayableService payableService;
@@ -57,3 +59,4 @@ public class PayableController {
         return payableService.agingReport(branchId);
     }
 }
+

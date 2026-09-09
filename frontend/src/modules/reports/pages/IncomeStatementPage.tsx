@@ -3,15 +3,15 @@
 import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { PeriodSelector, IncomeStatementViewer } from '../../components';
-import { useIncomeStatement } from '../../hooks';
-import { format, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
+import { PeriodSelector, IncomeStatementViewer } from '../components';
+import { useIncomeStatement } from '../hooks';
+import { formatDate, startOfYear } from '../lib/date';
 
 export function IncomeStatementPage() {
   const router = useRouter();
   const today = new Date();
-  const [from, setFrom] = useState(format(startOfYear(today), 'yyyy-MM-dd'));
-  const [to, setTo] = useState(format(today, 'yyyy-MM-dd'));
+  const [from, setFrom] = useState(formatDate(startOfYear(today), 'yyyy-MM-dd'));
+  const [to, setTo] = useState(formatDate(today, 'yyyy-MM-dd'));
   const [compareFrom, setCompareFrom] = useState<string | undefined>();
   const [compareTo, setCompareTo] = useState<string | undefined>();
 

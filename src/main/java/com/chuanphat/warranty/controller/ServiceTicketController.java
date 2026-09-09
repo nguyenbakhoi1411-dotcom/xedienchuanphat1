@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/service-tickets")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class ServiceTicketController {
     private final ServiceTicketService serviceTicketService;
 
@@ -144,3 +145,4 @@ public class ServiceTicketController {
         return serviceTicketService.historyByVehicle(vehicleId);
     }
 }
+

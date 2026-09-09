@@ -6,11 +6,16 @@ import com.chuanphat.warranty.core.dto.PurchaseOrderRequest;
 import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.service.PurchaseOrderService;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/purchase-orders")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class PurchaseOrderController {
 
     private final PurchaseOrderService poService;
@@ -33,6 +38,12 @@ public class PurchaseOrderController {
     @GetMapping("/{id}")
     public PurchaseOrderDto get(@PathVariable Long id) {
         return poService.get(id);
+    }
+
+    /** Don mua co han thanh toan qua han */
+    @GetMapping("/overdue")
+    public List<PurchaseOrderDto> overdue(@RequestParam(required = false) Long branchId) {
+        return poService.getOverduePayments(branchId);
     }
 
     @PostMapping
@@ -66,4 +77,13 @@ public class PurchaseOrderController {
                                     @RequestParam(defaultValue = "") String reason) {
         return poService.cancel(id, reason);
     }
+
+    /** Ghi nhan thanh toan NCC */
+    @PostMapping("/{id}/pay")
+    public PurchaseOrderDto pay(@PathVariable Long id,
+                                 @RequestBody Map<String, Object> body) {
+        BigDecimal amount = new BigDecimal(body.get("amount").toString());
+        return poService.pay(id, amount);
+    }
 }
+

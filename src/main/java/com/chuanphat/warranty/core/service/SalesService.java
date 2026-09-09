@@ -12,7 +12,7 @@ import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.dto.ConvertQuotationRequest;
 import com.chuanphat.warranty.core.dto.CreateInstallmentRequest;
-import com.chuanphat.warranty.core.dto.CreateInvoiceRequest;
+
 import com.chuanphat.warranty.core.dto.CreateQuotationItemRequest;
 import com.chuanphat.warranty.core.dto.CreateQuotationRequest;
 import com.chuanphat.warranty.core.dto.CreateSalesOrderItemRequest;
@@ -20,7 +20,7 @@ import com.chuanphat.warranty.core.dto.CreateSalesOrderRequest;
 import com.chuanphat.warranty.core.dto.CreateSalesReturnItemRequest;
 import com.chuanphat.warranty.core.dto.CreateSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.InstallmentResponse;
-import com.chuanphat.warranty.core.dto.InvoiceResponse;
+
 import com.chuanphat.warranty.core.dto.PaymentEntryRequest;
 import com.chuanphat.warranty.core.dto.QuotationListResponse;
 import com.chuanphat.warranty.core.dto.QuotationResponse;
@@ -34,7 +34,7 @@ import com.chuanphat.warranty.core.dto.VoucherPreviewRequest;
 import com.chuanphat.warranty.core.dto.VoucherPreviewResponse;
 import com.chuanphat.warranty.core.entity.Customer;
 import com.chuanphat.warranty.core.entity.InstallmentApplication;
-import com.chuanphat.warranty.core.entity.Invoice;
+
 import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.ProductSerial;
 import com.chuanphat.warranty.core.entity.Quotation;
@@ -56,7 +56,6 @@ import com.chuanphat.warranty.core.enums.DiscountApprovalStatus;
 import com.chuanphat.warranty.core.enums.SalesReturnStatus;
 import com.chuanphat.warranty.core.enums.SerialStatus;
 import com.chuanphat.warranty.core.repository.InstallmentApplicationRepository;
-import com.chuanphat.warranty.core.repository.InvoiceRepository;
 import com.chuanphat.warranty.core.repository.ProductSerialRepository;
 import com.chuanphat.warranty.core.repository.QuotationRepository;
 import com.chuanphat.warranty.core.repository.SalesOrderRepository;
@@ -77,6 +76,8 @@ import com.chuanphat.warranty.repository.WarrantyRepository;
 import com.chuanphat.warranty.pricing.dto.PricingDtos;
 import com.chuanphat.warranty.pricing.service.PriceCalculationService;
 import com.chuanphat.warranty.settings.SettingService;
+import com.chuanphat.warranty.core.event.SalesOrderDeliveredEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -104,7 +105,7 @@ public class SalesService {
     private final InstallmentApplicationRepository installmentRepository;
     private final SalesReturnRepository returnRepository;
     private final ProductSerialRepository serialRepository;
-    private final InvoiceRepository invoiceRepository;
+    // private final InvoiceRepository invoiceRepository;
     private final VoucherRepository voucherRepository;
     private final ProductService productService;
     private final InventoryService inventoryService;
@@ -119,6 +120,7 @@ public class SalesService {
     private final SettingService settingService;
     private final ExportDocumentService exportDocumentService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SalesService(
             SalesOrderRepository salesOrderRepository,
@@ -127,7 +129,7 @@ public class SalesService {
             InstallmentApplicationRepository installmentRepository,
             SalesReturnRepository returnRepository,
             ProductSerialRepository serialRepository,
-            InvoiceRepository invoiceRepository,
+            // InvoiceRepository invoiceRepository,
             VoucherRepository voucherRepository,
             ProductService productService,
             InventoryService inventoryService,
@@ -141,7 +143,8 @@ public class SalesService {
             BranchSecurity branchSecurity,
             SettingService settingService,
             ExportDocumentService exportDocumentService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.salesOrderRepository = salesOrderRepository;
         this.quotationRepository = quotationRepository;
@@ -149,7 +152,7 @@ public class SalesService {
         this.installmentRepository = installmentRepository;
         this.returnRepository = returnRepository;
         this.serialRepository = serialRepository;
-        this.invoiceRepository = invoiceRepository;
+        // this.invoiceRepository = invoiceRepository;
         this.voucherRepository = voucherRepository;
         this.productService = productService;
         this.inventoryService = inventoryService;
@@ -164,6 +167,7 @@ public class SalesService {
         this.settingService = settingService;
         this.exportDocumentService = exportDocumentService;
         this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -198,6 +202,10 @@ public class SalesService {
         order.setVoucherCode(blankToEmpty(request.voucherCode()));
         order.setNote(request.note());
         order.setReservationUntil(resolveReservationUntil(request.reservationUntil(), null));
+        order.setDeliveryStatus(request.deliveryStatus());
+        order.setEcommercePlatform(request.ecommercePlatform());
+        order.setShopName(request.shopName());
+        order.setStoreCode(request.storeCode());
 
         BigDecimal subtotal = addOrderItems(order, request.items());
         BigDecimal discount = resolveDiscount(order.getBranchId(), subtotal, order.getVoucherCode(), orderProductIds(order), nullToZero(request.discountAmount()));
@@ -219,7 +227,7 @@ public class SalesService {
 
         boolean shouldIssueInvoice = request.issueInvoice() == null ? shouldConfirm : Boolean.TRUE.equals(request.issueInvoice());
         if (shouldIssueInvoice) {
-            createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
+            // createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
         }
 
         return SalesOrderResponse.from(saved);
@@ -260,6 +268,10 @@ public class SalesService {
         order.setDeliveredAt(OffsetDateTime.now());
         // Cập nhật Customer 360 khi giao hàng thành công
         customerService.recordPurchase(order.getCustomerId(), order.getTotalAmount(), order.getOrderDate());
+        
+        // Bắn sự kiện để module kế toán tự động sinh Hóa đơn nháp
+        eventPublisher.publishEvent(new SalesOrderDeliveredEvent(order.getId()));
+        
         return SalesOrderResponse.from(order);
     }
 
@@ -439,7 +451,7 @@ public class SalesService {
             }
         }
         if (Boolean.TRUE.equals(request.issueInvoice())) {
-            createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
+            // createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
         }
         return SalesOrderResponse.from(saved);
     }
@@ -505,6 +517,7 @@ public class SalesService {
         return InstallmentResponse.from(installment);
     }
 
+/*
     @Transactional
     public InvoiceResponse createInvoice(Long orderId, CreateInvoiceRequest request) {
         SalesOrder order = getOrderEntity(orderId);
@@ -552,6 +565,7 @@ public class SalesService {
                 invoice.getTotalAmount()
         ));
     }
+*/
 
     @Transactional(readOnly = true)
     public byte[] salesOrderPdf(Long id) {
@@ -814,6 +828,7 @@ public class SalesService {
         return saved;
     }
 
+/*
     private Invoice createInvoiceEntity(SalesOrder order, CreateInvoiceRequest request) {
         Invoice existing = invoiceRepository.findByOrder_Id(order.getId()).orElse(null);
         if (existing != null) {
@@ -851,6 +866,7 @@ public class SalesService {
         createWarrantiesIfNeeded(invoice.getOrder());
         audit(AuditAction.ISSUE_INVOICE, AuditModule.SALES, "Invoice", invoice.getId(), null, invoice.getInvoiceNo());
     }
+*/
 
     private BigDecimal addOrderItems(SalesOrder order, List<CreateSalesOrderItemRequest> requests) {
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -1031,7 +1047,7 @@ public class SalesService {
             return;
         }
         Customer customer = customerService.get(order.getCustomerId());
-        String invoiceNo = invoiceRepository.findByOrder_Id(order.getId()).map(Invoice::getInvoiceNo).orElse(null);
+        String invoiceNo = null; // invoiceRepository.findByOrder_Id(order.getId()).map(Invoice::getInvoiceNo).orElse(null);
         for (SalesOrderItem item : order.getItems()) {
             if (item.getSerial() != null && item.getProduct().getCategory() == ProductCategory.ELECTRIC_MOTORBIKE) {
                 if (warrantyRepository.existsBySerialNumber(item.getSerial().getSerialNumber())) {

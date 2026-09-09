@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/users")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class UserController {
     private final UserAdminService service;
 
@@ -42,3 +43,4 @@ public class UserController {
         return service.updateStatus(id, request);
     }
 }
+

@@ -41,6 +41,15 @@ public class TaxDeclaration {
     @Column(nullable = false, precision = 18, scale = 2)
     private BigDecimal vatPayable = BigDecimal.ZERO;
     
+    @Column(name = "declaration_type", length = 20)
+    private String declarationType = "MONTHLY"; // MONTHLY, QUARTERLY
+    
+    @Column(name = "quarter")
+    private Integer quarter;
+    
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+    
     @Column(length = 20)
     private String status; // DRAFT, SUBMITTED, ACCEPTED
     
@@ -74,6 +83,12 @@ public class TaxDeclaration {
     public void setInputVatAmount(BigDecimal inputVatAmount) { this.inputVatAmount = inputVatAmount; }
     public BigDecimal getVatPayable() { return vatPayable; }
     public void setVatPayable(BigDecimal vatPayable) { this.vatPayable = vatPayable; }
+    public String getDeclarationType() { return declarationType; }
+    public void setDeclarationType(String declarationType) { this.declarationType = declarationType; }
+    public Integer getQuarter() { return quarter; }
+    public void setQuarter(Integer quarter) { this.quarter = quarter; }
+    public LocalDate getDueDate() { return dueDate; }
+    public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public LocalDate getSubmittedDate() { return submittedDate; }

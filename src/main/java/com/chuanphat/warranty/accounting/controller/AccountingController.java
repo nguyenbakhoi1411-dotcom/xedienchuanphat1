@@ -25,13 +25,14 @@ import com.chuanphat.warranty.accounting.dto.ProfitLossReportResponse;
 import com.chuanphat.warranty.accounting.dto.ReceiptVoucherResponse;
 import com.chuanphat.warranty.accounting.dto.RecordPurchaseDebtRequest;
 import com.chuanphat.warranty.accounting.dto.RecordSalesPaymentRequest;
-import com.chuanphat.warranty.accounting.dto.TaxInvoiceDtos;
+// import com.chuanphat.warranty.accounting.dto.TaxInvoiceDtos;
+import com.chuanphat.warranty.accounting.dto.TrialBalanceResponse;
 import com.chuanphat.warranty.accounting.enums.JournalEntryStatus;
 import com.chuanphat.warranty.accounting.service.AccountingLedgerService;
 import com.chuanphat.warranty.accounting.service.AccountingService;
 import com.chuanphat.warranty.accounting.service.ExpenseService;
 import com.chuanphat.warranty.accounting.service.FixedAssetService;
-import com.chuanphat.warranty.accounting.service.TaxInvoiceService;
+// import com.chuanphat.warranty.accounting.service.TaxInvoiceService;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -45,6 +46,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -52,37 +54,38 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/accounting")
+@RequestMapping({"/api/accounting", "/api/v1/accounting"})
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class AccountingController {
     private final AccountingService accountingService;
     private final AccountingLedgerService ledgerService;
-    private final TaxInvoiceService taxInvoiceService;
+    // private final ;
     private final ExpenseService expenseService;
     private final FixedAssetService fixedAssetService;
 
     public AccountingController(
             AccountingService accountingService,
             AccountingLedgerService ledgerService,
-            TaxInvoiceService taxInvoiceService,
+            
             ExpenseService expenseService,
             FixedAssetService fixedAssetService
     ) {
         this.accountingService = accountingService;
         this.ledgerService = ledgerService;
-        this.taxInvoiceService = taxInvoiceService;
+        // this.taxInvoiceService = taxInvoiceService;
         this.expenseService = expenseService;
         this.fixedAssetService = fixedAssetService;
     }
 
     // ── Chart of Accounts ──
 
-    @GetMapping("/accounts")
+    @GetMapping({"/accounts", "/chart-of-accounts"})
     @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
     public PageResponse<ChartOfAccountResponse> accounts(@RequestParam(required = false) Boolean active, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "100") int pageSize) {
         return ledgerService.accounts(active, page, pageSize);
     }
 
-    @PostMapping("/accounts")
+    @PostMapping({"/accounts", "/chart-of-accounts"})
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('ACCOUNTING_CREATE')")
     @Audited(action = AuditAction.UPDATE_ACCOUNT, module = AuditModule.ACCOUNTING, entityType = "ChartOfAccount")
@@ -98,6 +101,20 @@ public class AccountingController {
     @Audited(action = AuditAction.CREATE_JOURNAL_ENTRY, module = AuditModule.ACCOUNTING, entityType = "JournalEntry")
     public JournalEntryResponse createJournalEntry(@Valid @RequestBody JournalEntryRequest request) {
         return ledgerService.createJournalEntry(request);
+    }
+
+    @PutMapping("/journal-entries/{id}")
+    @PreAuthorize("hasAuthority('ACCOUNTING_CREATE')")
+    @Audited(action = AuditAction.UPDATE_JOURNAL_ENTRY, module = AuditModule.ACCOUNTING, entityType = "JournalEntry")
+    public JournalEntryResponse updateJournalEntry(@PathVariable Long id, @Valid @RequestBody JournalEntryRequest request) {
+        return ledgerService.updateJournalEntry(id, request);
+    }
+
+    @PostMapping("/journal-entries/{id}/reverse")
+    @PreAuthorize("hasAuthority('ACCOUNTING_POST')")
+    @Audited(action = AuditAction.POST_JOURNAL_ENTRY, module = AuditModule.ACCOUNTING, entityType = "JournalEntry")
+    public JournalEntryResponse reverseJournalEntry(@PathVariable Long id) {
+        return ledgerService.reverseJournalEntry(id);
     }
 
     @GetMapping("/journal-entries")
@@ -254,8 +271,12 @@ public class AccountingController {
 
     @GetMapping("/reports/trial-balance")
     @PreAuthorize("hasAuthority('ACCOUNTING_REPORT')")
-    public FinancialStatementResponse trialBalance(@RequestParam LocalDate fromDate, @RequestParam LocalDate toDate) {
-        return ledgerService.trialBalance(fromDate, toDate);
+    public TrialBalanceResponse trialBalance(
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate,
+            @RequestParam(required = false) Long branchId
+    ) {
+        return ledgerService.trialBalance(fromDate, toDate, branchId);
     }
 
     @GetMapping("/reports/balance-sheet")
@@ -278,62 +299,103 @@ public class AccountingController {
 
     @GetMapping("/reports/general-ledger")
     @PreAuthorize("hasAuthority('ACCOUNTING_REPORT')")
-    public GeneralLedgerResponse generalLedger(@RequestParam String accountCode, @RequestParam LocalDate fromDate, @RequestParam LocalDate toDate) {
-        return ledgerService.generalLedger(accountCode, fromDate, toDate);
+    public GeneralLedgerResponse generalLedger(
+            @RequestParam String accountCode,
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate,
+            @RequestParam(required = false) Long branchId
+    ) {
+        return ledgerService.generalLedger(accountCode, fromDate, toDate, branchId);
+    }
+
+    @GetMapping("/reports/journal-ledger")
+    @PreAuthorize("hasAuthority('ACCOUNTING_REPORT')")
+    public PageResponse<JournalEntryResponse> journalLedger(
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate,
+            @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) String accountCode,
+            @RequestParam(required = false) String referenceType,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int pageSize
+    ) {
+        return ledgerService.journalLedger(fromDate, toDate, branchId, accountCode, referenceType, keyword, page, pageSize);
+    }
+
+    @GetMapping("/reports/detail-debt/receivable")
+    @PreAuthorize("hasAuthority('ACCOUNTING_REPORT')")
+    public GeneralLedgerResponse detailDebtReceivable(
+            @RequestParam Long customerId,
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate
+    ) {
+        return ledgerService.detailDebtReceivable(customerId, fromDate, toDate);
+    }
+
+    @GetMapping("/reports/detail-debt/payable")
+    @PreAuthorize("hasAuthority('ACCOUNTING_REPORT')")
+    public GeneralLedgerResponse detailDebtPayable(
+            @RequestParam Long supplierId,
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate
+    ) {
+        return ledgerService.detailDebtPayable(supplierId, fromDate, toDate);
     }
 
     // ── Tax Invoices (VAT) ──
 
     @GetMapping("/tax-invoices/output")
     @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
-    public PageResponse<TaxInvoiceDtos.TaxInvoiceResponse> outputInvoices(
+    public PageResponse<Object> outputInvoices(
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
-        return taxInvoiceService.listOutput(branchId, status, page, pageSize);
+        return null; // taxInvoiceService.listOutput(branchId, status, page, pageSize);
     }
 
     @GetMapping("/tax-invoices/input")
     @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
-    public PageResponse<TaxInvoiceDtos.TaxInvoiceResponse> inputInvoices(
+    public PageResponse<Object> inputInvoices(
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
-        return taxInvoiceService.listInput(branchId, status, page, pageSize);
+        return null; // taxInvoiceService.listInput(branchId, status, page, pageSize);
     }
 
+    /*
     @PostMapping("/tax-invoices/output")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('ACCOUNTING_CREATE')")
-    public TaxInvoiceDtos.TaxInvoiceResponse createOutputInvoice(@Valid @RequestBody TaxInvoiceDtos.CreateTaxInvoiceRequest request) {
+    public Object createOutputInvoice(@Valid @RequestBody TaxInvoiceDtos.CreateTaxInvoiceRequest request) {
         return taxInvoiceService.createOutputInvoice(request);
     }
 
     @PostMapping("/tax-invoices/input")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('ACCOUNTING_CREATE')")
-    public TaxInvoiceDtos.TaxInvoiceResponse createInputInvoice(@Valid @RequestBody TaxInvoiceDtos.CreateTaxInvoiceRequest request) {
+    public Object createInputInvoice(@Valid @RequestBody TaxInvoiceDtos.CreateTaxInvoiceRequest request) {
         return taxInvoiceService.createInputInvoice(request);
     }
 
     @PostMapping("/tax-invoices/{id}/issue")
     @PreAuthorize("hasAuthority('ACCOUNTING_POST')")
-    public TaxInvoiceDtos.TaxInvoiceResponse issueInvoice(@PathVariable Long id) {
+    public Object issueInvoice(@PathVariable Long id) {
         return taxInvoiceService.issue(id);
     }
 
     @PostMapping("/tax-invoices/{id}/cancel")
     @PreAuthorize("hasAuthority('ACCOUNTING_CANCEL')")
-    public TaxInvoiceDtos.TaxInvoiceResponse cancelInvoice(@PathVariable Long id, @RequestBody TaxInvoiceDtos.CancelInvoiceRequest request) {
+    public Object cancelInvoice(@PathVariable Long id, @RequestBody TaxInvoiceDtos.CancelInvoiceRequest request) {
         return taxInvoiceService.cancel(id, request.reason());
     }
 
     @PostMapping("/tax-invoices/{id}/adjust")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('ACCOUNTING_CREATE')")
-    public TaxInvoiceDtos.TaxInvoiceResponse adjustInvoice(@PathVariable Long id, @RequestBody TaxInvoiceDtos.CreateTaxInvoiceRequest request) {
+    public Object adjustInvoice(@PathVariable Long id, @RequestBody TaxInvoiceDtos.CreateTaxInvoiceRequest request) {
         return taxInvoiceService.adjust(id, request);
     }
 
@@ -345,6 +407,7 @@ public class AccountingController {
             @RequestParam(required = false) Long branchId) {
         return taxInvoiceService.vatReport(year, month, branchId);
     }
+    */
 
     // ── Expenses ──
 
@@ -421,3 +484,4 @@ public class AccountingController {
         return fixedAssetService.depreciationHistory(id);
     }
 }
+

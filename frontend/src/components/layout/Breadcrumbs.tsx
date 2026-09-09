@@ -1,67 +1,45 @@
 "use client";
-
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
 import { navigationItems } from "@/constants/navigation";
 
-const segmentLabels: Record<string, string> = {
-  dashboard: "Tổng quan",
-  branches: "Chi nhánh",
-  products: "Sản phẩm",
-  inventory: "Kho hàng",
-  sales: "Bán hàng",
-  customers: "Khách hàng",
-  crm: "CRM",
-  reminders: "Nhắc lịch",
-  warranty: "Bảo hành",
-  suppliers: "Nhà cung cấp",
-  accounting: "Kế toán",
-  reports: "Báo cáo",
-  hr: "Nhân sự",
-  marketing: "Marketing",
-  settings: "Cài đặt",
-  operations: "Vận hành"
-};
-
-function humanize(segment: string) {
-  const item = navigationItems.find((navItem) => navItem.href === `/${segment}`);
-  if (item) return item.label;
-  if (segmentLabels[segment]) return segmentLabels[segment];
-
-  return segment
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 export function Breadcrumbs() {
   const pathname = usePathname();
-  const segments = pathname.split("/").filter(Boolean);
+  const segments = (pathname || "").split("/").filter(Boolean);
+
+  const crumbs = segments.map((seg, i) => {
+    const href = "/" + segments.slice(0, i + 1).join("/");
+    const navItem = navigationItems.find(n => n.href === href);
+    return { href, label: navItem?.label ?? seg.charAt(0).toUpperCase() + seg.slice(1) };
+  });
+
+  if (crumbs.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm text-slate-500">
-      <Link href="/dashboard" className="inline-flex items-center gap-1 hover:text-primary">
-        <Home className="h-4 w-4" />
-        <span className="hidden sm:inline">Trang chủ</span>
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
+      <Link
+        href="/dashboard"
+        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-orange-50 hover:text-primary"
+        title="Trang chủ"
+      >
+        <Home className="h-3.5 w-3.5" />
       </Link>
-      {segments.map((segment, index) => {
-        const href = `/${segments.slice(0, index + 1).join("/")}`;
-        const isLast = index === segments.length - 1;
-
-        return (
-          <span key={href} className="flex min-w-0 items-center gap-2">
-            <ChevronRight className="h-4 w-4 shrink-0" />
-            {isLast ? (
-              <span className="truncate font-medium text-text">{humanize(segment)}</span>
-            ) : (
-              <Link href={href} className="truncate hover:text-primary">
-                {humanize(segment)}
-              </Link>
-            )}
-          </span>
-        );
-      })}
+      {crumbs.map((crumb, i) => (
+        <span key={crumb.href} className="flex items-center gap-1">
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
+          {i === crumbs.length - 1 ? (
+            <span className="font-semibold text-text text-[13px]">{crumb.label}</span>
+          ) : (
+            <Link
+              href={crumb.href}
+              className="text-slate-400 text-[13px] hover:text-primary transition-colors"
+            >
+              {crumb.label}
+            </Link>
+          )}
+        </span>
+      ))}
     </nav>
   );
 }

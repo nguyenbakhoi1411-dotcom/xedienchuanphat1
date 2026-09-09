@@ -34,6 +34,11 @@ public class GoodsIssueItem {
     @JoinColumn(name = "serial_id")
     private ProductSerial serial;
 
+    /** Lô hàng (dành cho thực phẩm) */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    private ProductBatch batch;
+
     @Column(length = 500)
     private String note;
 
@@ -48,6 +53,8 @@ public class GoodsIssueItem {
     public void setUnitCost(BigDecimal unitCost) { this.unitCost = unitCost == null ? BigDecimal.ZERO : unitCost; }
     public ProductSerial getSerial() { return serial; }
     public void setSerial(ProductSerial serial) { this.serial = serial; }
+    public ProductBatch getBatch() { return batch; }
+    public void setBatch(ProductBatch batch) { this.batch = batch; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
 }

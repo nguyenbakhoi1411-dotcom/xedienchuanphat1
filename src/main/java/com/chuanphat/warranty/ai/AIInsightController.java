@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/ai-assistant")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class AIInsightController {
     private final AIInsightService service;
 
@@ -28,3 +29,4 @@ public class AIInsightController {
         return service.ask(request);
     }
 }
+

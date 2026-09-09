@@ -90,6 +90,16 @@ public class AccountingPeriodService {
             });
     }
 
+    public Long findPeriodIdByDate(LocalDate date, Long branchId) {
+        if (date == null) return null;
+        return periodRepository.findByBranchIdIsNullOrBranchId(branchId).stream()
+            .filter(p -> (p.getStartDate() == null || !date.isBefore(p.getStartDate())) && 
+                         (p.getEndDate() == null || !date.isAfter(p.getEndDate())))
+            .map(AccountingPeriod::getId)
+            .findFirst()
+            .orElse(null);
+    }
+
     private AccountingPeriodDtos.PeriodResponse toResponse(AccountingPeriod p) {
         return new AccountingPeriodDtos.PeriodResponse(
             p.getId(), p.getPeriodCode(), p.getMonth(), p.getQuarter(), p.getYear(),

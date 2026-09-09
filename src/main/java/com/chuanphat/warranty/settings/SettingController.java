@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/settings")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class SettingController {
     private final SettingService service;
 
@@ -31,3 +32,4 @@ public class SettingController {
         return service.updateSettings(request);
     }
 }
+

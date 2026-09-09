@@ -31,7 +31,8 @@ spring:
 app:
   ai:
     enabled: ${AI_ENABLED:true}
-    mode: ${AI_MODE:mock}
+    mode: ${AI_MODE:claude}
+    anthropic-key: ${ANTHROPIC_API_KEY:}
   security:
     bootstrap-admin:
       # Dev: bật sẵn admin mặc định để tiện phát triển

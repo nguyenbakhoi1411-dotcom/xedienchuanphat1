@@ -24,6 +24,9 @@ public class PurchaseReceipt {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false, unique = true, length = 80)
     private String receiptNo;
 
@@ -62,6 +65,19 @@ public class PurchaseReceipt {
 
     private OffsetDateTime confirmedAt;
 
+    /** Bổ sung AMIS fields */
+    @Column(length = 120)
+    private String deliverer; // Người giao hàng
+
+    @Column(length = 80)
+    private String objectCode; // Mã đối tượng
+
+    @Column(length = 255)
+    private String objectAddress; // Địa chỉ
+
+    @Column(length = 80)
+    private String receiptType; // Loại phiếu nhập (Thành phẩm sản xuất, Hàng bán trả lại...)
+
     /** Da sinh but toan ke toan chua — idempotency guard */
     @Column(nullable = false)
     private boolean accountingRecorded = false;
@@ -99,6 +115,14 @@ public class PurchaseReceipt {
     public void setConfirmedAt(OffsetDateTime confirmedAt) { this.confirmedAt = confirmedAt; }
     public boolean isAccountingRecorded() { return accountingRecorded; }
     public void setAccountingRecorded(boolean accountingRecorded) { this.accountingRecorded = accountingRecorded; }
+    public String getDeliverer() { return deliverer; }
+    public void setDeliverer(String deliverer) { this.deliverer = deliverer; }
+    public String getObjectCode() { return objectCode; }
+    public void setObjectCode(String objectCode) { this.objectCode = objectCode; }
+    public String getObjectAddress() { return objectAddress; }
+    public void setObjectAddress(String objectAddress) { this.objectAddress = objectAddress; }
+    public String getReceiptType() { return receiptType; }
+    public void setReceiptType(String receiptType) { this.receiptType = receiptType; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public List<PurchaseReceiptItem> getItems() { return items; }
     public void addItem(PurchaseReceiptItem item) { items.add(item); item.setReceipt(this); }

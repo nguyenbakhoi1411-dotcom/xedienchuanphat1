@@ -47,9 +47,9 @@ export function JournalEntriesPanel({ data, loading }: { data?: PageResponse<Jou
 export function AccountingReportsPanel({ trialBalance, balanceSheet, incomeStatement, customerDebtAging, supplierDebtAging, loading }: { trialBalance?: FinancialStatement; balanceSheet?: FinancialStatement; incomeStatement?: FinancialStatement; customerDebtAging?: DebtAgingRow[]; supplierDebtAging?: DebtAgingRow[]; loading: boolean }) {
   return (
     <div className="space-y-4">
-      <StatementTable title="Trial Balance" data={trialBalance} loading={loading} />
-      <StatementTable title="Balance Sheet co ban" data={balanceSheet} loading={loading} />
-      <StatementTable title="Income Statement co ban" data={incomeStatement} loading={loading} />
+      <StatementTable title="Bảng cân đối số phát sinh" data={trialBalance} loading={loading} />
+      <StatementTable title="Bảng cân đối kế toán" data={balanceSheet} loading={loading} />
+      <StatementTable title="Báo cáo kết quả kinh doanh" data={incomeStatement} loading={loading} />
       <AgingTable title="Customer Debt Aging" rows={customerDebtAging} loading={loading} />
       <AgingTable title="Supplier Debt Aging" rows={supplierDebtAging} loading={loading} />
     </div>
@@ -59,7 +59,7 @@ export function AccountingReportsPanel({ trialBalance, balanceSheet, incomeState
 function StatementTable({ title, data, loading }: { title: string; data?: FinancialStatement; loading: boolean }) {
   return (
     <section className="rounded-lg border border-border bg-white shadow-soft">
-      <PanelHeader title={title} description={data ? `${data.fromDate} - ${data.toDate}` : "Dang tai du lieu"} />
+      <PanelHeader title={title} description={data ? `${data.fromDate} - ${data.toDate}` : "Đang tải dữ liệu"} />
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">

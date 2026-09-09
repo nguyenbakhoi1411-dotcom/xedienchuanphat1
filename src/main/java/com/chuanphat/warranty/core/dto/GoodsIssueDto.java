@@ -38,6 +38,8 @@ public record GoodsIssueDto(
             BigDecimal lineTotal,
             Long serialId,
             String serialNumber,
+            Long batchId,
+            String batchCode,
             String note
     ) {
         public static GoodsIssueItemDto from(GoodsIssueItem item) {
@@ -51,6 +53,8 @@ public record GoodsIssueDto(
                     item.getUnitCost().multiply(BigDecimal.valueOf(item.getQuantity())),
                     item.getSerial() != null ? item.getSerial().getId() : null,
                     item.getSerial() != null ? item.getSerial().getSerialNumber() : null,
+                    item.getBatch() != null ? item.getBatch().getId() : null,
+                    item.getBatch() != null ? item.getBatch().getBatchCode() : null,
                     item.getNote()
             );
         }

@@ -15,7 +15,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/inventory")
+@RequestMapping({"/api/inventory", "/api/v1/inventory"})
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class InventoryController {
     private final InventoryService service;
 
@@ -32,6 +33,40 @@ public class InventoryController {
             @RequestParam(defaultValue = "20") int pageSize
     ) {
         return service.list(branchId, warehouseId, page, pageSize);
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
+    public com.chuanphat.warranty.core.dto.InventorySummaryDTO summary(@RequestParam(required = false) Long branchId) {
+        return service.getSummary(branchId);
+    }
+
+    @GetMapping("/{productId}")
+    @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
+    public InventoryStockDto getInventoryDetail(
+            @PathVariable Long productId,
+            @RequestParam(required = false) Long branchId) {
+        return service.getInventoryDetail(productId, branchId);
+    }
+
+    @PutMapping({ "/{productId}/threshold", "/products/{productId}/threshold" })
+    @PreAuthorize("hasAuthority('INVENTORY_IMPORT')")
+    public void updateThreshold(
+            @PathVariable Long productId,
+            @RequestParam(required = false) Long branchId,
+            @RequestBody java.util.Map<String, Integer> body) {
+        service.updateThreshold(productId, branchId, body.getOrDefault("tonKhoToiThieu", 0));
+    }
+
+    @GetMapping({ "/{productId}/history", "/movements/{productId}/history" })
+    @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
+    public PageResponse<InventoryTransactionDto> getProductHistory(
+            @PathVariable Long productId,
+            @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) InventoryTransactionType loaiGiaoDich,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return service.getProductHistory(productId, branchId, loaiGiaoDich, page, pageSize);
     }
 
     @GetMapping("/warehouses")
@@ -52,14 +87,14 @@ public class InventoryController {
 
     @PostMapping("/import")
     @PreAuthorize("hasAuthority('INVENTORY_IMPORT')")
-    public InventoryTransactionDto importStock(@Valid @RequestBody InventoryImportRequest request) {
-        return service.importStock(request);
+    public void importStock(@Valid @RequestBody InventoryImportRequest request) {
+        service.importStock(request);
     }
 
     @PostMapping("/export")
     @PreAuthorize("hasAuthority('INVENTORY_EXPORT')")
-    public InventoryTransactionDto exportStock(@Valid @RequestBody InventoryExportRequest request) {
-        return service.exportStock(request);
+    public void exportStock(@Valid @RequestBody InventoryExportRequest request) {
+        service.exportStock(request);
     }
 
     @PostMapping("/transfer")
@@ -74,7 +109,7 @@ public class InventoryController {
         return service.stocktake(request);
     }
 
-    @GetMapping("/transactions")
+    @GetMapping({"/transactions", "/movements"})
     @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
     public PageResponse<InventoryTransactionDto> transactions(
             @RequestParam(required = false) Long branchId,
@@ -85,3 +120,4 @@ public class InventoryController {
         return service.transactions(branchId, type, page, pageSize);
     }
 }
+

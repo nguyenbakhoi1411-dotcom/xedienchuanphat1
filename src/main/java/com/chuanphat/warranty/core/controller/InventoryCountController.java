@@ -24,7 +24,8 @@ import org.springframework.web.bind.annotation.*;
  * POST /api/inventory/counts/{id}/cancel           — Huy
  */
 @RestController
-@RequestMapping("/api/inventory/counts")
+@RequestMapping({"/api/inventory/counts", "/api/v1/inventory/counts"})
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class InventoryCountController {
 
     private final InventoryCountService service;
@@ -88,4 +89,22 @@ public class InventoryCountController {
     public InventoryCountDto cancel(@PathVariable Long id) {
         return service.cancel(id);
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('INVENTORY_ADJUST')")
+    public InventoryCountDto delete(@PathVariable Long id) {
+        return service.cancel(id); // Using the same cancel logic for soft delete
+    }
+
+    @PostMapping("/{id}/confirm")
+    @PreAuthorize("hasAuthority('INVENTORY_ADJUST')")
+    public InventoryCountDto confirm(
+            @PathVariable Long id,
+            @Valid @RequestBody List<InventoryCountItemSubmit> submissions
+    ) {
+        service.submitCounts(id, submissions);
+        service.requestApproval(id);
+        return service.approve(id);
+    }
 }
+

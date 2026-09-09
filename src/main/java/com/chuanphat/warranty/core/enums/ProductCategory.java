@@ -6,5 +6,6 @@ public enum ProductCategory {
     CHARGER,
     SPARE_PART,
     ACCESSORY,
-    SERVICE
+    SERVICE,
+    E_BIKE
 }

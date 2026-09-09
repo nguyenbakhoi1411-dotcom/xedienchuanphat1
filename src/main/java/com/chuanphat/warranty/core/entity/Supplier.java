@@ -39,11 +39,38 @@ public class Supplier {
     @Column(length = 200)
     private String website;
 
+    @Column(length = 100)
+    private String tenVietTat;
+
     @Column(length = 255)
     private String address;
 
+    @Column(length = 100)
+    private String tinhThanh;
+
     @Column(length = 120)
     private String contactPerson;
+
+    @Column(length = 100)
+    private String chucVuNguoiLH;
+
+    @Column(length = 20)
+    private String dienThoaiNguoiLH;
+
+    @Column(length = 255)
+    private String emailNguoiLH;
+
+    @Column(length = 50)
+    private String soTaiKhoanNH;
+
+    @Column(length = 255)
+    private String tenNganHang;
+
+    @Column(length = 255)
+    private String chiNhanhNH;
+
+    @Column(length = 10)
+    private String phuongThucTT = "BOTH";
 
     /** Cong no hien tai (tu dong cap nhat khi nhap/tra hang/thanh toan) */
     @Column(nullable = false, precision = 14, scale = 2)
@@ -86,10 +113,28 @@ public class Supplier {
     public void setEmail(String email) { this.email = email; }
     public String getWebsite() { return website; }
     public void setWebsite(String website) { this.website = website; }
+    public String getTenVietTat() { return tenVietTat; }
+    public void setTenVietTat(String tenVietTat) { this.tenVietTat = tenVietTat; }
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
+    public String getTinhThanh() { return tinhThanh; }
+    public void setTinhThanh(String tinhThanh) { this.tinhThanh = tinhThanh; }
     public String getContactPerson() { return contactPerson; }
     public void setContactPerson(String contactPerson) { this.contactPerson = contactPerson; }
+    public String getChucVuNguoiLH() { return chucVuNguoiLH; }
+    public void setChucVuNguoiLH(String chucVuNguoiLH) { this.chucVuNguoiLH = chucVuNguoiLH; }
+    public String getDienThoaiNguoiLH() { return dienThoaiNguoiLH; }
+    public void setDienThoaiNguoiLH(String v) { this.dienThoaiNguoiLH = v; }
+    public String getEmailNguoiLH() { return emailNguoiLH; }
+    public void setEmailNguoiLH(String v) { this.emailNguoiLH = v; }
+    public String getSoTaiKhoanNH() { return soTaiKhoanNH; }
+    public void setSoTaiKhoanNH(String v) { this.soTaiKhoanNH = v; }
+    public String getTenNganHang() { return tenNganHang; }
+    public void setTenNganHang(String v) { this.tenNganHang = v; }
+    public String getChiNhanhNH() { return chiNhanhNH; }
+    public void setChiNhanhNH(String v) { this.chiNhanhNH = v; }
+    public String getPhuongThucTT() { return phuongThucTT; }
+    public void setPhuongThucTT(String v) { this.phuongThucTT = v; }
     public BigDecimal getCurrentDebt() { return currentDebt; }
     public void setCurrentDebt(BigDecimal currentDebt) { this.currentDebt = currentDebt; }
     public BigDecimal getCreditLimit() { return creditLimit; }

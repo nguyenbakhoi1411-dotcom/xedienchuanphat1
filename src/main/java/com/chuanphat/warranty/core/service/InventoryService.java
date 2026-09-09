@@ -38,6 +38,7 @@ public class InventoryService {
     private final WarehouseRepository warehouseRepository;
     private final ProductService productService;
     private final BranchSecurity branchSecurity;
+    private final com.chuanphat.warranty.accounting.service.AccountingLedgerService ledgerService;
 
     public InventoryService(
             InventoryStockRepository stockRepository,
@@ -45,7 +46,8 @@ public class InventoryService {
             InventoryAverageCostRepository averageCostRepository,
             WarehouseRepository warehouseRepository,
             ProductService productService,
-            BranchSecurity branchSecurity
+            BranchSecurity branchSecurity,
+            com.chuanphat.warranty.accounting.service.AccountingLedgerService ledgerService
     ) {
         this.stockRepository = stockRepository;
         this.transactionRepository = transactionRepository;
@@ -53,6 +55,7 @@ public class InventoryService {
         this.warehouseRepository = warehouseRepository;
         this.productService = productService;
         this.branchSecurity = branchSecurity;
+        this.ledgerService = ledgerService;
     }
 
     @Transactional(readOnly = true)
@@ -64,9 +67,91 @@ public class InventoryService {
             return PageResponse.from(stockRepository.findByWarehouse_Id(warehouseId, PageRequest.of(page, pageSize)).map(this::stockDto));
         }
         if (scopedBranchId == null) {
-            return PageResponse.from(stockRepository.findAll(PageRequest.of(page, pageSize)).map(this::stockDto));
+            return PageResponse.from(stockRepository.findAllNonService(PageRequest.of(page, pageSize)).map(this::stockDto));
         }
         return PageResponse.from(stockRepository.findByBranchId(scopedBranchId, PageRequest.of(page, pageSize)).map(this::stockDto));
+    }
+
+    @Transactional(readOnly = true)
+    public com.chuanphat.warranty.core.dto.InventorySummaryDTO getSummary(Long branchId) {
+        Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        java.util.List<InventoryStock> stocks;
+        if (scopedBranchId == null) {
+            stocks = stockRepository.findAll();
+        } else {
+            stocks = stockRepository.findByBranchId(scopedBranchId, org.springframework.data.domain.Pageable.unpaged()).getContent();
+        }
+        
+        long tongSanPham = stocks.stream()
+                .filter(s -> s.getProduct().getCategory() != com.chuanphat.warranty.core.enums.ProductCategory.SERVICE)
+                .map(s -> s.getProduct().getId())
+                .distinct()
+                .count();
+                
+        long soSanPhamHetHang = stocks.stream()
+                .filter(s -> s.getProduct().getCategory() != com.chuanphat.warranty.core.enums.ProductCategory.SERVICE)
+                .filter(s -> s.getQuantityOnHand() == 0)
+                .count();
+                
+        long soSanPhamSapHet = stocks.stream()
+                .filter(s -> s.getProduct().getCategory() != com.chuanphat.warranty.core.enums.ProductCategory.SERVICE)
+                .filter(s -> s.getQuantityOnHand() > 0 && s.getQuantityOnHand() <= s.getMinQuantity())
+                .count();
+                
+        BigDecimal tongGiaTri = stocks.stream()
+                .filter(s -> s.getProduct().getCategory() != com.chuanphat.warranty.core.enums.ProductCategory.SERVICE)
+                .map(s -> {
+                    BigDecimal cost = s.getWarehouse() == null ? BigDecimal.ZERO : averageCost(s.getBranchId(), s.getWarehouse().getId(), s.getProduct().getId());
+                    return cost.multiply(BigDecimal.valueOf(s.getQuantityOnHand()));
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+        return new com.chuanphat.warranty.core.dto.InventorySummaryDTO(tongSanPham, tongGiaTri, soSanPhamHetHang, soSanPhamSapHet);
+    }
+
+    @Transactional(readOnly = true)
+    public InventoryStockDto getInventoryDetail(Long productId, Long branchId) {
+        Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        if (scopedBranchId == null) {
+            scopedBranchId = branchSecurity.currentUser().getBranchId(); // default to user's branch
+        }
+        InventoryStock stock = stockRepository.findByBranchIdAndProductId(scopedBranchId, productId)
+                .orElseThrow(() -> new BusinessException("Inventory not found for product"));
+        return stockDto(stock);
+    }
+
+    @Transactional
+    public void updateThreshold(Long productId, Long branchId, int threshold) {
+        Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        if (scopedBranchId == null) {
+            scopedBranchId = branchSecurity.currentUser().getBranchId();
+        }
+        InventoryStock stock = stockRepository.findByBranchIdAndProductId(scopedBranchId, productId)
+                .orElseThrow(() -> new BusinessException("Inventory not found for product"));
+        stock.setMinQuantity(threshold);
+        stockRepository.save(stock);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<InventoryTransactionDto> getProductHistory(Long productId, Long branchId, InventoryTransactionType type, int page, int pageSize) {
+        Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        PageRequest pageRequest = PageRequest.of(page, pageSize, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        
+        org.springframework.data.domain.Page<InventoryTransaction> transactions;
+        if (scopedBranchId == null) {
+            if (type != null) {
+                transactions = transactionRepository.findByProductIdAndType(productId, type, pageRequest);
+            } else {
+                transactions = transactionRepository.findByProductId(productId, pageRequest);
+            }
+        } else {
+            if (type != null) {
+                transactions = transactionRepository.findByProductIdAndTypeAndFromBranchIdOrTypeAndToBranchId(productId, type, scopedBranchId, type, scopedBranchId, pageRequest);
+            } else {
+                transactions = transactionRepository.findByProductIdAndFromBranchIdOrToBranchId(productId, scopedBranchId, scopedBranchId, pageRequest);
+            }
+        }
+        return PageResponse.from(transactions.map(InventoryTransactionDto::from));
     }
 
     @Transactional(readOnly = true)
@@ -114,44 +199,95 @@ public class InventoryService {
     }
 
     @Transactional
-    public InventoryTransactionDto importStock(InventoryImportRequest request) {
+    public void importStock(InventoryImportRequest request) {
         branchSecurity.requireBranchAccess(request.branchId());
-        Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
-        BigDecimal averageCost = increase(request.branchId(), warehouse, product, request.quantity(), request.unitCost());
-        return InventoryTransactionDto.from(record(
-                InventoryTransactionType.IMPORT,
-                product,
-                null,
-                request.branchId(),
-                null,
-                warehouse.getId(),
-                request.quantity(),
-                averageCost,
-                request.transactionDate(),
-                request.note()
-        ));
+        BigDecimal totalValue = BigDecimal.ZERO;
+        String transactionNo = "IMP-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        
+        for (com.chuanphat.warranty.core.dto.InventoryImportItemRequest item : request.items()) {
+            Product product = productService.get(item.productId());
+            if (product.getCategory() == com.chuanphat.warranty.core.enums.ProductCategory.SERVICE) {
+                throw new BusinessException("Cannot import SERVICE products");
+            }
+            BigDecimal unitCost = item.unitCost() != null ? item.unitCost() : product.getImportPrice();
+            BigDecimal averageCost = increase(request.branchId(), warehouse, product, item.quantity(), unitCost);
+            
+            BigDecimal itemTotal = unitCost.multiply(BigDecimal.valueOf(item.quantity()));
+            totalValue = totalValue.add(itemTotal);
+            
+            InventoryTransaction tx = new InventoryTransaction();
+            tx.setType(InventoryTransactionType.IMPORT);
+            tx.setTransactionNo(transactionNo);
+            tx.setTransactionDate(request.transactionDate() == null ? LocalDate.now() : request.transactionDate());
+            tx.setProduct(product);
+            tx.setFromBranchId(null);
+            tx.setToBranchId(request.branchId());
+            tx.setFromWarehouseId(null);
+            tx.setToWarehouseId(warehouse.getId());
+            tx.setQuantity(item.quantity());
+            tx.setUnitCost(averageCost);
+            tx.setTotalCost(itemTotal);
+            tx.setNote(request.note());
+            tx.setCreatedBy("system");
+            transactionRepository.save(tx);
+        }
+        
+        // Post journal entry
+        if ("ADJUSTMENT".equals(request.nguonNhap())) {
+            ledgerService.postInventoryAdjustment(transactionNo, request.transactionDate() == null ? LocalDate.now() : request.transactionDate(), totalValue, true, request.lyDo() != null ? request.lyDo() : "Điều chỉnh tăng kho", "6318");
+        } else if ("PURCHASE".equals(request.nguonNhap())) {
+            ledgerService.postInventoryAdjustment(transactionNo, request.transactionDate() == null ? LocalDate.now() : request.transactionDate(), totalValue, true, request.note() != null ? request.note() : "Nhập mua ngoài", "331");
+        } else {
+            ledgerService.postInventoryAdjustment(transactionNo, request.transactionDate() == null ? LocalDate.now() : request.transactionDate(), totalValue, true, request.note() != null ? request.note() : "Nhập kho khác", "338");
+        }
     }
 
     @Transactional
-    public InventoryTransactionDto exportStock(InventoryExportRequest request) {
+    public void exportStock(InventoryExportRequest request) {
         branchSecurity.requireBranchAccess(request.branchId());
-        Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
-        BigDecimal averageCost = averageCost(request.branchId(), warehouse.getId(), request.productId());
-        decrease(request.branchId(), warehouse.getId(), request.productId(), request.quantity());
-        return InventoryTransactionDto.from(record(
-                InventoryTransactionType.EXPORT,
-                product,
-                request.branchId(),
-                null,
-                warehouse.getId(),
-                null,
-                request.quantity(),
-                averageCost,
-                request.transactionDate(),
-                request.note()
-        ));
+        BigDecimal totalValue = BigDecimal.ZERO;
+        String transactionNo = "EXP-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        for (com.chuanphat.warranty.core.dto.InventoryExportItemRequest item : request.items()) {
+            Product product = productService.get(item.productId());
+            if (product.getCategory() == com.chuanphat.warranty.core.enums.ProductCategory.SERVICE) {
+                throw new BusinessException("Cannot export SERVICE products");
+            }
+            BigDecimal averageCost = averageCost(request.branchId(), warehouse.getId(), item.productId());
+            decrease(request.branchId(), warehouse.getId(), item.productId(), item.quantity());
+            
+            BigDecimal itemTotal = averageCost.multiply(BigDecimal.valueOf(item.quantity()));
+            totalValue = totalValue.add(itemTotal);
+            
+            InventoryTransaction tx = new InventoryTransaction();
+            tx.setType(InventoryTransactionType.EXPORT);
+            tx.setTransactionNo(transactionNo);
+            tx.setTransactionDate(request.transactionDate() == null ? LocalDate.now() : request.transactionDate());
+            tx.setProduct(product);
+            tx.setFromBranchId(request.branchId());
+            tx.setToBranchId(null);
+            tx.setFromWarehouseId(warehouse.getId());
+            tx.setToWarehouseId(null);
+            tx.setQuantity(item.quantity());
+            tx.setUnitCost(averageCost);
+            tx.setTotalCost(itemTotal);
+            tx.setNote(request.note());
+            tx.setCreatedBy("system");
+            transactionRepository.save(tx);
+        }
+        
+        // Post journal entry
+        if ("ADJUSTMENT".equals(request.lyDoXuat())) {
+            ledgerService.postInventoryAdjustment(transactionNo, request.transactionDate() == null ? LocalDate.now() : request.transactionDate(), totalValue, false, request.ghiChu() != null ? request.ghiChu() : "Điều chỉnh giảm kho", "6318");
+        } else if ("INTERNAL_USE".equals(request.lyDoXuat())) {
+            ledgerService.postInventoryAdjustment(transactionNo, request.transactionDate() == null ? LocalDate.now() : request.transactionDate(), totalValue, false, request.ghiChu() != null ? request.ghiChu() : "Xuất sử dụng nội bộ", "642");
+        } else if ("DAMAGED".equals(request.lyDoXuat())) {
+            ledgerService.postInventoryAdjustment(transactionNo, request.transactionDate() == null ? LocalDate.now() : request.transactionDate(), totalValue, false, request.ghiChu() != null ? request.ghiChu() : "Xuất hủy hàng hỏng", "632");
+        } else {
+            ledgerService.postInventoryAdjustment(transactionNo, request.transactionDate() == null ? LocalDate.now() : request.transactionDate(), totalValue, false, request.ghiChu() != null ? request.ghiChu() : "Xuất kho khác", "811");
+        }
     }
 
     @Transactional
@@ -161,20 +297,62 @@ public class InventoryService {
         }
         branchSecurity.requireBranchAccess(request.fromBranchId());
         branchSecurity.requireBranchAccess(request.toBranchId());
-        Product product = productService.get(request.productId());
         Warehouse fromWarehouse = resolveWarehouse(request.fromBranchId(), request.fromWarehouseId());
         Warehouse toWarehouse = resolveWarehouse(request.toBranchId(), request.toWarehouseId());
-        BigDecimal movingCost = averageCost(request.fromBranchId(), fromWarehouse.getId(), request.productId());
-        decrease(request.fromBranchId(), fromWarehouse.getId(), request.productId(), request.quantity());
-        increase(request.toBranchId(), toWarehouse, product, request.quantity(), movingCost);
-        record(InventoryTransactionType.TRANSFER_OUT, product, request.fromBranchId(), request.toBranchId(), fromWarehouse.getId(), toWarehouse.getId(), request.quantity(), movingCost, request.transactionDate(), request.note());
-        record(InventoryTransactionType.TRANSFER_IN, product, request.fromBranchId(), request.toBranchId(), fromWarehouse.getId(), toWarehouse.getId(), request.quantity(), movingCost, request.transactionDate(), request.note());
+        String transactionNo = "TRF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        for (com.chuanphat.warranty.core.dto.InventoryTransferItemRequest item : request.items()) {
+            Product product = productService.get(item.productId());
+            if (product.getCategory() == com.chuanphat.warranty.core.enums.ProductCategory.SERVICE) {
+                throw new BusinessException("Cannot transfer SERVICE products");
+            }
+            BigDecimal movingCost = averageCost(request.fromBranchId(), fromWarehouse.getId(), item.productId());
+            decrease(request.fromBranchId(), fromWarehouse.getId(), item.productId(), item.quantity());
+            increase(request.toBranchId(), toWarehouse, product, item.quantity(), movingCost);
+            
+            // Transfer OUT
+            InventoryTransaction txOut = new InventoryTransaction();
+            txOut.setType(InventoryTransactionType.TRANSFER_OUT);
+            txOut.setTransactionNo(transactionNo);
+            txOut.setTransactionDate(request.transactionDate() == null ? LocalDate.now() : request.transactionDate());
+            txOut.setProduct(product);
+            txOut.setFromBranchId(request.fromBranchId());
+            txOut.setToBranchId(request.toBranchId());
+            txOut.setFromWarehouseId(fromWarehouse.getId());
+            txOut.setToWarehouseId(toWarehouse.getId());
+            txOut.setQuantity(item.quantity());
+            txOut.setUnitCost(movingCost);
+            txOut.setTotalCost(movingCost.multiply(BigDecimal.valueOf(item.quantity())));
+            txOut.setNote(request.note());
+            txOut.setCreatedBy("system");
+            transactionRepository.save(txOut);
+
+            // Transfer IN
+            InventoryTransaction txIn = new InventoryTransaction();
+            txIn.setType(InventoryTransactionType.TRANSFER_IN);
+            txIn.setTransactionNo(transactionNo);
+            txIn.setTransactionDate(request.transactionDate() == null ? LocalDate.now() : request.transactionDate());
+            txIn.setProduct(product);
+            txIn.setFromBranchId(request.fromBranchId());
+            txIn.setToBranchId(request.toBranchId());
+            txIn.setFromWarehouseId(fromWarehouse.getId());
+            txIn.setToWarehouseId(toWarehouse.getId());
+            txIn.setQuantity(item.quantity());
+            txIn.setUnitCost(movingCost);
+            txIn.setTotalCost(movingCost.multiply(BigDecimal.valueOf(item.quantity())));
+            txIn.setNote(request.note());
+            txIn.setCreatedBy("system");
+            transactionRepository.save(txIn);
+        }
     }
 
     @Transactional
     public InventoryTransactionDto stocktake(InventoryStocktakeRequest request) {
         branchSecurity.requireBranchAccess(request.branchId());
         Product product = productService.get(request.productId());
+        if (product.getCategory() == com.chuanphat.warranty.core.enums.ProductCategory.SERVICE) {
+            throw new BusinessException("Cannot stocktake SERVICE products");
+        }
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
         InventoryStock stock = stockRepository.findByBranchIdAndWarehouseIdAndProductId(request.branchId(), warehouse.getId(), request.productId()).orElseGet(InventoryStock::new);
         int currentQuantity = stock.getQuantityOnHand();
@@ -265,6 +443,11 @@ public class InventoryService {
         return InventoryStockDto.from(stock, averageCost);
     }
 
+    public Warehouse getWarehouse(Long id) {
+        return warehouseRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("Warehouse not found"));
+    }
+
     private Warehouse resolveWarehouse(Long branchId, Long warehouseId) {
         if (warehouseId != null) {
             Warehouse warehouse = warehouseRepository.findById(warehouseId).orElseThrow(() -> new BusinessException("Warehouse not found"));
@@ -300,6 +483,10 @@ public class InventoryService {
         });
     }
 
+    public BigDecimal getAverageCost(Long branchId, Long warehouseId, Long productId) {
+        return averageCost(branchId, warehouseId, productId);
+    }
+
     private BigDecimal averageCost(Long branchId, Long warehouseId, Long productId) {
         return averageCostRepository.findByBranchIdAndWarehouseIdAndProductId(branchId, warehouseId, productId)
                 .map(InventoryAverageCost::getAverageCost)
@@ -331,6 +518,7 @@ public class InventoryService {
         transaction.setUnitCost(unitCost);
         transaction.setTotalCost((unitCost == null ? BigDecimal.ZERO : unitCost).multiply(BigDecimal.valueOf(quantity)));
         transaction.setNote(note);
+        transaction.setCreatedBy("system");
         return transactionRepository.save(transaction);
     }
 }

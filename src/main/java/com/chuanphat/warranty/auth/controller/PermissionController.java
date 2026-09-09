@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/permissions")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class PermissionController {
     private final UserAdminService service;
 
@@ -21,3 +22,4 @@ public class PermissionController {
         return service.permissions();
     }
 }
+

@@ -1,218 +1,113 @@
-import axios, { AxiosInstance } from 'axios';
+import { api } from "@/lib/api/axios";
 import {
   BankAccount,
-  BankTransaction,
-  BankReconciliation,
   CreateBankAccountRequest,
   UpdateBankAccountRequest,
-  CreateBankReceiptRequest,
-  CreateBankPaymentRequest,
-  UpdateBankTransactionRequest,
-  QueryTransactionRequest,
-  ReconcileRequest,
-  ApiResponse,
-  PaginatedResponse,
-} from '../types';
+  BankAccountSummary,
+  BankTransaction,
+  CreateBankTransactionRequest,
+  PagedResponse,
+  ImportStatementResult,
+  AutoMatchResult,
+  ReconciliationReport,
+  BankStatementLineDTO,
+} from "../types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+export const bankDepositApi = {
+  // Accounts
+  async getAccounts(includeInactive = false) {
+    const res = await api.get("/api/bank-deposit/accounts", { params: { includeInactive } });
+    return res.data as BankAccount[];
+  },
+  async getAccount(id: string | number) {
+    const res = await api.get(`/api/bank-deposit/accounts/${id}`);
+    return res.data as BankAccount;
+  },
+  async createAccount(data: CreateBankAccountRequest) {
+    const res = await api.post("/api/bank-deposit/accounts", data);
+    return res.data as BankAccount;
+  },
+  async updateAccount(id: string | number, data: UpdateBankAccountRequest) {
+    const res = await api.put(`/api/bank-deposit/accounts/${id}`, data);
+    return res.data as BankAccount;
+  },
+  async deactivateAccount(id: string | number) {
+    await api.delete(`/api/bank-deposit/accounts/${id}`);
+  },
+  async getAccountSummary(id: string | number, fromDate?: string, toDate?: string) {
+    const res = await api.get(`/api/bank-deposit/accounts/${id}/summary`, { params: { fromDate, toDate } });
+    return res.data as BankAccountSummary;
+  },
 
-export class BankDepositAPI {
-  private api: AxiosInstance;
+  // Transactions
+  async getTransactions(params: {
+    bankAccountId?: string | number;
+    startDate?: string;
+    endDate?: string;
+    loaiGiaoDich?: string;
+    trangThaiDoiChieu?: string;
+    keyword?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const res = await api.get("/api/bank-deposit/transactions", { params });
+    // DTO might not have aliases, we cast it to BankTransaction
+    return res.data as PagedResponse<BankTransaction>;
+  },
+  async getTransaction(id: string | number) {
+    const res = await api.get(`/api/bank-deposit/transactions/${id}`);
+    return res.data as BankTransaction;
+  },
+  async createReceipt(data: CreateBankTransactionRequest) {
+    const res = await api.post("/api/bank-deposit/receipts", data);
+    return res.data as BankTransaction;
+  },
+  async createPayment(data: CreateBankTransactionRequest) {
+    const res = await api.post("/api/bank-deposit/payments", data);
+    return res.data as BankTransaction;
+  },
+  async postTransaction(id: string | number) {
+    await api.post(`/api/bank-deposit/transactions/${id}/post`);
+  },
+  async cancelTransaction(id: string | number) {
+    await api.post(`/api/bank-deposit/transactions/${id}/cancel`);
+  },
 
-  constructor() {
-    this.api = axios.create({
-      baseURL: `${API_BASE_URL}/bank-deposit`,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+  // Statements
+  async importStatement(file: File, bankAccountId: string | number, nganHang: string) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("bankAccountId", String(bankAccountId));
+    formData.append("nganHang", nganHang);
+    const res = await api.post("/api/bank-deposit/statements/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
-
-    // Add JWT token to requests if available
-    this.api.interceptors.request.use((config) => {
-      const token = localStorage.getItem('authToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    });
-
-    // Handle response errors
-    this.api.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          // Handle unauthorized - redirect to login
-          localStorage.removeItem('authToken');
-          window.location.href = '/login';
-        }
-        return Promise.reject(error);
-      },
-    );
-  }
-
-  // ============ BANK ACCOUNT OPERATIONS ============
-
-  async createBankAccount(
-    data: CreateBankAccountRequest,
-  ): Promise<ApiResponse<BankAccount>> {
-    const response = await this.api.post('/accounts', data);
-    return response.data;
-  }
-
-  async getBankAccounts(includeInactive = false): Promise<BankAccount[]> {
-    const response = await this.api.get('/accounts', {
-      params: { includeInactive },
-    });
-    return response.data;
-  }
-
-  async getBankAccount(id: string): Promise<BankAccount> {
-    const response = await this.api.get(`/accounts/${id}`);
-    return response.data;
-  }
-
-  async updateBankAccount(
-    id: string,
-    data: UpdateBankAccountRequest,
-  ): Promise<ApiResponse<BankAccount>> {
-    const response = await this.api.put(`/accounts/${id}`, data);
-    return response.data;
-  }
-
-  async deactivateBankAccount(id: string): Promise<ApiResponse<BankAccount>> {
-    const response = await this.api.delete(`/accounts/${id}`);
-    return response.data;
-  }
-
-  // ============ RECEIPT OPERATIONS ============
-
-  async createBankReceipt(
-    data: CreateBankReceiptRequest,
-  ): Promise<ApiResponse<BankTransaction>> {
-    const response = await this.api.post('/receipts', data);
-    return response.data;
-  }
-
-  // ============ PAYMENT OPERATIONS ============
-
-  async createBankPayment(
-    data: CreateBankPaymentRequest,
-  ): Promise<ApiResponse<BankTransaction>> {
-    const response = await this.api.post('/payments', data);
-    return response.data;
-  }
-
-  // ============ TRANSACTION OPERATIONS ============
-
-  async createTransaction(
-    type: 'receipt' | 'payment',
-    data: CreateBankReceiptRequest | CreateBankPaymentRequest,
-  ): Promise<ApiResponse<BankTransaction>> {
-    const endpoint = type === 'receipt' ? '/receipts' : '/payments';
-    const response = await this.api.post(endpoint, data);
-    return response.data;
-  }
-
-  async getTransactions(
-    query: QueryTransactionRequest,
-  ): Promise<PaginatedResponse<BankTransaction>> {
-    const response = await this.api.get('/transactions', { params: query });
-    return response.data;
-  }
-
-  async getTransaction(id: string): Promise<BankTransaction> {
-    const response = await this.api.get(`/transactions/${id}`);
-    return response.data;
-  }
-
-  async updateTransaction(
-    id: string,
-    data: UpdateBankTransactionRequest,
-  ): Promise<ApiResponse<BankTransaction>> {
-    const response = await this.api.put(`/transactions/${id}`, data);
-    return response.data;
-  }
-
-  async postTransaction(id: string): Promise<ApiResponse<BankTransaction>> {
-    const response = await this.api.post(`/transactions/${id}/post`);
-    return response.data;
-  }
-
-  async cancelTransaction(id: string): Promise<ApiResponse<BankTransaction>> {
-    const response = await this.api.post(`/transactions/${id}/cancel`);
-    return response.data;
-  }
-
-  // ============ RECONCILIATION OPERATIONS ============
-
-  async getReconciliation(
-    accountId: string,
-    period: string,
-  ): Promise<BankReconciliation> {
-    const response = await this.api.get(`/reconciliation/${accountId}/${period}`);
-    return response.data;
-  }
-
-  async reconcile(
-    accountId: string,
-    period: string,
-    data: ReconcileRequest,
-  ): Promise<ApiResponse<BankReconciliation>> {
-    const response = await this.api.post(
-      `/reconciliation/${accountId}/${period}`,
-      data,
-    );
-    return response.data;
-  }
-
-  async getLatestReconciliation(accountId: string): Promise<BankReconciliation | null> {
-    try {
-      const response = await this.api.get(
-        `/reconciliation/${accountId}/latest`,
-      );
-      return response.data;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  // ============ REPORT OPERATIONS ============
-
-  async getDailySummary(
-    startDate: string,
-    endDate: string,
-  ): Promise<PaginatedResponse<BankTransaction>> {
-    const response = await this.api.get('/reports/daily-summary', {
-      params: { startDate, endDate },
-    });
-    return response.data;
-  }
-
-  async getAccountBalanceReport(): Promise<BankAccount[]> {
-    const response = await this.api.get('/reports/account-balance');
-    return response.data;
-  }
-
-  async getPendingTransactions(): Promise<PaginatedResponse<BankTransaction>> {
-    const response = await this.api.get('/reports/pending-transactions');
-    return response.data;
-  }
-
-  async getReconciliationStatusReport(): Promise<any> {
-    const response = await this.api.get('/reports/reconciliation-status');
-    return response.data;
-  }
-
-  async getTransactionAuditReport(
-    startDate: string,
-    endDate: string,
-  ): Promise<PaginatedResponse<BankTransaction>> {
-    const response = await this.api.get('/reports/transaction-audit', {
-      params: { startDate, endDate },
-    });
-    return response.data;
-  }
-}
-
-// Export singleton instance
-export const bankDepositAPI = new BankDepositAPI();
+    return res.data as ImportStatementResult;
+  },
+  async getStatementLines(statementId: string | number, trangThaiDoiChieu?: string, page = 0, size = 50) {
+    const res = await api.get(`/api/bank-deposit/statements/${statementId}/lines`, { params: { trangThaiDoiChieu, page, size } });
+    return res.data;
+  },
+  async runAutoMatch(statementId: string | number) {
+    const res = await api.post(`/api/bank-deposit/statements/${statementId}/auto-match`);
+    return res.data as AutoMatchResult;
+  },
+  async manualMatch(statementId: string | number, lineId: string | number, bankTransactionId: string | number) {
+    await api.post(`/api/bank-deposit/statements/${statementId}/lines/${lineId}/manual-match`, { bankTransactionId });
+  },
+  async createTransactionFromLine(statementId: string | number, lineId: string | number, data: { loaiThuChi: string; dienGiai?: string }) {
+    const res = await api.post(`/api/bank-deposit/statements/${statementId}/lines/${lineId}/create-transaction`, data);
+    return res.data as BankTransaction;
+  },
+  async ignoreLine(statementId: string | number, lineId: string | number) {
+    await api.post(`/api/bank-deposit/statements/${statementId}/lines/${lineId}/ignore`);
+  },
+  async getReconciliationReport(statementId: string | number) {
+    const res = await api.get(`/api/bank-deposit/statements/${statementId}/reconciliation-report`);
+    return res.data as ReconciliationReport;
+  },
+  async matchReconciliation(id: string, data: object) {
+    const res = await api.post(`/api/bank-deposit/reconciliations/${id}/match`, data);
+    return res.data;
+  },
+};

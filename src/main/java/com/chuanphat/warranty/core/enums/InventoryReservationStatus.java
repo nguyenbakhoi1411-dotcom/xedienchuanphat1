@@ -4,5 +4,6 @@ public enum InventoryReservationStatus {
     ACTIVE,
     RELEASED,
     CONSUMED,
-    EXPIRED
+    EXPIRED,
+    CANCELLED
 }

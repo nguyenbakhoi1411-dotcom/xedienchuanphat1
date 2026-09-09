@@ -126,6 +126,8 @@ export interface BalanceSheetItem {
   previousPeriod?: number;
   difference?: number;
   note?: string;
+  children?: BalanceSheetItem[];
+  isTotalRow?: boolean;
 }
 
 export interface BalanceSheetReport {
@@ -137,21 +139,28 @@ export interface BalanceSheetReport {
   currencyUnit: CurrencyUnit;
   
   assets: {
-    currentAssets: BalanceSheetItem[];
-    fixedAssets: BalanceSheetItem[];
-    totalAssets: number;
+    currentAssets?: BalanceSheetItem[];
+    fixedAssets?: BalanceSheetItem[];
+    totalAssets?: number;
+    previousTotalAssets?: number;
+    [key: string]: any;
   };
 
   liabilitiesEquity: {
-    currentLiabilities: BalanceSheetItem[];
-    longTermLiabilities: BalanceSheetItem[];
-    equity: BalanceSheetItem[];
-    totalLiabilitiesEquity: number;
+    currentLiabilities?: BalanceSheetItem[];
+    longTermLiabilities?: BalanceSheetItem[];
+    equity?: BalanceSheetItem[];
+    totalLiabilitiesEquity?: number;
+    liabilities?: BalanceSheetItem[];
+    total?: number;
+    previousTotal?: number;
+    [key: string]: any;
   };
 
   isBalanced: boolean;
   balanceError?: number;
   notes?: string;
+  [key: string]: any;
 }
 
 // ============ Income Statement (B02) ============
@@ -297,7 +306,7 @@ export interface GeneralLedgerReport {
   };
 }
 
-// ============ Trial Balance ============
+// ============ Bảng cân đối số phát sinh ============
 
 export interface TrialBalanceRow {
   accountCode: string;

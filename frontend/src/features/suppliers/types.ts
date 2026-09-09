@@ -9,6 +9,7 @@ export type Supplier = {
   address: string;
   contactPerson: string;
   status: SupplierStatus;
+  currentDebt?: number;
 };
 
 export type SupplierPayload = Omit<Supplier, "id">;

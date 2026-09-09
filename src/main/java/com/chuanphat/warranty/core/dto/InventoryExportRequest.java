@@ -1,15 +1,18 @@
 package com.chuanphat.warranty.core.dto;
 
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.util.List;
 
 public record InventoryExportRequest(
         @NotNull Long branchId,
         Long warehouseId,
-        @NotNull Long productId,
-        @Min(1) int quantity,
         LocalDate transactionDate,
-        String note
-) {
-}
+        @NotNull String lyDoXuat, // SALE, DAMAGED, INTERNAL_USE, TRANSFER, OTHER
+        Long orderId,
+        String ghiChu,
+        String note,
+        @NotEmpty @Valid List<InventoryExportItemRequest> items
+) {}

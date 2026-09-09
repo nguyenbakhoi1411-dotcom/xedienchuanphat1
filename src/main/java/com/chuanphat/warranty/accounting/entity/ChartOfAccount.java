@@ -42,6 +42,13 @@ public class ChartOfAccount {
     private String description;
 
     @Column(nullable = false)
+    private int accountLevel = 1;
+
+    @Column(nullable = false, length = 20)
+    private String accountNature = "DEBIT_NORMAL";
+    // DEBIT_NORMAL=Dư Nợ (TS/CP), CREDIT_NORMAL=Dư Có (NV/DT), DUAL_NATURE=Lưỡng tính (131,331,421)
+
+    @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
     public Long getId() { return id; }
@@ -57,5 +64,9 @@ public class ChartOfAccount {
     public void setActive(boolean active) { this.active = active; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public int getAccountLevel() { return accountLevel; }
+    public void setAccountLevel(int accountLevel) { this.accountLevel = accountLevel; }
+    public String getAccountNature() { return accountNature; }
+    public void setAccountNature(String accountNature) { this.accountNature = accountNature; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 }

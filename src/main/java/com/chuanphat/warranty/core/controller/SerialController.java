@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/serials")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class SerialController {
 
     private final SerialService serialService;
@@ -153,3 +154,4 @@ public class SerialController {
     record RepairRequest(String ticketNo) {}
     record NoteRequest(String note) {}
 }
+

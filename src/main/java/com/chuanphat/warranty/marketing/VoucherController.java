@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/marketing/vouchers")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class VoucherController {
     private final VoucherService service;
 
@@ -51,3 +52,4 @@ public class VoucherController {
         service.delete(id);
     }
 }
+

@@ -33,12 +33,12 @@ export function CartPanel({ onSelectCustomer, onOpenCustomer360 }: CartPanelProp
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-text">Gio hang</h2>
-            <p className="mt-1 text-sm text-slate-500">{items.length} mat hang - {formatCurrency(subtotal)}</p>
+            <h2 className="text-base font-semibold text-text">Giỏ hàng</h2>
+            <p className="mt-1 text-sm text-slate-500">{items.length} mặt hàng - {formatCurrency(subtotal)}</p>
           </div>
           <Button variant="secondary" onClick={onSelectCustomer}>
             <UserRound className="h-4 w-4" />
-            Khach hang
+            Khách hàng
           </Button>
         </div>
         {customer && (
@@ -49,7 +49,7 @@ export function CartPanel({ onSelectCustomer, onOpenCustomer360 }: CartPanelProp
           >
             <p className="font-semibold text-text">{customer.name}</p>
             <p className="mt-1 text-slate-600">{customer.phone} - {customer.address}</p>
-            {onOpenCustomer360 && <p className="mt-1 text-xs text-indigo-600 underline">Xem lich su 360°</p>}
+            {onOpenCustomer360 && <p className="mt-1 text-xs text-indigo-600 underline">Xem lịch sử 360°</p>}
           </button>
         )}
 
@@ -58,7 +58,7 @@ export function CartPanel({ onSelectCustomer, onOpenCustomer360 }: CartPanelProp
           <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
             <p className="text-xs text-amber-700">
-              Giam gia <strong>{discountPct.toFixed(1)}%</strong> vuot nguong {MAX_DISCOUNT_PCT}% — can quan ly duyet khi tao don.
+              Giảm giá <strong>{discountPct.toFixed(1)}%</strong> vượt ngưỡng {MAX_DISCOUNT_PCT}% — cần quản lý duyệt khi tạo đơn.
             </p>
           </div>
         )}
@@ -66,7 +66,7 @@ export function CartPanel({ onSelectCustomer, onOpenCustomer360 }: CartPanelProp
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {items.length === 0 ? (
-          <EmptyState title="Gio hang dang trong" description="Chon san pham ben trai de them vao hoa don." />
+          <EmptyState title="Giỏ hàng đang trống" description="Chọn sản phẩm bên trái để thêm vào hóa đơn." />
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
@@ -130,7 +130,7 @@ function CartLine({
           <p className="font-semibold text-text">{item.productName}</p>
           <p className="mt-1 text-xs text-slate-500">{item.productCode} - {formatCurrency(item.unitPrice)}</p>
         </div>
-        <button type="button" onClick={onRemove} className="text-slate-400 hover:text-red-600" aria-label="Xoa san pham">
+        <button type="button" onClick={onRemove} className="text-slate-400 hover:text-red-600" aria-label="Xóa sản phẩm">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
@@ -150,8 +150,8 @@ function CartLine({
               </option>
             ))}
           </select>
-          {availableSerials.length === 0 && <p className="mt-1 text-xs text-red-600">Khong co serial con hang tai chi nhanh nay</p>}
-          {item.selectedSerials.length === 0 && <p className="mt-1 text-xs text-red-600">Vui long chon serial xe</p>}
+          {availableSerials.length === 0 && <p className="mt-1 text-xs text-red-600">Không có serial còn hàng tại chi nhánh này</p>}
+          {item.selectedSerials.length === 0 && <p className="mt-1 text-xs text-red-600">Vui lòng chọn serial xe</p>}
         </div>
       ) : (
         <div className="mt-3 flex items-center justify-between gap-3">

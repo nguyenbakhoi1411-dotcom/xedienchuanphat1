@@ -13,7 +13,7 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "inventory_stocks", uniqueConstraints = @UniqueConstraint(columnNames = {"branch_id", "warehouse_id", "product_id"}))
+@Table(name = "inventory_stocks", uniqueConstraints = @UniqueConstraint(name = "uq_stock_loc_prod_batch_serial", columnNames = {"branch_id", "warehouse_id", "product_id", "batch_id", "serial_id"}))
 public class InventoryStock {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,6 +29,14 @@ public class InventoryStock {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    private ProductBatch batch;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "serial_id")
+    private ProductSerial serial;
 
     @Column(name = "quantity_on_hand", nullable = false)
     private int quantity;
@@ -55,6 +63,10 @@ public class InventoryStock {
     public void setWarehouse(Warehouse warehouse) { this.warehouse = warehouse; }
     public Product getProduct() { return product; }
     public void setProduct(Product product) { this.product = product; }
+    public ProductBatch getBatch() { return batch; }
+    public void setBatch(ProductBatch batch) { this.batch = batch; }
+    public ProductSerial getSerial() { return serial; }
+    public void setSerial(ProductSerial serial) { this.serial = serial; }
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; recalculateAvailable(); }
     public int getReservedQuantity() { return reservedQuantity; }

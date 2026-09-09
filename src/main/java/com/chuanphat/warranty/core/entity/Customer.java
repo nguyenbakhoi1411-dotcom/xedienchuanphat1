@@ -88,6 +88,27 @@ public class Customer {
     @Column(columnDefinition = "TEXT")
     private String note;
 
+    @Column private boolean isOrganization = false;
+    @Column private boolean isSupplier = false;
+    @Column private boolean isInternal = false;
+    @Column private String taxUnitCode;
+    @Column private String website;
+    @Column private String customerGroup;
+    @Column private String salesEmployee;
+    @Column private String contactTitle;
+    @Column private String contactName;
+    @Column private String contactEmail;
+    @Column private String contactMobilePhone;
+    @Column private String legalRepresentative;
+    @Column private String invoiceRecipientName;
+    @Column private String invoiceRecipientEmail;
+    @Column private String invoiceRecipientPhone;
+    @Column private String bankAccountNumber;
+    @Column private String bankName;
+    @Column private String bankBranch;
+    @Column private Long customerPriceGroupId;
+    @Column private java.math.BigDecimal revenue30Days = java.math.BigDecimal.ZERO;
+
     // ── Getters / Setters ──────────────────────────────────────────
     public Long getId() { return id; }
     public String getCustomerCode() { return customerCode; }
@@ -135,4 +156,45 @@ public class Customer {
     public void setLifetimeValue(BigDecimal v) { this.lifetimeValue = v == null ? BigDecimal.ZERO : v; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+    public boolean isOrganization() { return isOrganization; }
+    public void setOrganization(boolean isOrganization) { this.isOrganization = isOrganization; }
+    public boolean isSupplier() { return isSupplier; }
+    public void setSupplier(boolean isSupplier) { this.isSupplier = isSupplier; }
+    public boolean isInternal() { return isInternal; }
+    public void setInternal(boolean isInternal) { this.isInternal = isInternal; }
+    public String getTaxUnitCode() { return taxUnitCode; }
+    public void setTaxUnitCode(String taxUnitCode) { this.taxUnitCode = taxUnitCode; }
+    public String getWebsite() { return website; }
+    public void setWebsite(String website) { this.website = website; }
+    public String getCustomerGroup() { return customerGroup; }
+    public void setCustomerGroup(String customerGroup) { this.customerGroup = customerGroup; }
+    public String getSalesEmployee() { return salesEmployee; }
+    public void setSalesEmployee(String salesEmployee) { this.salesEmployee = salesEmployee; }
+    public String getContactTitle() { return contactTitle; }
+    public void setContactTitle(String contactTitle) { this.contactTitle = contactTitle; }
+    public String getContactName() { return contactName; }
+    public void setContactName(String contactName) { this.contactName = contactName; }
+    public String getContactEmail() { return contactEmail; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+    public String getContactMobilePhone() { return contactMobilePhone; }
+    public void setContactMobilePhone(String contactMobilePhone) { this.contactMobilePhone = contactMobilePhone; }
+    public String getLegalRepresentative() { return legalRepresentative; }
+    public void setLegalRepresentative(String legalRepresentative) { this.legalRepresentative = legalRepresentative; }
+    public String getInvoiceRecipientName() { return invoiceRecipientName; }
+    public void setInvoiceRecipientName(String invoiceRecipientName) { this.invoiceRecipientName = invoiceRecipientName; }
+    public String getInvoiceRecipientEmail() { return invoiceRecipientEmail; }
+    public void setInvoiceRecipientEmail(String invoiceRecipientEmail) { this.invoiceRecipientEmail = invoiceRecipientEmail; }
+    public String getInvoiceRecipientPhone() { return invoiceRecipientPhone; }
+    public void setInvoiceRecipientPhone(String invoiceRecipientPhone) { this.invoiceRecipientPhone = invoiceRecipientPhone; }
+    public String getBankAccountNumber() { return bankAccountNumber; }
+    public void setBankAccountNumber(String bankAccountNumber) { this.bankAccountNumber = bankAccountNumber; }
+    public String getBankName() { return bankName; }
+    public void setBankName(String bankName) { this.bankName = bankName; }
+    public String getBankBranch() { return bankBranch; }
+    public void setBankBranch(String bankBranch) { this.bankBranch = bankBranch; }
+    public Long getCustomerPriceGroupId() { return customerPriceGroupId; }
+    public void setCustomerPriceGroupId(Long customerPriceGroupId) { this.customerPriceGroupId = customerPriceGroupId; }
+    public java.math.BigDecimal getRevenue30Days() { return revenue30Days; }
+    public void setRevenue30Days(java.math.BigDecimal revenue30Days) { this.revenue30Days = revenue30Days; }
 }
+

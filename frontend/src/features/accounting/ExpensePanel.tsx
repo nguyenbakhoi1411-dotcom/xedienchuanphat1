@@ -1,19 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountingApi } from "./api";
 import type { Expense, ExpenseCategory, CreateExpensePayload } from "./types";
+import { useCurrentUser } from "@/lib/auth/useCurrentUser";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + " ₫";
 
-const CATEGORIES: { value: ExpenseCategory; label: string; icon: string }[] = [
-  { value: "SALARY",      label: "Lương",         icon: "👤" },
-  { value: "RENT",        label: "Thuê mặt bằng", icon: "🏢" },
-  { value: "UTILITIES",   label: "Điện/Nước",     icon: "⚡" },
-  { value: "MARKETING",   label: "Marketing",     icon: "📣" },
-  { value: "MAINTENANCE", label: "Bảo trì",       icon: "🔧" },
-  { value: "OTHER",       label: "Khác",           icon: "📝" },
+const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
+  { value: "SALARY",      label: "Lương" },
+  { value: "RENT",        label: "Thuê mặt bằng" },
+  { value: "UTILITIES",   label: "Điện/Nước" },
+  { value: "MARKETING",   label: "Marketing" },
+  { value: "MAINTENANCE", label: "Bảo trì" },
+  { value: "OTHER",       label: "Khác" },
 ];
 
 const STATUS_COLOR: Record<string, string> = { DRAFT: "#94a3b8", POSTED: "#22c55e", CANCELLED: "#ef4444" };
@@ -44,12 +47,19 @@ type FormState = {
 
 export function ExpensePanel() {
   const qc = useQueryClient();
+  const user = useCurrentUser();
   const [showForm, setShowForm] = useState(false);
   const [catFilter, setCatFilter] = useState("");
   const [form, setForm] = useState<FormState>({
-    category: "OTHER", amount: "", description: "", branchId: 1,
+    category: "OTHER", amount: "", description: "", branchId: user?.branchId ?? 1,
     accountCode: "642", contraAccount: "111",
   });
+
+  useEffect(() => {
+    if (user?.branchId) {
+      setForm((f) => ({ ...f, branchId: user.branchId as number }));
+    }
+  }, [user?.branchId]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["expenses", catFilter],
@@ -71,7 +81,7 @@ export function ExpensePanel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["expenses"] }),
   });
 
-  const resetForm = () => setForm({ category: "OTHER", amount: "", description: "", branchId: 1, accountCode: "642", contraAccount: "111" });
+  const resetForm = () => setForm({ category: "OTHER", amount: "", description: "", branchId: user?.branchId ?? 1, accountCode: "642", contraAccount: "111" });
 
   const handleSubmit = () => {
     if (!form.amount || isNaN(Number(form.amount))) return;
@@ -99,7 +109,7 @@ export function ExpensePanel() {
         <button onClick={() => setCatFilter("")} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid", cursor: "pointer", fontSize: 12, fontWeight: 600, borderColor: !catFilter ? "#6366f1" : "rgba(255,255,255,0.1)", background: !catFilter ? "rgba(99,102,241,0.15)" : "transparent", color: !catFilter ? "#818cf8" : "#64748b" }}>Tất cả</button>
         {CATEGORIES.map((c) => (
           <button key={c.value} onClick={() => setCatFilter(c.value)} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid", cursor: "pointer", fontSize: 12, fontWeight: 600, borderColor: catFilter === c.value ? "#6366f1" : "rgba(255,255,255,0.1)", background: catFilter === c.value ? "rgba(99,102,241,0.15)" : "transparent", color: catFilter === c.value ? "#818cf8" : "#64748b" }}>
-            {c.icon} {c.label}
+            {c.label}
           </button>
         ))}
       </div>
@@ -116,9 +126,27 @@ export function ExpensePanel() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={8} style={{ textAlign: "center", padding: 40, color: "#475569" }}>Đang tải...</td></tr>
+              Array.from({ length: 5 }).map((_, idx) => (
+                <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <td style={{ padding: "10px 14px" }}><Skeleton className="h-4 w-16 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 14px" }}><Skeleton className="h-4 w-24 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 14px" }}><Skeleton className="h-4 w-20 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 14px" }}><Skeleton className="h-4 w-32 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 14px" }}><Skeleton className="h-4 w-12 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 14px" }}><Skeleton className="h-4 w-20 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 14px" }}><Skeleton className="h-4 w-16 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 14px" }}><Skeleton className="h-4 w-20 bg-slate-800" /></td>
+                </tr>
+              ))
             ) : !items.length ? (
-              <tr><td colSpan={8} style={{ textAlign: "center", padding: 40, color: "#475569" }}>Chưa có chi phí nào</td></tr>
+              <tr>
+                <td colSpan={8} style={{ padding: 40 }}>
+                  <EmptyState
+                    title="Chưa có chi phí nào"
+                    description="Hãy thêm chi phí mới để quản lý các khoản chi tiêu của doanh nghiệp."
+                  />
+                </td>
+              </tr>
             ) : items.map((exp, i) => {
               const cat = CATEGORIES.find((c) => c.value === exp.category);
               return (
@@ -126,7 +154,7 @@ export function ExpensePanel() {
                   <td style={{ padding: "10px 14px", fontFamily: "monospace", color: "#818cf8", fontWeight: 600, fontSize: 13 }}>{exp.expenseCode}</td>
                   <td style={{ padding: "10px 14px", color: "#94a3b8", fontSize: 13 }}>{exp.expenseDate}</td>
                   <td style={{ padding: "10px 14px" }}>
-                    <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(99,102,241,0.12)", color: "#818cf8" }}>{cat?.icon} {cat?.label ?? exp.category}</span>
+                    <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(99,102,241,0.12)", color: "#818cf8" }}>{cat?.label ?? exp.category}</span>
                   </td>
                   <td style={{ padding: "10px 14px", color: "#94a3b8", fontSize: 13, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exp.description ?? "—"}</td>
                   <td style={{ padding: "10px 14px", fontFamily: "monospace", color: "#64748b", fontSize: 12 }}>{exp.accountCode}</td>
@@ -156,7 +184,7 @@ export function ExpensePanel() {
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div style={{ background: "#0f172a", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 16, padding: 28, width: 480, maxWidth: "90vw", maxHeight: "90vh", overflowY: "auto" }}>
-            <h3 style={{ color: "#f1f5f9", marginTop: 0, fontSize: 17 }}>➕ Thêm chi phí</h3>
+            <h3 style={{ color: "#f1f5f9", marginTop: 0, fontSize: 17 }}>Thêm chi phí</h3>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div style={{ gridColumn: "1/-1" }}>
@@ -164,7 +192,7 @@ export function ExpensePanel() {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {CATEGORIES.map((c) => (
                     <button key={c.value} onClick={() => setForm((f) => ({ ...f, category: c.value }))} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid", cursor: "pointer", fontSize: 12, fontWeight: 600, borderColor: form.category === c.value ? "#6366f1" : "rgba(255,255,255,0.1)", background: form.category === c.value ? "rgba(99,102,241,0.2)" : "transparent", color: form.category === c.value ? "#818cf8" : "#64748b" }}>
-                      {c.icon} {c.label}
+                      {c.label}
                     </button>
                   ))}
                 </div>

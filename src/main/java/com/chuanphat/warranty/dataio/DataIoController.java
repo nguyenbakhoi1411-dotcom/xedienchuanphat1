@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/data-io")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class DataIoController {
     private final DataIoService service;
 
@@ -63,3 +64,4 @@ public class DataIoController {
         return "csv".equalsIgnoreCase(format) ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     }
 }
+

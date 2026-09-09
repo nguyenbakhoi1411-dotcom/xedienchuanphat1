@@ -23,4 +23,7 @@ public enum InventoryTransactionType {
     WRITE_OFF,                // Huy/xoa so
     COUNT_ADJUSTMENT_IN,      // Dieu chinh tang sau kiem ke
     COUNT_ADJUSTMENT_OUT      // Dieu chinh giam sau kiem ke
+    ,TRANSFER
 }
+
+

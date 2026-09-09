@@ -24,6 +24,10 @@ public record CreateSalesOrderRequest(
         Boolean confirm,
         OffsetDateTime reservationUntil,
         Boolean issueInvoice,
+        String deliveryStatus,
+        String ecommercePlatform,
+        String shopName,
+        String storeCode,
         @Valid List<PaymentEntryRequest> payments,
         @Valid @NotEmpty List<CreateSalesOrderItemRequest> items
 ) {

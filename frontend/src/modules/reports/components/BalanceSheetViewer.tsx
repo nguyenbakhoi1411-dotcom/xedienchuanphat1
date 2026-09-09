@@ -6,9 +6,11 @@ import { cn } from '@/lib/utils';
 import { BalanceSheetReport, BalanceSheetItem } from '../types';
 
 interface BalanceSheetViewerProps {
-  report: BalanceSheetReport;
+  report?: BalanceSheetReport;
   isLoading?: boolean;
   currencyUnit?: 'vnd' | 'thousands' | 'millions';
+  fromDate?: string;
+  toDate?: string;
 }
 
 interface RowProps {
@@ -105,6 +107,8 @@ export function BalanceSheetViewer({
   report,
   isLoading = false,
   currencyUnit = 'vnd',
+  fromDate,
+  toDate,
 }: BalanceSheetViewerProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set(['assets', 'liabilities', 'equity']));
 
@@ -118,10 +122,10 @@ export function BalanceSheetViewer({
     setExpandedRows(newExpanded);
   };
 
-  if (isLoading) {
+  if (isLoading || !report) {
     return (
       <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
+        {[...Array(6)].map((_, i) => (
           <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
         ))}
       </div>
@@ -130,11 +134,29 @@ export function BalanceSheetViewer({
 
   const hasChildren = (item: BalanceSheetItem) => item.children && item.children.length > 0;
 
+  const fmtDate = (d: string | null | undefined) => {
+    if (!d) return '';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return d;
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex items-center justify-between bg-white p-4 rounded-lg border border-gray-200">
-        <h2 className="font-semibold text-gray-900">Bảng cân đối kế toán (B01-DN)</h2>
+        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+          <span>Bảng cân đối kế toán (B01-DN)</span>
+          {toDate && (
+            <span className="text-xs text-gray-500 font-normal">
+              (Tại ngày {fmtDate(toDate)})
+            </span>
+          )}
+        </h2>
         <div className="flex items-center gap-2">
           <button
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors"

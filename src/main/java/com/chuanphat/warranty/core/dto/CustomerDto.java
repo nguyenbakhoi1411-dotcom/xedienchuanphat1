@@ -17,7 +17,25 @@ public record CustomerDto(
         Long assignedTo,
         String birthday,
         CustomerTier tier,
-        RecordStatus status
+        RecordStatus status,
+        boolean isOrganization,
+        boolean isSupplier,
+        boolean isInternal,
+        String taxUnitCode,
+        String website,
+        String customerGroup,
+        String salesEmployee,
+        String contactTitle,
+        String contactName,
+        String contactEmail,
+        String contactMobilePhone,
+        String legalRepresentative,
+        String invoiceRecipientName,
+        String invoiceRecipientEmail,
+        String invoiceRecipientPhone,
+        String bankAccountNumber,
+        String bankName,
+        String bankBranch
 ) {
     public static CustomerDto from(Customer customer) {
         return new CustomerDto(
@@ -31,7 +49,25 @@ public record CustomerDto(
                 customer.getAssignedTo(),
                 customer.getBirthday(),
                 customer.getTier(),
-                customer.getStatus()
+                customer.getStatus(),
+                customer.isOrganization(),
+                customer.isSupplier(),
+                customer.isInternal(),
+                customer.getTaxUnitCode(),
+                customer.getWebsite(),
+                customer.getCustomerGroup(),
+                customer.getSalesEmployee(),
+                customer.getContactTitle(),
+                customer.getContactName(),
+                customer.getContactEmail(),
+                customer.getContactMobilePhone(),
+                customer.getLegalRepresentative(),
+                customer.getInvoiceRecipientName(),
+                customer.getInvoiceRecipientEmail(),
+                customer.getInvoiceRecipientPhone(),
+                customer.getBankAccountNumber(),
+                customer.getBankName(),
+                customer.getBankBranch()
         );
     }
 }

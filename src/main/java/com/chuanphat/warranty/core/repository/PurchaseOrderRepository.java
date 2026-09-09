@@ -3,6 +3,7 @@ package com.chuanphat.warranty.core.repository;
 import com.chuanphat.warranty.core.entity.PurchaseOrder;
 import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -24,10 +25,19 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
 
     List<PurchaseOrder> findByStatusIn(List<PurchaseOrderStatus> statuses);
 
+    /** Lay cac don qua han thanh toan theo chi nhanh */
+    List<PurchaseOrder> findByBranchIdAndHanThanhToanBeforeAndTrangThaiThanhToanNot(
+            Long branchId, LocalDate today, String paidStatus);
+
+    /** Lay cac don qua han thanh toan (toan he thong) */
+    List<PurchaseOrder> findByHanThanhToanBeforeAndTrangThaiThanhToanNot(
+            LocalDate today, String paidStatus);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select po from PurchaseOrder po where po.id = :id")
     Optional<PurchaseOrder> findWithLockById(@Param("id") Long id);
 
-    @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(po.purchaseOrderNo, 5) AS int)), 0) FROM PurchaseOrder po WHERE po.purchaseOrderNo LIKE 'DH-%'")
+    /** Max seq de sinh ma don mua. Format moi: DH-YYYYMMDD-XXX (lay so cuoi cung) */
+    @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(po.purchaseOrderNo, 13) AS int)), 0) FROM PurchaseOrder po WHERE po.purchaseOrderNo LIKE 'DH-%'")
     int findMaxPoSeq();
 }

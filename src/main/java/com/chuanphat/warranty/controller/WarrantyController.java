@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/warranties")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class WarrantyController {
     private final WarrantyService warrantyService;
 
@@ -50,3 +51,4 @@ public class WarrantyController {
         return warrantyService.createPolicy(request);
     }
 }
+

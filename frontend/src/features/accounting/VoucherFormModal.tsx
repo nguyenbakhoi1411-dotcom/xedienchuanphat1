@@ -109,7 +109,7 @@ export function VoucherFormModal({
               }
             })}
           >
-            <option value="">{optionsLoading ? "Dang tai du lieu" : isReceipt ? "Chon khach hang" : "Chon nha cung cap"}</option>
+            <option value="">{optionsLoading ? "Đang tải dữ liệu" : isReceipt ? "Chon khach hang" : "Chon nha cung cap"}</option>
             {(isReceipt ? customers : suppliers).map((item) => (
               <option key={item.id} value={item.id}>{item.name}{item.secondary ? ` - ${item.secondary}` : ""}</option>
             ))}
@@ -126,7 +126,7 @@ export function VoucherFormModal({
         {paymentMethod === "BANK_TRANSFER" && (
           <Field label="Tai khoan ngan hang" error={form.formState.errors.bankAccountId?.message}>
             <select className={inputClass} disabled={optionsLoading} {...form.register("bankAccountId")}>
-              <option value="">{optionsLoading ? "Dang tai du lieu" : "Chon tai khoan"}</option>
+              <option value="">{optionsLoading ? "Đang tải dữ liệu" : "Chon tai khoan"}</option>
               {bankAccounts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </Field>

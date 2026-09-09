@@ -221,7 +221,7 @@ export function ServiceTicketDetailDrawer({
                       {componentTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                     </select>
                     <Button className="w-full" variant="secondary" onClick={() => onUpdateDiagnosis?.({ diagnosisNote: "Da kiem tra", technicianDiagnosis: ticket.predictedCause ?? ticket.issueDescription, warrantyRepair: ticket.warrantyRepair, componentType: ticket.componentType })}>Luu chan doan</Button>
-                    <Button className="w-full" variant="secondary" onClick={() => onCreateQuotation?.("Bao gia sua chua theo chi phi da nhap")}>Tao bao gia</Button>
+                    <Button className="w-full" variant="secondary" onClick={() => onCreateQuotation?.("Báo giá sua chua theo chi phi da nhap")}>Tao bao gia</Button>
                     <Button className="w-full" variant="secondary" onClick={onApproveQuotation}>Khach dong y</Button>
                     <Button className="w-full" onClick={onCreateInvoice}>Tao invoice service</Button>
                   </div>

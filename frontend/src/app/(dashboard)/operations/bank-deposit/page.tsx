@@ -44,7 +44,6 @@ export default function BankDepositPage() {
 
         {/* Promotional Banners */}
         <BannerStrip
-          onReportClick={handleReportClick}
           onBannerClick={handleReportClick}
         />
 

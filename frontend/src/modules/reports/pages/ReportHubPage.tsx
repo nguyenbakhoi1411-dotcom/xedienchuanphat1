@@ -250,12 +250,13 @@ export function ReportHubPage() {
   };
 
   const recentReportItems = recentReports.map((recent) => {
-    const report = MOCK_REPORTS.find((r) => r.id === recent.id);
+    const report = MOCK_REPORTS.find((r) => r.id === recent.reportId);
     return {
-      id: recent.id,
+      id: recent.reportId,
       name: report?.name || 'Unknown',
-      icon: report?.icon,
+      icon: report?.icon || 'FileText',
       viewedAt: recent.viewedAt,
+      onView: () => handleViewReport(recent.reportId)
     };
   });
 
@@ -321,7 +322,7 @@ export function ReportHubPage() {
           <div className="lg:col-span-1 space-y-6">
             {/* Deadlines Widget */}
             <DeadlineWidget
-              deadlines={deadlines}
+              deadlines={deadlines as any}
               isLoading={deadlineLoading}
               maxItems={4}
             />
@@ -330,7 +331,7 @@ export function ReportHubPage() {
             <div className="bg-white p-4 rounded-lg border border-gray-200">
               <h3 className="font-semibold text-gray-900 mb-3">Dùng gần đây</h3>
               <RecentReportsSection
-                reports={recentReportItems}
+                reports={recentReportItems as any}
                 onView={handleViewReport}
                 isLoading={recentLoading}
               />

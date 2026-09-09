@@ -144,7 +144,7 @@ export default function OperationsPage() {
               <input value={restoreFile} onChange={(event) => setRestoreFile(event.target.value)} placeholder="chuanphat-20260608-071500.dump" className={inputClass} />
             </label>
             <label className="mt-3 block text-sm font-medium text-text">
-              Xac nhan
+              Xác nhận
               <input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="RESTORE DATABASE" className={inputClass} />
             </label>
             <Button className="mt-4 w-full" variant="danger" type="submit" disabled={restore.isPending || confirmation !== "RESTORE DATABASE" || !restoreFile}>
@@ -392,7 +392,7 @@ const exportOptions: Array<{ value: DataIoType; label: string }> = [
   { value: "PRODUCTS", label: "San pham" },
   { value: "INVENTORY", label: "Ton kho" },
   { value: "SERIALS", label: "Serial" },
-  { value: "ORDERS", label: "Don hang" },
+  { value: "ORDERS", label: "Đơn hàng" },
   { value: "DEBT", label: "Cong no" },
   { value: "SUPPLIERS", label: "Nha cung cap" }
 ];

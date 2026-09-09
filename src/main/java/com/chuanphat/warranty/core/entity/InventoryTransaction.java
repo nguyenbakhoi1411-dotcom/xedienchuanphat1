@@ -37,6 +37,14 @@ public class InventoryTransaction {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    private ProductBatch batch;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "serial_id")
+    private ProductSerial serial;
+
     private Long fromBranchId;
 
     private Long toBranchId;
@@ -66,6 +74,9 @@ public class InventoryTransaction {
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
+    @Column(nullable = false, length = 120)
+    private String createdBy;
+
     public Long getId() { return id; }
     public InventoryTransactionType getType() { return type; }
     public void setType(InventoryTransactionType type) { this.type = type; }
@@ -75,6 +86,10 @@ public class InventoryTransaction {
     public void setTransactionDate(LocalDate transactionDate) { this.transactionDate = transactionDate; }
     public Product getProduct() { return product; }
     public void setProduct(Product product) { this.product = product; }
+    public ProductBatch getBatch() { return batch; }
+    public void setBatch(ProductBatch batch) { this.batch = batch; }
+    public ProductSerial getSerial() { return serial; }
+    public void setSerial(ProductSerial serial) { this.serial = serial; }
     public Long getFromBranchId() { return fromBranchId; }
     public void setFromBranchId(Long fromBranchId) { this.fromBranchId = fromBranchId; }
     public Long getToBranchId() { return toBranchId; }
@@ -96,4 +111,6 @@ public class InventoryTransaction {
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
 }

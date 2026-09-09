@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/branches")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class BranchController {
     private final BranchService service;
 
@@ -40,3 +41,4 @@ public class BranchController {
         service.delete(id);
     }
 }
+

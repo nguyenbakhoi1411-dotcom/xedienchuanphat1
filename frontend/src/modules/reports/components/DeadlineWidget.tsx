@@ -2,9 +2,8 @@
 
 import React from 'react';
 import { Calendar, AlertCircle, Clock } from 'lucide-react';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
-import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { formatDate } from '../lib/date';
 
 export interface DeadlineItem {
   id: string;
@@ -39,7 +38,7 @@ export function DeadlineWidget({
     const deadline = new Date(dueDate);
     deadline.setHours(0, 0, 0, 0);
 
-    if (isAfter(today, deadline)) {
+    if (today.getTime() > deadline.getTime()) {
       return 'overdue';
     }
 
@@ -112,7 +111,7 @@ export function DeadlineWidget({
                     )}
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs">
-                        {format(new Date(deadline.dueDate), 'dd/MM/yyyy', { locale: vi })}
+                        {formatDate(new Date(deadline.dueDate), 'dd/MM/yyyy')}
                       </span>
                       <span className="text-xs font-semibold">
                         {status === 'overdue' && 'Quá hạn'}

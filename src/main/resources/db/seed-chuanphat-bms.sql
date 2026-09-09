@@ -66,9 +66,7 @@ MERGE INTO permissions (id, code, module, action) KEY(id) VALUES
 (37, 'ROLE_UPDATE', 'ROLE', 'UPDATE'),
 (38, 'MARKETING_VIEW', 'MARKETING', 'VIEW'),
 (39, 'MARKETING_CREATE', 'MARKETING', 'CREATE'),
-(40, 'MARKETING_UPDATE', 'MARKETING', 'UPDATE');
-
-MERGE INTO permissions (id, code, module, action) KEY(id) VALUES
+(40, 'MARKETING_UPDATE', 'MARKETING', 'UPDATE'),
 (41, 'SALES_UPDATE', 'SALES', 'UPDATE'),
 (42, 'SALES_CANCEL', 'SALES', 'CANCEL'),
 (43, 'SALES_DISCOUNT_APPROVE', 'SALES', 'APPROVE'),
@@ -76,13 +74,15 @@ MERGE INTO permissions (id, code, module, action) KEY(id) VALUES
 (45, 'INVOICE_ISSUE', 'INVOICE', 'ISSUE');
 
 MERGE INTO roles (id, code, name) KEY(id) VALUES
-(1, 'ADMIN', 'Quan tri he thong'),
-(2, 'BRANCH_MANAGER', 'Quan ly chi nhanh'),
-(3, 'SALES', 'Nhan vien ban hang'),
-(4, 'WAREHOUSE', 'Thu kho'),
-(5, 'ACCOUNTANT', 'Ke toan'),
-(6, 'TECHNICIAN', 'Ky thuat vien'),
-(7, 'USER', 'Nguoi dung');
+(1, 'ADMIN', 'Quản trị hệ thống'),
+(2, 'BRANCH_MANAGER', 'Quản lý chi nhánh'),
+(3, 'SALES_STAFF', 'Nhân viên bán hàng (Seller)'),
+(4, 'WAREHOUSE_STAFF', 'Thủ kho'),
+(5, 'ACCOUNTANT', 'Kế toán'),
+(6, 'TECHNICIAN', 'Kỹ thuật viên'),
+(7, 'USER', 'Người dùng'),
+(8, 'CASHIER', 'Thủ quỹ'),
+(9, 'MARKETING_STAFF', 'Nhân viên Marketing');
 
 MERGE INTO role_permissions (role_id, permission_id) KEY(role_id, permission_id)
 SELECT 1, id FROM permissions;
@@ -111,360 +111,107 @@ SELECT role_id, permission_id FROM (
 );
 
 MERGE INTO app_users (id, username, email, phone, full_name, password_hash, branch_id, role_id, status, created_at) KEY(id) VALUES
-(1, 'admin', 'admin@chuanphat.vn', '0909000001', 'Admin Chuan Phat', '{bcrypt}$2a$10$7EqJtq98hPqEX7fNZaFWoOhi/3zO4IdbQGtoK9PHT7y.gD1yP7z8m', NULL, 1, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00');
+(1, 'admin', 'admin@chuanphat.vn', '0909000001', 'Admin Chuan Phat', '{noop}123456', NULL, 1, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(2, 'sales', 'sales@chuanphat.vn', '0909000002', 'Sales Chuan Phat', '{noop}123456', NULL, 3, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(3, 'checker', 'checker@chuanphat.vn', '0909000003', 'Checker Chuan Phat', '{noop}123456', NULL, 2, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00');
 
 MERGE INTO branches (id, code, name, address, phone, status, created_at) KEY(id) VALUES
-(1, 'CP-GV', 'Chuan Phat Go Vap', '121 Quang Trung, Quan Go Vap, TP.HCM', '02839010001', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(2, 'CP-TD', 'Chuan Phat Thu Duc', '45 Vo Van Ngan, TP. Thu Duc, TP.HCM', '02839010002', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(3, 'CP-Q7', 'Chuan Phat Quan 7', '88 Nguyen Thi Thap, Quan 7, TP.HCM', '02839010003', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(4, 'CP-TB', 'Chuan Phat Tan Binh', '19 Cong Hoa, Quan Tan Binh, TP.HCM', '02839010004', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(5, 'CP-BD', 'Chuan Phat Binh Duong', '22 Dai lo Binh Duong, Thu Dau Mot', '02743901005', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(6, 'CP-DN', 'Chuan Phat Dong Nai', '9 Pham Van Thuan, Bien Hoa', '02513901006', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00');
+(1, 'CP-LVT', 'Chuẩn Phát Lê Viết Thuật', 'Số 389 Lê Viết Thuật, Vinh Lộc, Nghệ An', '0832032555', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(2, 'CP-NT', 'Chuẩn Phát Nguyễn Trãi', 'Số 7 Nguyễn Trãi, P. Vinh Hưng, Nghệ An', '0832058555', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(3, 'CP-ND', 'Chuẩn Phát Nam Đàn', 'Số 238, QL46, TT. Nam Đàn, Nghệ An', '0832028555', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(4, 'CP-NDU', 'Chuẩn Phát Nguyễn Du', 'Số 116 Nguyễn Du, P. Trường Vinh, Nghệ An', '0815016555', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(5, 'CP-LL', 'Chuẩn Phát Lê Lợi', 'Số 60 Lê Lợi, P. Thành Vinh, Nghệ An', '0815018555', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(6, 'CP-VF', 'Xưởng dịch vụ VinFast Chuẩn Phát', 'Số 389 Lê Viết Thuật, Vinh Lộc, Nghệ An', '0912186586', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00');
 
 MERGE INTO warehouses (id, warehouse_code, warehouse_name, branch_id, type, status, location_aisle, location_shelf, location_bin, description, created_at) KEY(id)
-SELECT X,
-       'WH-MAIN-' || LPAD(CAST(X AS VARCHAR), 2, '0'),
-       'Kho chinh chi nhanh ' || X,
-       X,
-       'MAIN',
-       'ACTIVE',
-       'A',
-       'S1',
-       'B1',
-       'Seed main warehouse for branch ' || X,
-       TIMESTAMP '2026-01-01 08:30:00'
+SELECT X, 'WH-MAIN-' || LPAD(CAST(X AS VARCHAR), 2, '0'), 'Kho chinh chi nhanh ' || X, X, 'MAIN', 'ACTIVE', 'A', 'S1', 'B1', 'Seed main warehouse for branch ' || X, TIMESTAMP '2026-01-01 08:30:00'
 FROM SYSTEM_RANGE(1, 6);
 
 MERGE INTO app_users (id, username, email, phone, full_name, password_hash, branch_id, role_id, status, created_at) KEY(id)
-SELECT X + 1,
-       'nv' || LPAD(CAST(X AS VARCHAR), 3, '0'),
-       'nv' || LPAD(CAST(X AS VARCHAR), 3, '0') || '@chuanphat.vn',
-       '09' || LPAD(CAST(10000000 + X AS VARCHAR), 8, '0'),
+SELECT X + 1, 'nv' || LPAD(CAST(X AS VARCHAR), 3, '0'), 'nv' || LPAD(CAST(X AS VARCHAR), 3, '0') || '@chuanphat.vn', '09' || LPAD(CAST(10000000 + X AS VARCHAR), 8, '0'), 
        CASE MOD(X, 6) WHEN 1 THEN 'Nguyen Minh Anh' WHEN 2 THEN 'Tran Bao Chau' WHEN 3 THEN 'Le Quoc Dat' WHEN 4 THEN 'Pham Gia Huy' WHEN 5 THEN 'Vo Thanh Khoa' ELSE 'Dang Nhat Linh' END || ' ' || X,
-       '{bcrypt}$2a$10$7EqJtq98hPqEX7fNZaFWoOhi/3zO4IdbQGtoK9PHT7y.gD1yP7z8m',
-       MOD(X - 1, 6) + 1,
+       '{bcrypt}$2a$10$7EqJtq98hPqEX7fNZaFWoOhi/3zO4IdbQGtoK9PHT7y.gD1yP7z8m', MOD(X - 1, 6) + 1,
        CASE WHEN X <= 6 THEN 2 WHEN MOD(X, 5) = 0 THEN 5 WHEN MOD(X, 4) = 0 THEN 6 WHEN MOD(X, 3) = 0 THEN 4 ELSE 3 END,
-       'ACTIVE',
-       TIMESTAMP '2026-01-01 08:00:00'
+       'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'
 FROM SYSTEM_RANGE(1, 20);
 
-MERGE INTO app_users (id, username, email, phone, full_name, password_hash, branch_id, role_id, status, created_at) KEY(id) VALUES
-(101, 'manager1', 'manager1@chuanphat.vn', '0909100001', 'Demo Branch Manager 1', '{bcrypt}$2a$10$GzAVGEgQ4s3vZ3c1Ew1DtOvTXqMJ09v0XyTHiWAevfDQZVNCyNyoa', 1, 2, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(102, 'sales1', 'sales1@chuanphat.vn', '0909100002', 'Demo Sales 1', '{bcrypt}$2a$10$GzAVGEgQ4s3vZ3c1Ew1DtOvTXqMJ09v0XyTHiWAevfDQZVNCyNyoa', 1, 3, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(103, 'warehouse1', 'warehouse1@chuanphat.vn', '0909100003', 'Demo Warehouse 1', '{bcrypt}$2a$10$GzAVGEgQ4s3vZ3c1Ew1DtOvTXqMJ09v0XyTHiWAevfDQZVNCyNyoa', 1, 4, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(104, 'accountant1', 'accountant1@chuanphat.vn', '0909100004', 'Demo Accountant 1', '{bcrypt}$2a$10$GzAVGEgQ4s3vZ3c1Ew1DtOvTXqMJ09v0XyTHiWAevfDQZVNCyNyoa', 1, 5, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(105, 'technician1', 'technician1@chuanphat.vn', '0909100005', 'Demo Technician 1', '{bcrypt}$2a$10$GzAVGEgQ4s3vZ3c1Ew1DtOvTXqMJ09v0XyTHiWAevfDQZVNCyNyoa', 1, 6, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(106, 'sales2', 'sales2@chuanphat.vn', '0909100006', 'Demo Sales 2', '{bcrypt}$2a$10$GzAVGEgQ4s3vZ3c1Ew1DtOvTXqMJ09v0XyTHiWAevfDQZVNCyNyoa', 2, 3, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00');
-
-MERGE INTO products (id, product_code, product_name, category, brand, model, color, battery_capacity, motor_power, import_price, sale_price, warranty_months, status, created_at) KEY(id)
+-- 20 Products
+MERGE INTO products (id, product_code, product_name, category, brand, model, import_price, sale_price, warranty_months, status, is_service, tax_reduction_allowed, created_at) KEY(id)
 SELECT X,
-       'CP-' || CASE WHEN X <= 30 THEN 'XE' WHEN X <= 40 THEN 'PIN' ELSE 'PT' END || '-' || LPAD(CAST(X AS VARCHAR), 3, '0'),
-       CASE WHEN X <= 30 THEN 'Xe may dien Chuan Phat ' || CASE MOD(X, 5) WHEN 1 THEN 'S1' WHEN 2 THEN 'City' WHEN 3 THEN 'Sport' WHEN 4 THEN 'Neo' ELSE 'Plus' END
-            WHEN X <= 40 THEN 'Pin lithium LFP ' || CAST(48 + MOD(X, 5) * 12 AS VARCHAR) || 'V'
-            ELSE CASE MOD(X, 5) WHEN 1 THEN 'Bo sac nhanh' WHEN 2 THEN 'Lop xe dien' WHEN 3 THEN 'Bo dieu khien' WHEN 4 THEN 'Tay ga dien' ELSE 'Den pha LED' END END || ' #' || X,
-       CASE WHEN X <= 30 THEN 'ELECTRIC_MOTORBIKE' WHEN X <= 40 THEN 'BATTERY' WHEN MOD(X, 5) = 1 THEN 'CHARGER' ELSE 'SPARE_PART' END,
-       CASE MOD(X, 4) WHEN 1 THEN 'Chuan Phat' WHEN 2 THEN 'VinFast' WHEN 3 THEN 'Dat Bike' ELSE 'Yadea' END,
-       CASE MOD(X, 5) WHEN 1 THEN 'S1' WHEN 2 THEN 'City' WHEN 3 THEN 'Sport' WHEN 4 THEN 'Neo' ELSE 'Plus' END,
-       CASE MOD(X, 6) WHEN 1 THEN 'Trang' WHEN 2 THEN 'Den' WHEN 3 THEN 'Do' WHEN 4 THEN 'Xanh duong' WHEN 5 THEN 'Xam' ELSE 'Bac' END,
-       CASE WHEN X <= 40 THEN CAST(48 + MOD(X, 4) * 12 AS VARCHAR) || 'V ' || CAST(20 + MOD(X, 5) * 8 AS VARCHAR) || 'Ah' ELSE NULL END,
-       CASE WHEN X <= 30 THEN CAST(800 + MOD(X, 6) * 250 AS VARCHAR) || 'W' ELSE NULL END,
-       CASE WHEN X <= 30 THEN 9500000 + X * 125000 WHEN X <= 40 THEN 2800000 + X * 45000 ELSE 120000 + X * 35000 END,
-       CASE WHEN X <= 30 THEN 13500000 + X * 180000 WHEN X <= 40 THEN 4200000 + X * 70000 ELSE 250000 + X * 55000 END,
-       CASE WHEN X <= 30 THEN 24 WHEN X <= 40 THEN 12 ELSE 6 END,
-       'ACTIVE',
-       TIMESTAMP '2026-01-15 09:00:00'
-FROM SYSTEM_RANGE(1, 50);
+       'CP-' || CASE WHEN X <= 10 THEN 'XE' WHEN X <= 15 THEN 'PIN' ELSE 'PT' END || '-' || LPAD(CAST(X AS VARCHAR), 3, '0'),
+       CASE WHEN X <= 10 THEN 'Xe may dien Chuan Phat S' || X WHEN X <= 15 THEN 'Pin lithium LFP ' || X ELSE 'Phu tung xe dien ' || X END,
+       CASE WHEN X <= 10 THEN 'ELECTRIC_MOTORBIKE' WHEN X <= 15 THEN 'BATTERY' ELSE 'SPARE_PART' END,
+       'Chuan Phat', 'S' || MOD(X, 5),
+       CASE WHEN X <= 10 THEN 9500000 WHEN X <= 15 THEN 2800000 ELSE 120000 END,
+       CASE WHEN X <= 10 THEN 13500000 WHEN X <= 15 THEN 4200000 ELSE 250000 END,
+       24, 'ACTIVE', FALSE, FALSE, TIMESTAMP '2026-01-15 09:00:00'
+FROM SYSTEM_RANGE(1, 20);
 
+-- Product Serials for Warranty (only for some)
 MERGE INTO product_serials (id, product_id, serial_number, branch_id, warehouse_id, battery_serial, motor_serial, import_date, status, created_at) KEY(id)
-SELECT X,
-       MOD(X - 1, 30) + 1,
-       'CP26-' || LPAD(CAST(MOD(X - 1, 30) + 1 AS VARCHAR), 3, '0') || '-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
-       MOD(X - 1, 6) + 1,
-       MOD(X - 1, 6) + 1,
-       'BAT26-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
-       'MOT26-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
-       DATEADD('DAY', -MOD(X, 120), DATE '2026-06-06'),
-       CASE WHEN X <= 60 THEN 'SOLD' WHEN MOD(X, 10) = 0 THEN 'WARRANTY' ELSE 'IN_STOCK' END,
-       CURRENT_TIMESTAMP
-FROM SYSTEM_RANGE(1, 100);
+SELECT X, MOD(X - 1, 10) + 1, 'CP26-' || LPAD(CAST(X AS VARCHAR), 5, '0'), MOD(X - 1, 2) + 1, MOD(X - 1, 2) + 1,
+       'BAT26-' || LPAD(CAST(X AS VARCHAR), 5, '0'), 'MOT26-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
+       DATEADD('DAY', -MOD(X, 120), CURRENT_DATE), CASE WHEN X <= 30 THEN 'SOLD' ELSE 'IN_STOCK' END, CURRENT_TIMESTAMP
+FROM SYSTEM_RANGE(1, 40);
 
-MERGE INTO customers (id, phone, full_name, email, address, source, branch_id, tier, rank, score, status, total_purchase_amount, total_purchase_count, total_debt, lifetime_value, created_at) KEY(id)
-SELECT X,
-       '09' || LPAD(CAST(20000000 + X AS VARCHAR), 8, '0'),
-       CASE MOD(X, 10) WHEN 1 THEN 'Nguyen Van Minh' WHEN 2 THEN 'Tran Thi Huong' WHEN 3 THEN 'Le Quoc Bao' WHEN 4 THEN 'Pham Ngoc Anh' WHEN 5 THEN 'Hoang Thanh Tung' WHEN 6 THEN 'Vo Thi Mai' WHEN 7 THEN 'Dang Gia Khang' WHEN 8 THEN 'Bui Minh Thu' WHEN 9 THEN 'Do Van Phuc' ELSE 'Phan Thanh Lam' END || ' ' || X,
-       'kh' || LPAD(CAST(X AS VARCHAR), 5, '0') || '@gmail.com',
-       CASE MOD(X, 6) WHEN 1 THEN 'Go Vap, TP.HCM' WHEN 2 THEN 'Thu Duc, TP.HCM' WHEN 3 THEN 'Quan 7, TP.HCM' WHEN 4 THEN 'Tan Binh, TP.HCM' WHEN 5 THEN 'Thu Dau Mot, Binh Duong' ELSE 'Bien Hoa, Dong Nai' END,
-       CASE MOD(X, 4) WHEN 1 THEN 'FACEBOOK' WHEN 2 THEN 'ZALO' WHEN 3 THEN 'REFERRAL' ELSE 'WALK_IN' END,
-       MOD(X - 1, 6) + 1,
-       'NEW',
-       'NEW',
-       0,
-       'ACTIVE',
-       0,
-       0,
-       0,
-       0,
-       DATEADD('DAY', -MOD(X, 365), TIMESTAMP '2026-06-06 10:00:00')
-FROM SYSTEM_RANGE(1, 100);
+-- 5 Customers
+MERGE INTO customers (id, phone, full_name, email, address, source, branch_id, tier, rank, score, status, total_purchase_amount, total_purchase_count, total_debt, lifetime_value, is_organization, is_supplier, is_internal, created_at) KEY(id)
+SELECT X, '09' || LPAD(CAST(20000000 + X AS VARCHAR), 8, '0'), 'Khach Hang ' || X, 'kh' || LPAD(CAST(X AS VARCHAR), 5, '0') || '@gmail.com',
+       'Dia chi Khach Hang ' || X, 'WALK_IN', MOD(X - 1, 2) + 1, 'NEW', 'NEW', 0, 'ACTIVE', 0, 0, 0, 0, FALSE, FALSE, FALSE, DATEADD('MONTH', -X, CURRENT_TIMESTAMP)
+FROM SYSTEM_RANGE(1, 5);
 
+-- 5 Suppliers
+MERGE INTO suppliers (id, code, name, tax_code, phone, email, website, address, contact_person, current_debt, credit_limit, payment_terms_days, rating, notes, status, created_at) KEY(id)
+SELECT X, 'NCC-' || LPAD(CAST(X AS VARCHAR), 3, '0'), 'Nha Cung Cap ' || X, '0315000' || LPAD(CAST(X AS VARCHAR), 3, '0'), '090870000' || X,
+       'ncc' || X || '@chuanphat.vn', 'https://supplier' || X || '.example.vn', 'Dia chi NCC ' || X, 'Nguoi Lien He ' || X, 0, 100000000, 30, 5, 'Seed supplier ' || X, 'ACTIVE', DATEADD('MONTH', -12, CURRENT_TIMESTAMP)
+FROM SYSTEM_RANGE(1, 5);
+
+-- Inventory Stocks
 MERGE INTO inventory_stocks (id, branch_id, warehouse_id, product_id, quantity_on_hand, reserved_quantity, available_quantity, min_quantity, max_stock_level, updated_at) KEY(id)
-SELECT (b.X - 1) * 50 + p.X,
-       b.X,
-       b.X,
-       p.X,
-       CASE WHEN p.X <= 30 THEN MOD(b.X + p.X, 7) + 1 WHEN p.X <= 40 THEN MOD(b.X * p.X, 11) + 3 ELSE MOD(b.X + p.X, 18) + 5 END,
-       0,
-       CASE WHEN p.X <= 30 THEN MOD(b.X + p.X, 7) + 1 WHEN p.X <= 40 THEN MOD(b.X * p.X, 11) + 3 ELSE MOD(b.X + p.X, 18) + 5 END,
-       CASE WHEN p.X <= 30 THEN 2 WHEN p.X <= 40 THEN 5 ELSE 8 END,
-       100,
-       TIMESTAMP '2026-06-06 18:00:00'
-FROM SYSTEM_RANGE(1, 6) b
-CROSS JOIN SYSTEM_RANGE(1, 50) p;
+SELECT (b.X - 1) * 20 + p.X, b.X, b.X, p.X, 100, 0, 100, 5, 200, CURRENT_TIMESTAMP
+FROM SYSTEM_RANGE(1, 2) b CROSS JOIN SYSTEM_RANGE(1, 20) p;
 
-MERGE INTO sales_orders (
-    id, order_no, branch_id, customer_id, employee_id, order_date, status,
-    subtotal, discount_amount, voucher_code, total_amount, vat_rate, vat_amount,
-    paid_amount, payment_status, accounting_recorded, stock_issued, warranty_created,
-    voucher_consumed, max_discount_pct, discount_approval_status, created_at
-) KEY(id)
-SELECT X,
-       'SO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
-       MOD(X - 1, 6) + 1,
-       MOD(X - 1, 100) + 1,
-       MOD(X - 1, 20) + 2,
-       DATEADD('DAY', -MOD(X, 365), DATE '2026-06-06'),
-       CASE WHEN MOD(X, 25) = 0 THEN 'CANCELLED' WHEN MOD(X, 6) = 0 THEN 'PARTIALLY_PAID' ELSE 'PAID' END,
-       CASE WHEN MOD(X, 4) = 0 THEN 5600000 + X * 10000 ELSE 14800000 + X * 22000 END,
-       CASE WHEN MOD(X, 7) = 0 THEN 500000 ELSE 0 END,
-       '',
-       CASE WHEN MOD(X, 4) = 0 THEN 5600000 + X * 10000 ELSE 14800000 + X * 22000 END - CASE WHEN MOD(X, 7) = 0 THEN 500000 ELSE 0 END,
-       10.00,
-       ROUND((CASE WHEN MOD(X, 4) = 0 THEN 5600000 + X * 10000 ELSE 14800000 + X * 22000 END - CASE WHEN MOD(X, 7) = 0 THEN 500000 ELSE 0 END) / 11, 2),
-       CASE WHEN MOD(X, 6) = 0 THEN 5000000 ELSE CASE WHEN MOD(X, 4) = 0 THEN 5600000 + X * 10000 ELSE 14800000 + X * 22000 END - CASE WHEN MOD(X, 7) = 0 THEN 500000 ELSE 0 END END,
-       CASE WHEN MOD(X, 6) = 0 THEN 'PARTIAL' ELSE 'PAID' END,
-       TRUE,
-       TRUE,
-       CASE WHEN MOD(X, 4) = 0 THEN FALSE ELSE TRUE END,
-       FALSE,
-       5.00,
-       CASE WHEN MOD(X, 7) = 0 THEN 'APPROVED' ELSE 'NONE' END,
-       DATEADD('DAY', -MOD(X, 365), TIMESTAMP '2026-06-06 10:00:00')
-FROM SYSTEM_RANGE(1, 200);
-
-MERGE INTO sales_order_items (id, order_id, product_id, serial_id, quantity, unit_price, line_total) KEY(id)
-SELECT X,
-       X,
-       CASE WHEN MOD(X, 4) = 0 THEN 31 + MOD(X, 20) ELSE MOD(X - 1, 30) + 1 END,
-       CASE WHEN X <= 100 THEN X ELSE NULL END,
-       CASE WHEN MOD(X, 4) = 0 THEN 2 ELSE 1 END,
-       CASE WHEN MOD(X, 4) = 0 THEN 2800000 + MOD(X, 20) * 70000 ELSE 14800000 + X * 22000 END,
-       CASE WHEN MOD(X, 4) = 0 THEN (2800000 + MOD(X, 20) * 70000) * 2 ELSE 14800000 + X * 22000 END
-FROM SYSTEM_RANGE(1, 200);
-
-MERGE INTO invoices (id, invoice_no, order_id, invoice_date, total_amount, vat_amount, status, created_at) KEY(id)
-SELECT id,
-       'INV-2026-' || LPAD(CAST(id AS VARCHAR), 5, '0'),
-       id,
-       order_date,
-       total_amount,
-       ROUND(total_amount / 11, 2),
-       CASE WHEN status = 'CANCELLED' THEN 'CANCELLED' ELSE 'ISSUED' END,
-       CAST(order_date AS TIMESTAMP)
-FROM sales_orders;
-
-MERGE INTO warranties (id, serial_number, vehicle_id, customer_name, purchase_date, start_date, end_date, status, created_at) KEY(id)
-SELECT X,
-       ps.serial_number,
-       ps.id,
-       c.full_name,
-       so.order_date,
-       so.order_date,
-       DATEADD('MONTH', 24, so.order_date),
-       'ACTIVE',
-       TIMESTAMP '2026-06-06 10:00:00'
-FROM SYSTEM_RANGE(1, 50) r
-JOIN product_serials ps ON ps.id = r.X
-JOIN sales_orders so ON so.id = r.X
-JOIN customers c ON c.id = so.customer_id
-WHERE ps.product_id <= 30;
-
-MERGE INTO service_tickets (
-    id, vehicle_id, branch_id, serial_number, customer_name, customer_id, customer_phone,
-    issue_description, customer_reported_issue, received_date, expected_return_date,
-    service_type, status, technician_username, diagnosis_note, component_type,
-    warranty_repair, labor_cost, parts_cost, warranty_cost, customer_pay_amount,
-    total_cost, created_at, updated_at
-) KEY(id)
-SELECT X,
-       X,
-       MOD(X - 1, 6) + 1,
-       'CP26-' || LPAD(CAST(MOD(X - 1, 30) + 1 AS VARCHAR), 3, '0') || '-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
-       'Khach hang dich vu ' || X,
-       MOD(X - 1, 100) + 1,
-       '09' || LPAD(CAST(30000000 + X AS VARCHAR), 8, '0'),
-       CASE MOD(X, 5) WHEN 1 THEN 'Kiem tra pin va thoi luong su dung' WHEN 2 THEN 'Xe khong nhan sac' WHEN 3 THEN 'Bao loi bo dieu khien' WHEN 4 THEN 'Thay lop va can chinh phanh' ELSE 'Bao duong dinh ky sau ban hang' END,
-       CASE MOD(X, 5) WHEN 1 THEN 'Kiem tra pin va thoi luong su dung' WHEN 2 THEN 'Xe khong nhan sac' WHEN 3 THEN 'Bao loi bo dieu khien' WHEN 4 THEN 'Thay lop va can chinh phanh' ELSE 'Bao duong dinh ky sau ban hang' END,
-       DATEADD('DAY', -MOD(X, 90), DATE '2026-06-06'),
-       DATEADD('DAY', 3 - MOD(X, 7), DATE '2026-06-06'),
-       CASE WHEN MOD(X, 3) = 0 THEN 'WARRANTY' WHEN MOD(X, 3) = 1 THEN 'PAID_REPAIR' ELSE 'MAINTENANCE' END,
-       CASE WHEN MOD(X, 5) = 0 THEN 'WAITING_PARTS' WHEN MOD(X, 4) = 0 THEN 'IN_PROGRESS' ELSE 'ASSIGNED' END,
-       'tech',
-       'Chan doan seed ticket ' || X,
-       CASE MOD(X, 6) WHEN 1 THEN 'BATTERY' WHEN 2 THEN 'MOTOR' WHEN 3 THEN 'CONTROLLER' WHEN 4 THEN 'BRAKE' WHEN 5 THEN 'CHARGER' ELSE 'ACCESSORY' END,
-       CASE WHEN MOD(X, 3) = 0 THEN TRUE ELSE FALSE END,
-       CASE WHEN MOD(X, 3) = 0 THEN 0 ELSE 90000 + MOD(X, 5) * 30000 END,
-       CASE WHEN MOD(X, 3) = 0 THEN 0 ELSE 160000 + MOD(X, 9) * 150000 END,
-       CASE WHEN MOD(X, 3) = 0 THEN 0 ELSE 250000 + MOD(X, 9) * 180000 END,
-       CASE WHEN MOD(X, 3) = 0 THEN 0 ELSE 90000 + MOD(X, 5) * 30000 + 160000 + MOD(X, 9) * 150000 END,
-       CASE WHEN MOD(X, 3) = 0 THEN 0 ELSE 250000 + MOD(X, 9) * 180000 END,
-       DATEADD('DAY', -MOD(X, 90), TIMESTAMP '2026-06-06 09:30:00'),
-       DATEADD('DAY', -MOD(X, 80), TIMESTAMP '2026-06-06 17:30:00')
-FROM SYSTEM_RANGE(1, 50);
-
-MERGE INTO suppliers (
-    id, code, name, tax_code, phone, email, website, address, contact_person,
-    current_debt, credit_limit, payment_terms_days, rating, notes, status, created_at
-) KEY(id)
-SELECT X,
-       'NCC-' || LPAD(CAST(X AS VARCHAR), 3, '0'),
-       CASE MOD(X, 5)
-           WHEN 1 THEN 'Cong ty TNHH Xe Dien Viet Nhat ' || X
-           WHEN 2 THEN 'Nha phan phoi Pin LFP Sai Gon ' || X
-           WHEN 3 THEN 'Cong ty Phu tung xe dien Minh Phat ' || X
-           WHEN 4 THEN 'Dai ly Sac va Phu kien An Tam ' || X
-           ELSE 'Cong ty Thuong mai Xe dien Nam Viet ' || X
-       END,
-       '031' || LPAD(CAST(5000000 + X AS VARCHAR), 7, '0'),
-       '0908' || LPAD(CAST(700000 + X AS VARCHAR), 6, '0'),
-       'ncc' || LPAD(CAST(X AS VARCHAR), 3, '0') || '@chuanphat.vn',
-       'https://supplier' || X || '.example.vn',
-       CASE MOD(X, 4)
-           WHEN 1 THEN 'Quan Binh Thanh, TP.HCM'
-           WHEN 2 THEN 'TP Thu Duc, TP.HCM'
-           WHEN 3 THEN 'Di An, Binh Duong'
-           ELSE 'Bien Hoa, Dong Nai'
-       END,
-       CASE MOD(X, 4) WHEN 1 THEN 'Nguyen Minh Khoa' WHEN 2 THEN 'Tran Thi Thanh' WHEN 3 THEN 'Le Quoc Hung' ELSE 'Pham Van Duc' END,
-       0,
-       100000000,
-       30,
-       CAST(3 + MOD(X, 3) AS SMALLINT),
-       'Seed supplier ' || X,
-       'ACTIVE',
-       TIMESTAMP '2026-01-10 08:00:00'
-FROM SYSTEM_RANGE(1, 20);
-
-MERGE INTO purchase_orders (
-    id, purchase_order_no, supplier_id, branch_id, status, purchase_date, expected_delivery,
-    total_amount, paid_amount, approval_threshold, note, created_by, created_at,
-    approved_at, approved_by, accounting_recorded, stock_received, serials_created
-) KEY(id)
-SELECT X,
-       'PO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
-       MOD(X - 1, 20) + 1,
-       MOD(X - 1, 6) + 1,
-       CASE WHEN MOD(X, 5) = 0 THEN 'PARTIALLY_RECEIVED' ELSE 'APPROVED' END,
-       DATEADD('DAY', -MOD(X, 180), DATE '2026-06-06'),
-       DATEADD('DAY', 7 - MOD(X, 10), DATE '2026-06-06'),
-       18000000 + MOD(X, 12) * 2500000,
-       CASE WHEN MOD(X, 4) = 0 THEN 8000000 ELSE 18000000 + MOD(X, 12) * 2500000 END,
-       50000000,
-       'Seed purchase order ' || X,
-       'system',
-       DATEADD('DAY', -MOD(X, 180), TIMESTAMP '2026-06-06 09:00:00'),
-       DATEADD('DAY', -MOD(X, 180), TIMESTAMP '2026-06-06 10:00:00'),
-       'system',
-       TRUE,
-       TRUE,
-       TRUE
+-- 30 Sales Orders (spread over 12 months)
+MERGE INTO sales_orders (id, order_no, branch_id, customer_id, employee_id, order_date, status, subtotal, discount_amount, voucher_code, total_amount, vat_rate, vat_amount, paid_amount, payment_status, accounting_recorded, stock_issued, warranty_created, voucher_consumed, max_discount_pct, discount_approval_status, created_at) KEY(id)
+SELECT X, 'SO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'), MOD(X - 1, 2) + 1, MOD(X - 1, 5) + 1, MOD(X - 1, 6) + 2,
+       DATEADD('DAY', -MOD(X * 12, 365), CURRENT_DATE), 'DELIVERED', 13500000, 0, '', 13500000, 10.00, 1227272.73, 13500000, 'PAID', TRUE, TRUE, FALSE, FALSE, 5.00, 'NONE', DATEADD('DAY', -MOD(X * 12, 365), CURRENT_TIMESTAMP)
 FROM SYSTEM_RANGE(1, 30);
 
+MERGE INTO sales_order_items (id, order_id, product_id, serial_id, quantity, returned_quantity, is_deposit_row, unit_price, line_total) KEY(id)
+SELECT X, X, MOD(X - 1, 20) + 1, NULL, 1, 0, FALSE, 13500000, 13500000
+FROM SYSTEM_RANGE(1, 30);
+
+MERGE INTO invoices (id, ma_hoa_don, loai_hoa_don, order_id, ngay_xuat, tong_tien_truoc_thue, tong_thue_gtgt, tong_cong, trang_thai, ngay_tao) KEY(id)
+SELECT id, 'INV-2026-' || LPAD(CAST(id AS VARCHAR), 5, '0'), 'INTERNAL', id, order_date, total_amount - ROUND(total_amount / 11, 2), ROUND(total_amount / 11, 2), total_amount, 'ISSUED', CAST(order_date AS TIMESTAMP)
+FROM sales_orders;
+
+-- 15 Purchase Orders (spread over 12 months)
+MERGE INTO purchase_orders (id, purchase_order_no, supplier_id, branch_id, status, purchase_date, expected_delivery, total_amount, paid_amount, approval_threshold, note, created_by, created_at, approved_at, approved_by, accounting_recorded, stock_received, serials_created, tong_tien_hang, tong_chiet_khau, tong_thue_gtgt) KEY(id)
+SELECT X, 'PO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'), MOD(X - 1, 5) + 1, MOD(X - 1, 2) + 1, 'RECEIVED',
+       DATEADD('DAY', -MOD(X * 24, 365), CURRENT_DATE), DATEADD('DAY', 7 - MOD(X * 24, 365), CURRENT_DATE),
+       95000000, 95000000, 50000000, 'Seed purchase order ' || X, 'system', DATEADD('DAY', -MOD(X * 24, 365), CURRENT_TIMESTAMP), DATEADD('DAY', -MOD(X * 24, 365), CURRENT_TIMESTAMP), 'system', TRUE, TRUE, TRUE, 95000000, 0, 0
+FROM SYSTEM_RANGE(1, 15);
+
 MERGE INTO purchase_order_items (id, purchase_order_id, product_id, quantity, unit_cost, line_total) KEY(id)
-SELECT X,
-       MOD(X - 1, 30) + 1,
-       MOD(X - 1, 50) + 1,
-       MOD(X, 5) + 1,
-       CASE WHEN MOD(X - 1, 50) + 1 <= 30 THEN 10800000 + MOD(X, 8) * 350000 ELSE 1200000 + MOD(X, 10) * 250000 END,
-       (MOD(X, 5) + 1) * CASE WHEN MOD(X - 1, 50) + 1 <= 30 THEN 10800000 + MOD(X, 8) * 350000 ELSE 1200000 + MOD(X, 10) * 250000 END
-FROM SYSTEM_RANGE(1, 60);
+SELECT X, X, MOD(X - 1, 20) + 1, 10, 9500000, 95000000
+FROM SYSTEM_RANGE(1, 15);
 
-MERGE INTO inventory_transactions (id, type, transaction_no, transaction_date, product_id, from_branch_id, to_branch_id, quantity, unit_cost, total_cost, note, created_at) KEY(id)
-SELECT X,
-       CASE MOD(X, 7)
-           WHEN 1 THEN 'IMPORT'
-           WHEN 2 THEN 'EXPORT'
-           WHEN 3 THEN 'TRANSFER_OUT'
-           WHEN 4 THEN 'TRANSFER_IN'
-           WHEN 5 THEN 'STOCKTAKE'
-           WHEN 6 THEN 'SALE'
-           ELSE 'RETURN'
-       END,
-       'ITX-' || LPAD(CAST(X AS VARCHAR), 6, '0'),
-       DATEADD('DAY', -MOD(X, 180), DATE '2026-06-06'),
-       MOD(X - 1, 50) + 1,
-       CASE WHEN MOD(X, 7) IN (2, 3, 6) THEN MOD(X - 1, 6) + 1 ELSE NULL END,
-       CASE WHEN MOD(X, 7) IN (1, 4, 5, 0) THEN MOD(X, 6) + 1 ELSE NULL END,
-       MOD(X, 5) + 1,
-       1800000 + MOD(X, 8) * 250000,
-       (MOD(X, 5) + 1) * (1800000 + MOD(X, 8) * 250000),
-       'Seed transaction ' || X,
-       DATEADD('DAY', -MOD(X, 180), TIMESTAMP '2026-06-06 12:00:00')
-FROM SYSTEM_RANGE(1, 120);
-
-MERGE INTO bank_accounts (id, bank_name, account_number, account_holder, current_balance, active, created_at) KEY(id) VALUES
-(1, 'Vietcombank', '970400001', 'CONG TY CHUAN PHAT', 520000000, TRUE, TIMESTAMP '2026-01-01 08:00:00'),
-(2, 'ACB', '970400002', 'CONG TY CHUAN PHAT', 225000000, TRUE, TIMESTAMP '2026-01-01 08:00:00');
-
-MERGE INTO receivables (id, customer_id, customer_name, type, transaction_date, debit_amount, credit_amount, source_type, source_no, due_date, status, description, created_at) KEY(id)
-SELECT X,
-       X,
-       c.full_name,
-       CASE WHEN MOD(X, 3) = 0 THEN 'RECEIPT' ELSE 'SALE' END,
-       DATEADD('DAY', -MOD(X, 90), DATE '2026-06-06'),
-       CASE WHEN MOD(X, 3) = 0 THEN 0 ELSE 8000000 + X * 50000 END,
-       CASE WHEN MOD(X, 3) = 0 THEN 3000000 ELSE 0 END,
-       CASE WHEN MOD(X, 3) = 0 THEN 'RECEIPT_VOUCHER' ELSE 'SALES_ORDER' END,
-       CASE WHEN MOD(X, 3) = 0 THEN 'PT-SEED-' || LPAD(CAST(X AS VARCHAR), 4, '0') ELSE 'SO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0') END,
-       DATEADD('DAY', 30 - MOD(X, 80), DATE '2026-06-06'),
-       CASE WHEN MOD(X, 5) = 0 THEN 'PAID' ELSE 'UNPAID' END,
-       'Seed receivable ' || X,
-       TIMESTAMP '2026-06-06 10:00:00'
-FROM SYSTEM_RANGE(1, 20) r
-JOIN customers c ON c.id = r.X;
-
-MERGE INTO accounting_payables (id, supplier_id, supplier_name, type, transaction_date, debit_amount, credit_amount, source_type, source_no, due_date, status, description, created_at) KEY(id)
-SELECT X,
-       X,
-       s.name,
-       CASE WHEN MOD(X, 4) = 0 THEN 'PAYMENT' ELSE 'PURCHASE' END,
-       DATEADD('DAY', -MOD(X, 120), DATE '2026-06-06'),
-       CASE WHEN MOD(X, 4) = 0 THEN 5000000 ELSE 0 END,
-       CASE WHEN MOD(X, 4) = 0 THEN 0 ELSE 15000000 + X * 100000 END,
-       CASE WHEN MOD(X, 4) = 0 THEN 'PAYMENT_VOUCHER' ELSE 'PURCHASE_ORDER' END,
-       CASE WHEN MOD(X, 4) = 0 THEN 'PC-SEED-' || LPAD(CAST(X AS VARCHAR), 4, '0') ELSE 'PO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0') END,
-       DATEADD('DAY', 35 - MOD(X, 90), DATE '2026-06-06'),
-       CASE WHEN MOD(X, 6) = 0 THEN 'PAID' ELSE 'UNPAID' END,
-       'Seed payable ' || X,
-       TIMESTAMP '2026-06-06 10:00:00'
-FROM SYSTEM_RANGE(1, 20) r
-JOIN suppliers s ON s.id = r.X;
+-- Accounting & Cash (Simplistic representation of the flows)
+MERGE INTO bank_accounts (id, bank_name, account_number, account_holder, current_balance, active, created_at, is_default) KEY(id) VALUES
+(1, 'Vietcombank', '970400001', 'CONG TY CHUAN PHAT', 520000000, TRUE, TIMESTAMP '2026-01-01 08:00:00', TRUE),
+(2, 'ACB', '970400002', 'CONG TY CHUAN PHAT', 225000000, TRUE, TIMESTAMP '2026-01-01 08:00:00', FALSE);
 
 MERGE INTO accounting_transactions (id, type, source_type, source_no, transaction_date, amount, cost_amount, description, created_at) KEY(id)
-SELECT X,
-       CASE WHEN MOD(X, 5) = 0 THEN 'COST_OF_GOODS_SOLD' ELSE 'SALES_REVENUE' END,
-       'SALES_ORDER',
-       'SO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
-       DATEADD('DAY', -MOD(X, 120), DATE '2026-06-06'),
-       CASE WHEN MOD(X, 5) = 0 THEN 0 ELSE 12000000 + X * 85000 END,
-       CASE WHEN MOD(X, 5) = 0 THEN 7000000 + X * 50000 ELSE NULL END,
-       'Seed transaction ' || X,
-       TIMESTAMP '2026-06-06 10:00:00'
-FROM SYSTEM_RANGE(1, 80);
+SELECT X, 'SALES_REVENUE', 'SALES_ORDER', 'SO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'), DATEADD('DAY', -MOD(X * 12, 365), CURRENT_DATE), 13500000, 9500000, 'Doanh thu SO ' || X, DATEADD('DAY', -MOD(X * 12, 365), CURRENT_TIMESTAMP)
+FROM SYSTEM_RANGE(1, 30);
 
-MERGE INTO cash_books (id, type, transaction_date, amount_in, amount_out, balance_after, bank_account_id, source_type, source_no, description, created_at) KEY(id) VALUES
-(1, 'BANK_IN', DATE '2026-06-01', 50000000, 0, 570000000, 1, 'RECEIPT_VOUCHER', 'PT-2026-001', 'Thu tien don hang', TIMESTAMP '2026-06-01 10:00:00'),
-(2, 'BANK_OUT', DATE '2026-06-02', 0, 18000000, 552000000, 1, 'PAYMENT_VOUCHER', 'PC-2026-001', 'Thanh toan nha cung cap', TIMESTAMP '2026-06-02 10:00:00'),
-(3, 'CASH_IN', DATE '2026-06-03', 9000000, 0, 9000000, NULL, 'RECEIPT_VOUCHER', 'PT-2026-002', 'Thu tien mat', TIMESTAMP '2026-06-03 10:00:00');
+MERGE INTO cash_books (id, type, transaction_date, amount_in, amount_out, balance_after, bank_account_id, source_type, source_no, description, created_at) KEY(id)
+SELECT X, 'BANK_IN', DATEADD('DAY', -MOD(X * 12, 365), CURRENT_DATE), 13500000, 0, 520000000 + (X * 13500000), 1, 'RECEIPT_VOUCHER', 'PT-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'), 'Thu tien don hang', DATEADD('DAY', -MOD(X * 12, 365), CURRENT_TIMESTAMP)
+FROM SYSTEM_RANGE(1, 30);
+
+MERGE INTO cash_books (id, type, transaction_date, amount_in, amount_out, balance_after, bank_account_id, source_type, source_no, description, created_at) KEY(id)
+SELECT X + 30, 'BANK_OUT', DATEADD('DAY', -MOD(X * 24, 365), CURRENT_DATE), 0, 95000000, 520000000 - (X * 95000000), 1, 'PAYMENT_VOUCHER', 'PC-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'), 'Thanh toan nha cung cap', DATEADD('DAY', -MOD(X * 24, 365), CURRENT_TIMESTAMP)
+FROM SYSTEM_RANGE(1, 15);
 
 MERGE INTO system_settings (id, setting_key, setting_value, updated_at) KEY(id) VALUES
 (1, 'companyName', 'Chuan Phat', TIMESTAMP '2026-06-06 08:00:00'),
@@ -476,37 +223,53 @@ MERGE INTO system_settings (id, setting_key, setting_value, updated_at) KEY(id) 
 (7, 'defaultWarrantyPolicy', 'Bao hanh xe 24 thang, pin 12 thang, phu tung 6 thang.', TIMESTAMP '2026-06-06 08:00:00'),
 (8, 'lowStockThreshold', '5', TIMESTAMP '2026-06-06 08:00:00');
 
-MERGE INTO vouchers (id, code, name, discount_type, discount_value, minimum_order_amount, start_date, end_date, usage_limit, used_count, status) KEY(id) VALUES
-(1, 'CPWELCOME', 'Uu dai khach hang moi', 'AMOUNT', 500000, 10000000, DATE '2026-06-01', DATE '2026-12-31', 200, 12, 'ACTIVE'),
-(2, 'PIN10', 'Giam gia pin lithium', 'PERCENT', 10, 3000000, DATE '2026-06-01', DATE '2026-09-30', 100, 8, 'ACTIVE');
+-- 15 Purchase Receipts
+MERGE INTO purchase_receipts (id, receipt_no, purchase_order_id, supplier_id, branch_id, warehouse_id, receipt_date, status, total_amount, note, created_by, accounting_recorded, created_at) KEY(id)
+SELECT X, 'NK-' || LPAD(CAST(X AS VARCHAR), 5, '0'), X, MOD(X - 1, 5) + 1, MOD(X - 1, 2) + 1, MOD(X - 1, 6) + 1,
+       DATEADD('DAY', -MOD(X * 24, 365), CURRENT_DATE), 'CONFIRMED', 95000000, 'Nhap kho mua hang', 'system', TRUE, DATEADD('DAY', -MOD(X * 24, 365), CURRENT_TIMESTAMP)
+FROM SYSTEM_RANGE(1, 15);
 
-MERGE INTO marketing_campaigns (id, name, source, start_date, end_date, budget, status, note) KEY(id) VALUES
-(1, 'Facebook Lead Thang 6', 'FACEBOOK', DATE '2026-06-01', DATE '2026-06-30', 25000000, 'RUNNING', 'Tap trung xe may dien CP S1'),
-(2, 'Zalo cham soc khach cu', 'ZALO', DATE '2026-06-05', DATE '2026-07-05', 8000000, 'PLANNED', 'Nhac bao duong va doi pin');
+MERGE INTO purchase_receipt_items (id, receipt_id, product_id, quantity, unit_cost, line_total) KEY(id)
+SELECT X, X, MOD(X - 1, 20) + 1, 10, 9500000, 95000000
+FROM SYSTEM_RANGE(1, 15);
 
-ALTER TABLE permissions ALTER COLUMN id RESTART WITH 46;
-ALTER TABLE roles ALTER COLUMN id RESTART WITH 8;
-ALTER TABLE app_users ALTER COLUMN id RESTART WITH 22;
-ALTER TABLE branches ALTER COLUMN id RESTART WITH 7;
-ALTER TABLE warehouses ALTER COLUMN id RESTART WITH 7;
-ALTER TABLE products ALTER COLUMN id RESTART WITH 51;
-ALTER TABLE product_serials ALTER COLUMN id RESTART WITH 101;
-ALTER TABLE customers ALTER COLUMN id RESTART WITH 101;
-ALTER TABLE inventory_stocks ALTER COLUMN id RESTART WITH 301;
-ALTER TABLE sales_orders ALTER COLUMN id RESTART WITH 201;
-ALTER TABLE sales_order_items ALTER COLUMN id RESTART WITH 201;
-ALTER TABLE invoices ALTER COLUMN id RESTART WITH 201;
-ALTER TABLE warranties ALTER COLUMN id RESTART WITH 51;
-ALTER TABLE service_tickets ALTER COLUMN id RESTART WITH 51;
-ALTER TABLE suppliers ALTER COLUMN id RESTART WITH 21;
-ALTER TABLE purchase_orders ALTER COLUMN id RESTART WITH 31;
-ALTER TABLE purchase_order_items ALTER COLUMN id RESTART WITH 61;
-ALTER TABLE inventory_transactions ALTER COLUMN id RESTART WITH 121;
+-- 30 Goods Issues (Xuất kho)
+MERGE INTO goods_issues (id, issue_no, branch_id, warehouse_id, issue_date, status, issue_type, note, created_by, created_at) KEY(id)
+SELECT X, 'XK-' || LPAD(CAST(X AS VARCHAR), 5, '0'), MOD(X - 1, 2) + 1, MOD(X - 1, 6) + 1,
+       DATEADD('DAY', -MOD(X * 12, 365), CURRENT_DATE), 'ISSUED', 'SALE', 'Xuat ban hang', 'system', DATEADD('DAY', -MOD(X * 12, 365), CURRENT_TIMESTAMP)
+FROM SYSTEM_RANGE(1, 30);
+
+MERGE INTO goods_issue_items (id, issue_id, product_id, quantity, unit_cost) KEY(id)
+SELECT X, X, MOD(X - 1, 20) + 1, 1, 9500000
+FROM SYSTEM_RANGE(1, 30);
+
+-- 10 Inventory Transfers (Chuyển kho)
+MERGE INTO inventory_transfers (id, transfer_no, transfer_date, from_branch_id, to_branch_id, from_warehouse_id, to_warehouse_id, product_id, quantity, transfer_cost, status, approval_required, note, created_by, created_at) KEY(id)
+SELECT X, 'CK-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
+       DATEADD('DAY', -MOD(X * 30, 365), CURRENT_DATE), 1, 2, 1, 2, MOD(X - 1, 20) + 1, 2, 19000000, 'RECEIVED', FALSE, 'Chuyen hang noi bo', 'system', DATEADD('DAY', -MOD(X * 30, 365), CURRENT_TIMESTAMP)
+FROM SYSTEM_RANGE(1, 10);
+
+ALTER TABLE permissions ALTER COLUMN id RESTART WITH 50;
+ALTER TABLE roles ALTER COLUMN id RESTART WITH 20;
+ALTER TABLE app_users ALTER COLUMN id RESTART WITH 25;
+ALTER TABLE branches ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE warehouses ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE products ALTER COLUMN id RESTART WITH 30;
+ALTER TABLE product_serials ALTER COLUMN id RESTART WITH 50;
+ALTER TABLE customers ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE inventory_stocks ALTER COLUMN id RESTART WITH 50;
+ALTER TABLE sales_orders ALTER COLUMN id RESTART WITH 50;
+ALTER TABLE sales_order_items ALTER COLUMN id RESTART WITH 31;
+ALTER TABLE invoices ALTER COLUMN id RESTART WITH 31;
+ALTER TABLE warranties ALTER COLUMN id RESTART WITH 1;
+ALTER TABLE service_tickets ALTER COLUMN id RESTART WITH 1;
+ALTER TABLE suppliers ALTER COLUMN id RESTART WITH 6;
+ALTER TABLE purchase_orders ALTER COLUMN id RESTART WITH 16;
+ALTER TABLE purchase_order_items ALTER COLUMN id RESTART WITH 16;
+ALTER TABLE inventory_transactions ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE bank_accounts ALTER COLUMN id RESTART WITH 3;
-ALTER TABLE receivables ALTER COLUMN id RESTART WITH 21;
-ALTER TABLE accounting_payables ALTER COLUMN id RESTART WITH 21;
-ALTER TABLE accounting_transactions ALTER COLUMN id RESTART WITH 81;
-ALTER TABLE cash_books ALTER COLUMN id RESTART WITH 4;
+ALTER TABLE receivables ALTER COLUMN id RESTART WITH 1;
+ALTER TABLE accounting_payables ALTER COLUMN id RESTART WITH 1;
+ALTER TABLE accounting_transactions ALTER COLUMN id RESTART WITH 31;
+ALTER TABLE cash_books ALTER COLUMN id RESTART WITH 46;
 ALTER TABLE system_settings ALTER COLUMN id RESTART WITH 9;
-ALTER TABLE vouchers ALTER COLUMN id RESTART WITH 3;
-ALTER TABLE marketing_campaigns ALTER COLUMN id RESTART WITH 3;

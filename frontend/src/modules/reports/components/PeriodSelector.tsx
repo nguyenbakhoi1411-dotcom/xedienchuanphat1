@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import { Calendar, ChevronDown } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { endOfMonth, formatDate, startOfMonth, startOfYear } from '../lib/date';
 
 interface PeriodSelectorProps {
   onPeriodChange?: (from: string, to: string) => void;
@@ -25,9 +24,9 @@ export function PeriodSelector({
   const [periodType, setPeriodType] = useState<PeriodType>('this-month');
   const [comparisonType, setComparisonType] = useState<ComparisonType>('none');
   const [customFrom, setCustomFrom] = useState<string>(
-    format(startOfMonth(today), 'yyyy-MM-dd'),
+    formatDate(startOfMonth(today), 'yyyy-MM-dd'),
   );
-  const [customTo, setCustomTo] = useState<string>(format(today, 'yyyy-MM-dd'));
+  const [customTo, setCustomTo] = useState<string>(formatDate(today, 'yyyy-MM-dd'));
   const [showCustom, setShowCustom] = useState(false);
 
   const getPeriodRange = (type: PeriodType) => {
@@ -35,26 +34,26 @@ export function PeriodSelector({
     switch (type) {
       case 'this-month':
         return {
-          from: format(startOfMonth(now), 'yyyy-MM-dd'),
-          to: format(now, 'yyyy-MM-dd'),
+          from: formatDate(startOfMonth(now), 'yyyy-MM-dd'),
+          to: formatDate(now, 'yyyy-MM-dd'),
         };
       case 'last-month':
         const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
         return {
-          from: format(startOfMonth(lastMonth), 'yyyy-MM-dd'),
-          to: format(endOfMonth(lastMonth), 'yyyy-MM-dd'),
+          from: formatDate(startOfMonth(lastMonth), 'yyyy-MM-dd'),
+          to: formatDate(endOfMonth(lastMonth), 'yyyy-MM-dd'),
         };
       case 'this-quarter':
         const quarter = Math.floor(now.getMonth() / 3);
         const quarterStart = new Date(now.getFullYear(), quarter * 3, 1);
         return {
-          from: format(quarterStart, 'yyyy-MM-dd'),
-          to: format(now, 'yyyy-MM-dd'),
+          from: formatDate(quarterStart, 'yyyy-MM-dd'),
+          to: formatDate(now, 'yyyy-MM-dd'),
         };
       case 'this-year':
         return {
-          from: format(startOfYear(now), 'yyyy-MM-dd'),
-          to: format(now, 'yyyy-MM-dd'),
+          from: formatDate(startOfYear(now), 'yyyy-MM-dd'),
+          to: formatDate(now, 'yyyy-MM-dd'),
         };
       case 'custom':
         return { from: customFrom, to: customTo };
@@ -76,8 +75,8 @@ export function PeriodSelector({
       const prevToDate = new Date(mainFromDate);
       prevToDate.setDate(prevToDate.getDate() - 1);
       return {
-        from: format(prevFromDate, 'yyyy-MM-dd'),
-        to: format(prevToDate, 'yyyy-MM-dd'),
+        from: formatDate(prevFromDate, 'yyyy-MM-dd'),
+        to: formatDate(prevToDate, 'yyyy-MM-dd'),
       };
     }
 
@@ -87,8 +86,8 @@ export function PeriodSelector({
       const prevToDate = new Date(mainToDate);
       prevToDate.setFullYear(prevToDate.getFullYear() - 1);
       return {
-        from: format(prevFromDate, 'yyyy-MM-dd'),
-        to: format(prevToDate, 'yyyy-MM-dd'),
+        from: formatDate(prevFromDate, 'yyyy-MM-dd'),
+        to: formatDate(prevToDate, 'yyyy-MM-dd'),
       };
     }
 
@@ -118,8 +117,8 @@ export function PeriodSelector({
   };
 
   const mainRange = getPeriodRange(periodType);
-  const displayFrom = format(new Date(mainRange.from), 'dd/MM/yyyy');
-  const displayTo = format(new Date(mainRange.to), 'dd/MM/yyyy');
+  const displayFrom = formatDate(new Date(mainRange.from), 'dd/MM/yyyy');
+  const displayTo = formatDate(new Date(mainRange.to), 'dd/MM/yyyy');
 
   if (compact) {
     return (

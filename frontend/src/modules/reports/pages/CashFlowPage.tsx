@@ -3,18 +3,19 @@
 import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { PeriodSelector, CashFlowViewer } from '../../components';
-import { useCashFlow } from '../../hooks';
-import { format, startOfYear } from 'date-fns';
+import { PeriodSelector, CashFlowViewer } from '../components';
+import { useCashFlow } from '../hooks';
+import { formatDate, startOfYear } from '../lib/date';
 
 export function CashFlowPage() {
   const router = useRouter();
   const today = new Date();
-  const [from, setFrom] = useState(format(startOfYear(today), 'yyyy-MM-dd'));
-  const [to, setTo] = useState(format(today, 'yyyy-MM-dd'));
+  const [from, setFrom] = useState(formatDate(startOfYear(today), 'yyyy-MM-dd'));
+  const [to, setTo] = useState(formatDate(today, 'yyyy-MM-dd'));
   const [method, setMethod] = useState<'direct' | 'indirect'>('direct');
 
-  const { data: report, isLoading } = useCashFlow(from, to, method);
+  const { data: _report, isLoading } = useCashFlow(from, to, method);
+  const report = _report as any;
 
   const handlePeriodChange = (fromDate: string, toDate: string) => {
     setFrom(fromDate);

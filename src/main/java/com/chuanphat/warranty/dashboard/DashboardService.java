@@ -143,21 +143,78 @@ public class DashboardService {
                   and (? is null or p.category = ?)
                 """, scopedBranchId, scopedBranchId, resolved.employeeId(), resolved.employeeId(), resolved.productCategory(), resolved.productCategory());
 
+        BigDecimal todayPayments = money("""
+                select coalesce(sum(v.amount), 0)
+                from cash_payments v
+                where v.status = 'CONFIRMED'
+                  and v.payment_date = ?
+                  and (? is null or v.branch_id = ?)
+                """, LocalDate.now(), scopedBranchId, scopedBranchId);
+        
+        BigDecimal totalReceipts = money("""
+                select coalesce(sum(v.amount), 0)
+                from cash_receipts v
+                where v.status = 'CONFIRMED'
+                  and v.receipt_date <= ?
+                  and (? is null or v.branch_id = ?)
+                """, LocalDate.now(), scopedBranchId, scopedBranchId);
+                
+        BigDecimal totalPayments = money("""
+                select coalesce(sum(v.amount), 0)
+                from cash_payments v
+                where v.status = 'CONFIRMED'
+                  and v.payment_date <= ?
+                  and (? is null or v.branch_id = ?)
+                """, LocalDate.now(), scopedBranchId, scopedBranchId);
+        
+        BigDecimal cashBalance = totalReceipts.subtract(totalPayments);
+
+        // Yesterday comparisons
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        BigDecimal yesterdayRevenue = money("""
+                select coalesce(sum(so.total_amount), 0)
+                from sales_orders so
+                where so.status <> 'CANCELLED' and so.order_date = ?
+                  and (? is null or so.branch_id = ?)
+                """, yesterday, scopedBranchId, scopedBranchId);
+        Number yesterdayOrders = number("""
+                select count(*)
+                from sales_orders so
+                where so.status <> 'CANCELLED' and so.order_date = ?
+                  and (? is null or so.branch_id = ?)
+                """, yesterday, scopedBranchId, scopedBranchId);
+        BigDecimal yesterdayPayments = money("""
+                select coalesce(sum(v.amount), 0)
+                from cash_payments v
+                where v.status = 'CONFIRMED'
+                  and v.payment_date = ?
+                  and (? is null or v.branch_id = ?)
+                """, yesterday, scopedBranchId, scopedBranchId);
+        Number todayOrders = number("""
+                select count(*)
+                from sales_orders so
+                where so.status <> 'CANCELLED' and so.order_date = ?
+                  and (? is null or so.branch_id = ?)
+                """, LocalDate.now(), scopedBranchId, scopedBranchId);
+
         BigDecimal grossProfit = revenue.subtract(cogs);
         double cancelRate = orders.longValue() == 0 ? 0 : cancelled.doubleValue() * 100.0 / orders.doubleValue();
 
         return Map.of(
                 "kpis", List.of(
-                        kpi("todayRevenue", "Doanh thu hom nay", compact(todayRevenue), "Doanh thu ghi nhan trong ngay", "", "orange"),
-                        kpi("monthRevenue", "Doanh thu thang nay", compact(monthRevenue), "Tong doanh thu tu dau thang", "", "green"),
-                        kpi("grossProfit", "Loi nhuan gop", compact(grossProfit), "Doanh thu tru gia von", marginText(grossProfit, revenue), "green"),
-                        kpi("orders", "So don hang", orders.toString(), "Tong don trong ky loc", "", "blue"),
-                        kpi("cancelRate", "Ty le don huy", percent(cancelRate), cancelled + " don huy", "", "red"),
-                        kpi("newCustomers", "Khach hang moi", newCustomers.toString(), "Khach hang tao moi trong ky", "", "slate"),
-                        kpi("receivable", "Cong no phai thu", compact(receivable), "So du cong no khach hang", "", "blue"),
-                        kpi("overdueReceivable", "Cong no qua han", compact(overdueReceivable.max(BigDecimal.ZERO)), "Can uu tien thu hoi", "", "red"),
-                        kpi("lowStock", "Ton kho thap", lowStock.toString(), "Mat hang duoi nguong toi thieu", "", "orange"),
-                        kpi("activeWarranty", "Phieu bao hanh dang xu ly", activeWarranty.toString(), "Phieu chua hoan tat", "", "blue")
+                        kpi("todayRevenue", "Doanh thu hôm nay", compact(todayRevenue), "Doanh thu ghi nhận trong ngày", delta(todayRevenue, yesterdayRevenue), "orange"),
+                        kpi("monthRevenue", "Doanh thu tháng này", compact(monthRevenue), "Tổng doanh thu từ đầu tháng", "", "green"),
+                        kpi("grossProfit", "Lợi nhuận gộp", compact(grossProfit), "Doanh thu trừ giá vốn", marginText(grossProfit, revenue), "green"),
+                        kpi("todayOrders", "Đơn hàng hôm nay", todayOrders.toString(), "Đơn tạo trong ngày (trừ hủy)", delta(BigDecimal.valueOf(todayOrders.longValue()), BigDecimal.valueOf(yesterdayOrders.longValue())), "blue"),
+                        kpi("orders", "Đơn hàng", orders.toString(), "Tổng đơn trong kỳ lọc", "", "blue"),
+                        kpi("cancelRate", "Tỷ lệ đơn hủy", percent(cancelRate), cancelled + " đơn hủy", "", "red"),
+                        kpi("newCustomers", "Khách hàng mới", newCustomers.toString(), "Khách hàng tạo mới trong kỳ", "", "slate"),
+                        kpi("receivable", "Công nợ phải thu", compact(receivable), "Số dư công nợ khách hàng", "", "blue"),
+                        kpi("overdueReceivable", "Công nợ quá hạn", compact(overdueReceivable.max(BigDecimal.ZERO)), "Cần ưu tiên thu hồi", "", "red"),
+                        kpi("payments", "Chi tiền hôm nay", compact(todayPayments), "Tổng phiếu chi trong ngày", delta(todayPayments, yesterdayPayments), "red"),
+                        kpi("cashBalance", "Tồn quỹ khả dụng", compact(cashBalance), "Số dư tiền mặt + ngân hàng", "", "green"),
+                        kpi("lowStock", "Tồn kho thấp", lowStock.toString(), "Mặt hàng dưới ngưỡng tối thiểu", "", "orange"),
+                        kpi("activeWarranty", "Phiếu bảo hành đang xử lý", activeWarranty.toString(), "Phiếu chưa hoàn tất", "", "blue")
                 ),
                 "revenueByMonth", revenueByMonth(scopedBranchId, resolved.employeeId(), resolved.productCategory()),
                 "revenueByBranch", revenueByBranch(resolved.fromDate(), resolved.toDate(), scopedBranchId, resolved.employeeId(), resolved.productCategory()),
@@ -428,8 +485,17 @@ public class DashboardService {
     }
 
     private String marginText(BigDecimal profit, BigDecimal revenue) {
-        if (revenue.compareTo(BigDecimal.ZERO) <= 0) return "Bien gop 0%";
-        return "Bien gop " + percent(profit.multiply(BigDecimal.valueOf(100)).divide(revenue, 4, RoundingMode.HALF_UP).doubleValue());
+        if (revenue.compareTo(BigDecimal.ZERO) <= 0) return "Biên gộp 0%";
+        return "Biên gộp " + percent(profit.multiply(BigDecimal.valueOf(100)).divide(revenue, 4, RoundingMode.HALF_UP).doubleValue());
+    }
+
+    private String delta(BigDecimal today, BigDecimal yesterday) {
+        if (yesterday.compareTo(BigDecimal.ZERO) == 0) {
+            return today.compareTo(BigDecimal.ZERO) == 0 ? "unchanged" : "up:100.0";
+        }
+        double pct = today.subtract(yesterday).multiply(BigDecimal.valueOf(100)).divide(yesterday, 4, RoundingMode.HALF_UP).doubleValue();
+        if (Math.abs(pct) < 0.05) return "unchanged";
+        return (pct > 0 ? "up:" : "down:") + String.format("%.1f", Math.abs(pct));
     }
 
     private Map<String, Object> map(String key1, Object value1, String key2, Object value2) {

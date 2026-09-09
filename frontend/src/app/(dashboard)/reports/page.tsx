@@ -1,182 +1,236 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
-import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Button } from "@/components/ui/Button";
-import { ReportExportButtons } from "@/features/reports/ReportExportButtons";
-import { ReportFilters } from "@/features/reports/ReportFilters";
-import { ReportSkeleton } from "@/features/reports/ReportSkeleton";
-import { ReportTable } from "@/features/reports/ReportTable";
-import { useReport } from "@/features/reports/hooks";
-import type { ReportFilters as ReportFiltersType, ReportSummaryCard, ReportType } from "@/features/reports/types";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { Star, BarChart2, Search, SlidersHorizontal, EyeOff, LayoutGrid } from "lucide-react";
+import { REPORT_CATALOG, ReportCategory, ReportItem } from "@/features/reports/data/reportCatalog";
 
-const ReportChart = dynamic(
-  () => import("@/features/reports/ReportChart").then((module) => module.ReportChart),
-  { loading: () => <ReportSkeleton /> }
-);
+export default function ReportsPortalPage() {
+  const [activeCategoryId, setActiveCategoryId] = useState<string>("yeu-thich");
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
 
-function defaultReportFilters(): ReportFiltersType {
-  const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  return {
-    fromDate: formatDateInput(monthStart),
-    toDate: formatDateInput(today),
-    branchId: "all",
-    employeeId: "all",
-    productId: "all",
-    customerId: "all",
-    status: "all",
-    productCategory: "all",
-    page: 0,
-    pageSize: 50
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem("misa-amis-report-favorites");
+    if (saved) {
+      try {
+        setFavorites(JSON.parse(saved));
+      } catch (e) {}
+    }
+  }, []);
+
+  const toggleFavorite = (id: string) => {
+    let newFavs;
+    if (favorites.includes(id)) {
+      newFavs = favorites.filter((f) => f !== id);
+    } else {
+      newFavs = [...favorites, id];
+    }
+    setFavorites(newFavs);
+    localStorage.setItem("misa-amis-report-favorites", JSON.stringify(newFavs));
   };
-}
 
-export default function ReportsPage() {
-  const [reportType, setReportType] = useState<ReportType>("SALES_REPORT");
-  const [filters, setFilters] = useState<ReportFiltersType>(() => defaultReportFilters());
-  const { data, isLoading, isError, refetch } = useReport(reportType, filters);
+  // Build the "Yêu thích" category
+  const favoriteItems: ReportItem[] = [];
+  REPORT_CATALOG.forEach((cat) => {
+    if (cat.items) {
+      cat.items.forEach((item) => {
+        if (favorites.includes(item.id)) favoriteItems.push(item);
+      });
+    }
+    if (cat.groups) {
+      cat.groups.forEach((g) => {
+        g.items.forEach((item) => {
+          if (favorites.includes(item.id)) favoriteItems.push(item);
+        });
+      });
+    }
+  });
 
-  const isInvalidRange = useMemo(() => filters.fromDate > filters.toDate, [filters.fromDate, filters.toDate]);
-  const pagination = data?.pagination;
+  const categories = [
+    { id: "yeu-thich", name: "Yêu thích" },
+    ...REPORT_CATALOG,
+  ];
+
+  const activeCategory = categories.find((c) => c.id === activeCategoryId);
 
   return (
-    <div className="space-y-5">
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-normal text-text">Bao cao</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Tong hop doanh thu, chi nhanh, nhan vien, san pham, ton kho, cong no, loi nhuan va bao hanh.
-          </p>
+    <div className="flex h-screen bg-white text-sm">
+      {/* Sidebar */}
+      <div className="w-56 border-r border-teal-100 flex flex-col bg-slate-50/50 flex-none">
+        <div className="p-3">
+          <button className="flex items-center gap-2 px-3 py-2 text-teal-700 bg-teal-50 rounded-md font-medium w-full shadow-sm border border-teal-100">
+            <span className="text-lg leading-none">+</span>
+            Thêm nhanh
+          </button>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <ReportExportButtons reportType={reportType} filters={filters} disabled={isLoading || isInvalidRange || !data} />
-          <Button variant="secondary" onClick={() => void refetch()} disabled={isInvalidRange}>
-            <RotateCcw className="h-4 w-4" />
-            Lam moi
-          </Button>
+        <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
+          {categories.map((cat) => {
+            const isActive = activeCategoryId === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategoryId(cat.id)}
+                className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+                  isActive
+                    ? "bg-teal-50 text-teal-800 font-medium border-l-4 border-teal-500 rounded-l-none -ml-2 pl-4"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                {cat.name}
+              </button>
+            );
+          })}
         </div>
-      </section>
+      </div>
 
-      <ReportFilters
-        reportType={reportType}
-        filters={filters}
-        onReportTypeChange={(nextType) => {
-          setReportType(nextType);
-          setFilters((current) => ({ ...current, page: 0 }));
-        }}
-        onFiltersChange={setFilters}
-      />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        {/* Top bar (Tabs) */}
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 flex-none bg-slate-50">
+          <div className="flex gap-6 h-12">
+            <button className="border-b-2 border-teal-500 text-teal-700 font-medium h-full flex items-center px-1">
+              Tất cả
+            </button>
+            <button className="text-slate-500 hover:text-slate-800 h-full flex items-center px-1">
+              Báo cáo đã lưu
+            </button>
+            <button className="text-slate-500 hover:text-slate-800 h-full flex items-center px-1">
+              Lịch gửi báo cáo định kỳ
+              <span className="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded">MỚI</span>
+            </button>
+            <button className="text-slate-500 hover:text-slate-800 h-full flex items-center px-1 gap-1">
+              AVA Phân tích tài chính
+              <span className="w-4 h-4 rounded-full bg-violet-100 flex items-center justify-center">
+                🤖
+              </span>
+            </button>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-slate-500">
+            <div className="flex items-center gap-2">
+              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 font-bold rounded">MỚI</span>
+              <span>In nhanh hơn - Ổn định hơn - In dữ liệu lớn với trình in mới của AMIS Kế toán. <a href="#" className="text-blue-600 hover:underline">Xem ngay</a></span>
+            </div>
+            <div className="flex items-center gap-2 border-l border-slate-300 pl-4">
+              Ngôn ngữ báo cáo: 
+              <select className="border border-slate-300 rounded px-2 py-1 bg-white">
+                <option>Tiếng Việt</option>
+                <option>English</option>
+              </select>
+            </div>
+            <button className="flex items-center gap-1 hover:text-slate-800">
+              <EyeOff className="w-3.5 h-3.5" /> Ẩn/hiện báo cáo
+            </button>
+          </div>
+        </div>
 
-      {isInvalidRange ? (
-        <EmptyState
-          title="Khoang ngay khong hop le"
-          description="Ngay bat dau phai nho hon hoac bang ngay ket thuc."
-        />
-      ) : isLoading ? (
-        <ReportSkeleton />
-      ) : isError || !data ? (
-        <EmptyState
-          title="Khong tai duoc bao cao"
-          description="Vui long thu lai hoac kiem tra ket noi API."
-          action={<Button onClick={() => void refetch()}>Tai lai</Button>}
-        />
-      ) : (
-        <>
-          <section className="grid gap-4 md:grid-cols-3">
-            {data.summary.map((item) => (
-              <SummaryCard key={item.key} item={item} />
-            ))}
-          </section>
+        {/* Search Bar */}
+        <div className="px-4 py-2 border-b border-slate-100 flex items-center gap-4 bg-white flex-none">
+          <div className="relative w-64">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Tìm theo tên báo cáo" 
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+            />
+          </div>
+          <div className="text-xs text-slate-500 flex items-center gap-1">
+            Tìm kiếm nhanh báo cáo với AVA Kế toán 🤖
+          </div>
+        </div>
 
-          <ReportChart
-            title={data.title}
-            description={data.description}
-            chartLabel={data.chartLabel}
-            secondaryChartLabel={data.secondaryChartLabel}
-            data={data.chart}
-          />
+        {/* Report List */}
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-4">
+          <div className="bg-white border border-slate-200 rounded shadow-sm min-h-full">
+            {/* Category Header */}
+            <div className="px-4 py-3 border-b border-slate-100 font-bold text-slate-800 bg-slate-50/50 rounded-t">
+              {activeCategory?.name}
+            </div>
 
-          <ReportTable columns={data.tableColumns} rows={data.tableRows} />
+            <div className="p-4 space-y-6">
+              {activeCategoryId === "yeu-thich" && (
+                <div>
+                  {favoriteItems.length === 0 ? (
+                    <div className="text-center text-slate-400 py-10">
+                      Chưa có báo cáo nào được thêm vào danh sách Yêu thích.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-x-12 gap-y-1">
+                      {favoriteItems.map(item => (
+                        <ReportRow key={item.id} item={item} isFav={true} onToggle={() => toggleFavorite(item.id)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-          {data.performance?.message ? (
-            <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              {data.performance.message}
-            </section>
-          ) : null}
-
-          {pagination ? (
-            <section className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm text-slate-500">
-                Trang {pagination.page + 1}/{Math.max(pagination.totalPages, 1)} - {pagination.totalItems} dong
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={filters.pageSize}
-                  onChange={(event) => setFilters((current) => ({ ...current, page: 0, pageSize: Number(event.target.value) }))}
-                  className="h-9 rounded-lg border border-border bg-white px-2 text-sm text-text outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-orange-100"
-                >
-                  {[25, 50, 100, 200].map((size) => (
-                    <option key={size} value={size}>
-                      {size}/trang
-                    </option>
+              {activeCategoryId !== "yeu-thich" && activeCategory && (activeCategory as ReportCategory).items && (
+                <div className="grid grid-cols-2 gap-x-12 gap-y-1">
+                  {(activeCategory as ReportCategory).items!.map(item => (
+                    <ReportRow key={item.id} item={item} isFav={favorites.includes(item.id)} onToggle={() => toggleFavorite(item.id)} />
                   ))}
-                </select>
-                <Button
-                  variant="secondary"
-                  disabled={filters.page <= 0 || isLoading}
-                  onClick={() => setFilters((current) => ({ ...current, page: Math.max(current.page - 1, 0) }))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Truoc
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={isLoading || pagination.page + 1 >= pagination.totalPages}
-                  onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}
-                >
-                  Sau
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </section>
-          ) : null}
+                </div>
+              )}
 
-          <p className="text-xs text-slate-500">
-            Cap nhat luc {new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(data.updatedAt))}
-          </p>
-        </>
-      )}
+              {activeCategoryId !== "yeu-thich" && activeCategory && (activeCategory as ReportCategory).groups && (
+                <div className="space-y-6">
+                  {(activeCategory as ReportCategory).groups!.map(group => (
+                    <div key={group.id}>
+                      <h3 className="font-semibold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 flex items-center justify-between group cursor-pointer hover:bg-slate-200">
+                        {group.name}
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 rotate-90" />
+                      </h3>
+                      <div className="grid grid-cols-2 gap-x-12 gap-y-1 px-3">
+                        {group.items.map(item => (
+                          <ReportRow key={item.id} item={item} isFav={favorites.includes(item.id)} onToggle={() => toggleFavorite(item.id)} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function formatDateInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function ReportRow({ item, isFav, onToggle }: { item: ReportItem, isFav: boolean, onToggle: () => void }) {
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-slate-100 group hover:bg-slate-50 px-2 -mx-2 rounded">
+      <Link 
+        href={item.href || "#"} 
+        className={`text-slate-700 hover:text-teal-600 truncate flex-1 ${!item.href && "opacity-70 cursor-not-allowed"}`}
+        title={item.href ? "" : "Báo cáo này đang được cập nhật"}
+        onClick={(e) => {
+          if (!item.href) {
+            e.preventDefault();
+            alert("Báo cáo này đang trong quá trình phát triển.");
+          }
+        }}
+      >
+        {item.name}
+      </Link>
+      <div className="flex items-center gap-3 ml-4 flex-none opacity-0 group-hover:opacity-100 transition-opacity">
+        <button className="text-slate-400 hover:text-teal-600" title="Xem báo cáo">
+          <BarChart2 className="w-4 h-4" />
+        </button>
+        <button className={`${isFav ? "text-green-500" : "text-slate-300 hover:text-green-500"} opacity-100`} onClick={onToggle}>
+          <Star className={`w-4 h-4 ${isFav ? "fill-green-500" : ""}`} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
-function SummaryCard({ item }: { item: ReportSummaryCard }) {
-  const toneClass =
-    item.tone === "orange"
-      ? "bg-orange-50 text-primary"
-      : item.tone === "green"
-        ? "bg-emerald-50 text-emerald-700"
-        : item.tone === "blue"
-          ? "bg-blue-50 text-blue-700"
-          : item.tone === "red"
-            ? "bg-red-50 text-red-700"
-            : "bg-slate-100 text-slate-700";
-
+// Simple icon for Chevron
+function ChevronRight(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <article className="rounded-lg border border-border bg-white p-4 shadow-soft">
-      <div className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-semibold ${toneClass}`}>{item.label}</div>
-      <div className="mt-3 text-2xl font-semibold tracking-normal text-text">{item.value}</div>
-      <p className="mt-1 text-sm text-slate-500">{item.helper}</p>
-    </article>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m9 18 6-6-6-6"/>
+    </svg>
   );
 }

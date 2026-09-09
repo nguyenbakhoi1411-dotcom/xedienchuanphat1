@@ -10,9 +10,11 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/purchase-returns")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class PurchaseReturnController {
 
     private final PurchaseReturnService returnService;
@@ -63,3 +65,4 @@ public class PurchaseReturnController {
             @NotNull List<ReturnItemRequest> items
     ) {}
 }
+

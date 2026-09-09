@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/marketing")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class MarketingController {
     private final MarketingService service;
 
@@ -50,3 +51,4 @@ public class MarketingController {
         return service.customerSources();
     }
 }
+

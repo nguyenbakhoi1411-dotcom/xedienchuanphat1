@@ -12,8 +12,8 @@ interface Props {
 }
 
 /**
- * DiscountApprovalAlert — hien thi khi don hang dang cho duyet giam gia.
- * Nguoi co quyen APPROVE_DISCOUNT co the chap thuan hoac tu choi.
+ * DiscountApprovalAlert — hiển thị khi đơn hàng đang chờ duyệt giảm giá.
+ * Người có quyền APPROVE_DISCOUNT có thể chấp thuận hoặc từ chối.
  */
 export function DiscountApprovalAlert({ order, onUpdated }: Props) {
   const qc = useQueryClient();
@@ -40,7 +40,7 @@ export function DiscountApprovalAlert({ order, onUpdated }: Props) {
     },
   });
 
-  if (order.status !== "WAITING_DISCOUNT_APPROVAL") return null;
+  if (order.discountApprovalStatus !== "PENDING") return null;
 
   const discountPct = order.subtotal > 0
     ? ((order.discountAmount / order.subtotal) * 100).toFixed(1)
@@ -135,14 +135,6 @@ export function DiscountApprovalAlert({ order, onUpdated }: Props) {
         </div>
       )}
 
-      {/* Approved badge */}
-      {order.discountApprovalStatus === "APPROVED" && (
-        <div className="pl-11 flex items-center gap-1.5 text-xs text-emerald-700">
-          <Check className="h-3.5 w-3.5" />
-          <span>Đã được <strong>{order.approvedBy}</strong> phê duyệt</span>
-          {order.approvalNote && <span className="text-slate-500">— {order.approvalNote}</span>}
-        </div>
-      )}
     </div>
   );
 }

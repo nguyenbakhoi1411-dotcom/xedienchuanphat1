@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/reports")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class PricePolicyReportController {
     private final SalesOrderItemRepository salesOrderItemRepository;
 
@@ -42,3 +43,4 @@ public class PricePolicyReportController {
         return authentication != null && authentication.getAuthorities().stream().anyMatch(item -> authority.equals(item.getAuthority()));
     }
 }
+

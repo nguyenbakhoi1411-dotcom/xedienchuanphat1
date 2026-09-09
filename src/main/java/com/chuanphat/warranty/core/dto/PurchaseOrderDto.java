@@ -13,13 +13,24 @@ public record PurchaseOrderDto(
         String purchaseOrderNo,
         Long supplierId,
         String supplierName,
+        String supplierPhone,
         Long branchId,
         PurchaseOrderStatus status,
         String statusLabel,
         LocalDate purchaseDate,
         LocalDate expectedDelivery,
+        BigDecimal tongTienHang,
+        BigDecimal tongChietKhau,
+        BigDecimal tongThueGtgt,
         BigDecimal totalAmount,
         BigDecimal paidAmount,
+        BigDecimal conLaiPhaiTra,
+        String hinhThucTT,
+        LocalDate hanThanhToan,
+        String trangThaiThanhToan,
+        String nguoiPhuTrach,
+        String diaChiGiaoHang,
+        String fileHoaDonNcc,
         String note,
         String createdBy,
         OffsetDateTime createdAt,
@@ -36,9 +47,15 @@ public record PurchaseOrderDto(
             Long productId,
             String productName,
             String productCode,
+            String tenSanPham,
+            String donViTinh,
             int quantity,
+            BigDecimal soLuongDaNhan,
             BigDecimal unitCost,
-            BigDecimal lineTotal
+            BigDecimal chietKhauPhanTram,
+            BigDecimal thueGtgtPhanTram,
+            BigDecimal lineTotal,
+            int thuTu
     ) {
         public static PurchaseOrderItemDto from(PurchaseOrderItem item) {
             return new PurchaseOrderItemDto(
@@ -46,9 +63,15 @@ public record PurchaseOrderDto(
                     item.getProduct().getId(),
                     item.getProduct().getProductName(),
                     item.getProduct().getProductCode(),
+                    item.getTenSanPham() != null ? item.getTenSanPham() : item.getProduct().getProductName(),
+                    item.getDonViTinh(),
                     item.getQuantity(),
+                    item.getSoLuongDaNhan(),
                     item.getUnitCost(),
-                    item.getLineTotal()
+                    item.getChietKhauPhanTram(),
+                    item.getThueGtgtPhanTram(),
+                    item.getLineTotal(),
+                    item.getThuTu()
             );
         }
     }
@@ -57,9 +80,13 @@ public record PurchaseOrderDto(
         return new PurchaseOrderDto(
                 po.getId(), po.getPurchaseOrderNo(),
                 po.getSupplier().getId(), po.getSupplier().getName(),
+                po.getSupplier().getPhone(),
                 po.getBranchId(), po.getStatus(), statusLabel(po.getStatus()),
                 po.getPurchaseDate(), po.getExpectedDelivery(),
-                po.getTotalAmount(), po.getPaidAmount(),
+                po.getTongTienHang(), po.getTongChietKhau(), po.getTongThueGtgt(),
+                po.getTotalAmount(), po.getPaidAmount(), po.getConLaiPhaiTra(),
+                po.getHinhThucTT(), po.getHanThanhToan(), po.getTrangThaiThanhToan(),
+                po.getNguoiPhuTrach(), po.getDiaChiGiaoHang(), po.getFileHoaDonNcc(),
                 po.getNote(), po.getCreatedBy(), po.getCreatedAt(),
                 po.getApprovedBy(), po.getApprovedAt(),
                 po.getRejectedBy(), po.getRejectReason(),

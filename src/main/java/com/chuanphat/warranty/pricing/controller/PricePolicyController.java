@@ -11,6 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/price-policies")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class PricePolicyController {
     private final PricePolicyService policyService;
     private final PriceCalculationService calculationService;
@@ -71,3 +72,4 @@ public class PricePolicyController {
         return calculationService.calculateEffectivePrice(productId, branchId, customerId, date);
     }
 }
+

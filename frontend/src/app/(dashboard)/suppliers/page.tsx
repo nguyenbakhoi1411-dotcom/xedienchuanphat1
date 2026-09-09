@@ -72,7 +72,7 @@ export default function SuppliersPage() {
             className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-orange-100"
           />
         </div>
-        <p className="text-sm text-slate-500">{data ? `${data.totalItems} nha cung cap` : "Dang tai du lieu"}</p>
+        <p className="text-sm text-slate-500">{data ? `${data.totalItems} nha cung cap` : "Đang tải dữ liệu"}</p>
       </section>
 
       <SupplierTable

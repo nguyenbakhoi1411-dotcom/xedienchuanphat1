@@ -16,18 +16,27 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import com.chuanphat.warranty.accounting.service.AccountingLedgerService;
+import com.chuanphat.warranty.accounting.dto.GeneralLedgerResponse;
+import com.chuanphat.warranty.accounting.dto.TrialBalanceResponse;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.chuanphat.warranty.sales.service.MisaExportService;
 
 @RestController
-@RequestMapping("/api/reports")
+@RequestMapping({"/api/reports", "/api/v1/reports"})
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class ReportController {
     private final ReportService service;
     private final AuditLogService auditLogService;
+    private final AccountingLedgerService ledgerService;
+    private final MisaExportService misaExportService;
 
-    public ReportController(ReportService service, AuditLogService auditLogService) {
+    public ReportController(ReportService service, AuditLogService auditLogService, AccountingLedgerService ledgerService, MisaExportService misaExportService) {
         this.service = service;
         this.auditLogService = auditLogService;
+        this.ledgerService = ledgerService;
+        this.misaExportService = misaExportService;
     }
 
     @GetMapping("/{type}")
@@ -208,4 +217,42 @@ public class ReportController {
         }
         return request.getRemoteAddr();
     }
+    @GetMapping("/general-ledger")
+    @PreAuthorize("hasAuthority('REPORT_VIEW')")
+    public GeneralLedgerResponse generalLedger(
+            @RequestParam String accountCode,
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate,
+            @RequestParam(required = false) Long branchId
+    ) {
+        return ledgerService.generalLedger(accountCode, fromDate, toDate, branchId);
+    }
+
+    @GetMapping("/trial-balance")
+    @PreAuthorize("hasAuthority('REPORT_VIEW')")
+    public TrialBalanceResponse trialBalance(
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate,
+            @RequestParam(required = false) Long branchId
+    ) {
+        return ledgerService.trialBalance(fromDate, toDate, branchId);
+    }
+
+    @GetMapping("/misa/export")
+    @PreAuthorize("hasAuthority('REPORT_EXPORT')")
+    public ResponseEntity<byte[]> exportMisa(
+            @RequestParam(required = false) LocalDate fromDate,
+            @RequestParam(required = false) LocalDate toDate,
+            @RequestParam(required = false) Long branchId,
+            HttpServletRequest request
+    ) {
+        DateRange range = defaultRange(fromDate, toDate);
+        byte[] csvBytes = misaExportService.exportToMisaFormat(range.fromDate(), range.toDate());
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentDisposition(ContentDisposition.attachment().filename("MISA_Sales_Export.csv").build());
+        headers.setContentType(MediaType.parseMediaType("text/csv; charset=utf-8"));
+        return ResponseEntity.ok().headers(headers).body(csvBytes);
+    }
 }
+

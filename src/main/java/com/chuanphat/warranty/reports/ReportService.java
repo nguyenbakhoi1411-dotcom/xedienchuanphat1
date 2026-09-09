@@ -14,6 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.chuanphat.warranty.reports.engine.ReportEngine;
+import com.chuanphat.warranty.reports.engine.ReportCriteria;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -27,11 +29,13 @@ public class ReportService {
     private final JdbcTemplate jdbcTemplate;
     private final BranchSecurity branchSecurity;
     private final ExportDocumentService exportDocumentService;
+    private final ReportEngine reportEngine;
 
-    public ReportService(JdbcTemplate jdbcTemplate, BranchSecurity branchSecurity, ExportDocumentService exportDocumentService) {
+    public ReportService(JdbcTemplate jdbcTemplate, BranchSecurity branchSecurity, ExportDocumentService exportDocumentService, ReportEngine reportEngine) {
         this.jdbcTemplate = jdbcTemplate;
         this.branchSecurity = branchSecurity;
         this.exportDocumentService = exportDocumentService;
+        this.reportEngine = reportEngine;
     }
 
     public Map<String, Object> report(String type, LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, String productCategory, int page, int pageSize) {
@@ -50,6 +54,14 @@ public class ReportService {
     private Map<String, Object> buildReport(String type, LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, Long customerId, String status, String productCategory, int page, int pageSize) {
         int safePage = Math.max(page, 0);
         int safePageSize = Math.min(Math.max(pageSize, 1), 500);
+
+        try {
+            ReportCriteria criteria = new ReportCriteria(type, fromDate, toDate, branchId, employeeId, productId, customerId, null, status, productCategory, safePage, safePageSize);
+            return maskSensitive(reportEngine.generateReport(criteria));
+        } catch (IllegalArgumentException e) {
+            // Fallback to legacy reports
+        }
+
         Map<String, Object> result = switch (normalizeType(type)) {
             case "SALES", "SALES_REPORT", "REVENUE_TIME" -> salesReport(fromDate, toDate, branchId, employeeId, productId, customerId, status, productCategory, safePage, safePageSize);
             case "INVENTORY_VALUATION", "INVENTORY" -> inventoryValuation(branchId, productId, productCategory, safePage, safePageSize);

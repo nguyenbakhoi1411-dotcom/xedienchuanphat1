@@ -19,8 +19,15 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import jakarta.persistence.Index;
+
 @Entity
-@Table(name = "journal_entries")
+@Table(name = "journal_entries", indexes = {
+    @Index(name = "idx_je_entry_date", columnList = "entryDate"),
+    @Index(name = "idx_je_period", columnList = "accountingYear, accountingMonth"),
+    @Index(name = "idx_je_status", columnList = "status"),
+    @Index(name = "idx_je_ref", columnList = "referenceType, referenceId")
+})
 public class JournalEntry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,6 +40,12 @@ public class JournalEntry {
     private String entryCode;
 
     private Long branchId;
+
+    @Column(nullable = false)
+    private Integer accountingYear;
+
+    @Column(nullable = false)
+    private Integer accountingMonth;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
@@ -80,6 +93,10 @@ public class JournalEntry {
     public void setEntryCode(String entryCode) { this.entryCode = entryCode; }
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+    public Integer getAccountingYear() { return accountingYear; }
+    public void setAccountingYear(Integer accountingYear) { this.accountingYear = accountingYear; }
+    public Integer getAccountingMonth() { return accountingMonth; }
+    public void setAccountingMonth(Integer accountingMonth) { this.accountingMonth = accountingMonth; }
     public JournalReferenceType getReferenceType() { return referenceType; }
     public void setReferenceType(JournalReferenceType referenceType) { this.referenceType = referenceType; }
     public String getReferenceId() { return referenceId; }

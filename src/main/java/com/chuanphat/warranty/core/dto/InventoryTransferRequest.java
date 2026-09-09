@@ -1,17 +1,18 @@
 package com.chuanphat.warranty.core.dto;
 
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.util.List;
 
 public record InventoryTransferRequest(
         @NotNull Long fromBranchId,
         Long fromWarehouseId,
         @NotNull Long toBranchId,
         Long toWarehouseId,
-        @NotNull Long productId,
-        @Min(1) int quantity,
         LocalDate transactionDate,
-        String note
-) {
-}
+        String ghiChu,
+        String note,
+        @NotEmpty @Valid List<InventoryTransferItemRequest> items
+) {}

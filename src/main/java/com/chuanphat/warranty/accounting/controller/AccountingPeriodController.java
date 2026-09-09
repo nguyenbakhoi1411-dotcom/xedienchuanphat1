@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/accounting/periods")
+@RequestMapping({"/api/accounting/periods", "/api/v1/accounting/periods"})
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class AccountingPeriodController {
 
     private final AccountingPeriodService periodService;
@@ -52,3 +53,4 @@ public class AccountingPeriodController {
         return ResponseEntity.ok(periodService.unlockPeriod(id, user.getUsername(), req.note()));
     }
 }
+

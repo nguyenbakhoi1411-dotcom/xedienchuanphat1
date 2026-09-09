@@ -9,13 +9,14 @@ import type { AccountingTab } from "./types";
 
 const tabs: Array<{ value: AccountingTab; label: string; icon: typeof BarChart3; group?: string }> = [
   { value: "overview",     label: "Tổng quan",    icon: BarChart3,     group: "main" },
+  { value: "general_operations", label: "Tổng hợp", icon: BookOpen,    group: "main" },
   { value: "accounts",     label: "Hệ TK",        icon: ListTree,      group: "main" },
   { value: "journal",      label: "Bút toán",     icon: BookOpen,      group: "main" },
+  { value: "recurring-journals", label: "BT định kỳ", icon: BookOpen,  group: "advanced" },
+  { value: "cost-centers", label: "Trung tâm CP", icon: Building2,     group: "advanced" },
   { value: "receipts",     label: "Phiếu thu",    icon: HandCoins,     group: "voucher" },
   { value: "payments",     label: "Phiếu chi",    icon: CreditCard,    group: "voucher" },
   { value: "debts",        label: "Công nợ",      icon: FileText,      group: "voucher" },
-  { value: "tax-invoices", label: "Hoá đơn VAT",  icon: Receipt,       group: "tax" },
-  { value: "vat-report",   label: "Báo cáo VAT",  icon: FileSpreadsheet, group: "tax" },
   { value: "expenses",     label: "Chi phí",      icon: Wallet,        group: "asset" },
   { value: "fixed-assets", label: "TSCĐ",         icon: Building2,     group: "asset" },
   { value: "reports",      label: "Báo cáo TC",   icon: FileSpreadsheet, group: "report" },
@@ -24,8 +25,8 @@ const tabs: Array<{ value: AccountingTab; label: string; icon: typeof BarChart3;
 
 const GROUP_LABELS: Record<string, string> = {
   main: "Kế toán",
+  advanced: "Nâng cao",
   voucher: "Chứng từ",
-  tax: "Thuế VAT",
   asset: "Chi phí / TSCĐ",
   report: "Báo cáo",
 };

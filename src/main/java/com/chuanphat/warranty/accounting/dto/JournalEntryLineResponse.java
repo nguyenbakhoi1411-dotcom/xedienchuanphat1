@@ -9,7 +9,10 @@ public record JournalEntryLineResponse(
         String accountName,
         BigDecimal debitAmount,
         BigDecimal creditAmount,
-        String description
+        String description,
+        Long customerId,
+        Long supplierId,
+        Long costCenterId
 ) {
     public static JournalEntryLineResponse from(JournalEntryLine line) {
         return new JournalEntryLineResponse(
@@ -18,7 +21,10 @@ public record JournalEntryLineResponse(
                 line.getAccount().getAccountName(),
                 line.getDebitAmount(),
                 line.getCreditAmount(),
-                line.getDescription()
+                line.getDescription(),
+                line.getCustomerId(),
+                line.getSupplierId(),
+                line.getCostCenterId()
         );
     }
 }

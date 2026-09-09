@@ -79,7 +79,7 @@ class AccountingLedgerControllerTest {
                         .param("fromDate", LocalDate.now().minusDays(1).toString())
                         .param("toDate", LocalDate.now().plusDays(1).toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalDebit").value(100))
-                .andExpect(jsonPath("$.totalCredit").value(100));
+                .andExpect(jsonPath("$.totalPeriodDebit").value(100))
+                .andExpect(jsonPath("$.totalPeriodCredit").value(100));
     }
 }

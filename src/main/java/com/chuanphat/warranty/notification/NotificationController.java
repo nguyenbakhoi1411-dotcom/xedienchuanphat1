@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class NotificationController {
     private final NotificationService service;
 
@@ -67,3 +68,4 @@ public class NotificationController {
         return service.markReminderDone(id);
     }
 }
+

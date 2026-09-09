@@ -10,4 +10,6 @@ public interface ChartOfAccountRepository extends JpaRepository<ChartOfAccount, 
     Optional<ChartOfAccount> findByAccountCode(String accountCode);
     boolean existsByAccountCode(String accountCode);
     Page<ChartOfAccount> findByActive(boolean active, Pageable pageable);
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT c.parentAccount.id FROM ChartOfAccount c WHERE c.parentAccount IS NOT NULL")
+    java.util.Set<Long> findAllParentAccountIds();
 }

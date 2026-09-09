@@ -59,6 +59,23 @@ public class SalesReturn {
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
+    @Column(length = 255)
+    private String createdBy;
+
+    private LocalDate accountingDate;
+
+    @Column(name = "voucher_id")
+    private Long voucherId;
+
+    @Column(name = "invoice_id")
+    private Long invoiceId;
+
+    @Column(precision = 18, scale = 2)
+    private BigDecimal totalTaxAmount = BigDecimal.ZERO;
+
+    @Column(length = 50)
+    private String refundMethod = "CASH";
+
     /** Đã đảo bút toán doanh thu/giá vốn chưa — chống ghi trùng */
     @Column(nullable = false)
     private boolean accountingReversed = false;
@@ -95,4 +112,17 @@ public class SalesReturn {
     public void setReversalEntryNo(String reversalEntryNo) { this.reversalEntryNo = reversalEntryNo; }
     public List<SalesReturnItem> getItems() { return items; }
     public void addItem(SalesReturnItem item) { items.add(item); item.setSalesReturn(this); }
+
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public LocalDate getAccountingDate() { return accountingDate; }
+    public void setAccountingDate(LocalDate accountingDate) { this.accountingDate = accountingDate; }
+    public Long getVoucherId() { return voucherId; }
+    public void setVoucherId(Long voucherId) { this.voucherId = voucherId; }
+    public Long getInvoiceId() { return invoiceId; }
+    public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
+    public BigDecimal getTotalTaxAmount() { return totalTaxAmount; }
+    public void setTotalTaxAmount(BigDecimal totalTaxAmount) { this.totalTaxAmount = totalTaxAmount; }
+    public String getRefundMethod() { return refundMethod; }
+    public void setRefundMethod(String refundMethod) { this.refundMethod = refundMethod; }
 }

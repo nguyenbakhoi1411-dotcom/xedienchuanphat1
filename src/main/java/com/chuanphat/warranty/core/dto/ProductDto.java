@@ -8,6 +8,10 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import com.fasterxml.jackson.annotation.JsonView;
 
 public record ProductDto(
         Long id,
@@ -16,13 +20,17 @@ public record ProductDto(
         @NotNull ProductCategory category,
         @NotBlank String brand,
         String model,
-        String color,
-        String batteryCapacity,
-        String motorPower,
-        @NotNull @DecimalMin("0.00") BigDecimal importPrice,
-        @NotNull @DecimalMin("0.01") BigDecimal salePrice,
+        Map<String, Object> attributes,
+        @JsonView(DataView.AdminView.class) @NotNull @DecimalMin("0.00") BigDecimal importPrice,
+        @JsonView(DataView.SalesView.class) @NotNull @DecimalMin("0.01") BigDecimal salePrice,
         @Min(0) int warrantyMonths,
-        RecordStatus status
+        RecordStatus status,
+        String origin,
+        String purchaseDescription,
+        String salesDescription,
+        String specialItemType,
+        String warrantyPeriod,
+        List<ProductComboItemDto> comboItems
 ) {
     public static ProductDto from(Product product) {
         return new ProductDto(
@@ -32,13 +40,17 @@ public record ProductDto(
                 product.getCategory(),
                 product.getBrand(),
                 product.getModel(),
-                product.getColor(),
-                product.getBatteryCapacity(),
-                product.getMotorPower(),
+                product.getAttributes(),
                 product.getImportPrice(),
                 product.getSalePrice(),
                 product.getWarrantyMonths(),
-                product.getStatus()
+                product.getStatus(),
+                product.getOrigin(),
+                product.getPurchaseDescription(),
+                product.getSalesDescription(),
+                product.getSpecialItemType(),
+                product.getWarrantyPeriod(),
+                product.getComboItems() != null ? product.getComboItems().stream().map(ProductComboItemDto::from).collect(Collectors.toList()) : null
         );
     }
 }

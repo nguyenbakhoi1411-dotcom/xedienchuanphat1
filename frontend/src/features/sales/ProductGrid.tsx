@@ -24,8 +24,8 @@ export function ProductGrid({ keyword, products, loading, onKeywordChange, onAdd
           <input
             value={keyword}
             onChange={(event) => onKeywordChange(event.target.value)}
-            placeholder="Tim nhanh san pham, ma SKU, serial"
-            aria-label="Tim nhanh san pham POS"
+            placeholder="Tìm nhanh sản phẩm, mã SKU, serial"
+            aria-label="Tìm nhanh sản phẩm POS"
             className="w-full border-0 bg-transparent text-sm outline-none"
           />
         </label>
@@ -37,7 +37,7 @@ export function ProductGrid({ keyword, products, loading, onKeywordChange, onAdd
             {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-48" />)}
           </div>
         ) : !products || products.length === 0 ? (
-          <EmptyState title="Khong tim thay san pham" description="Thu nhap ten hoac ma san pham khac." />
+          <EmptyState title="Không tìm thấy sản phẩm" description="Thử nhập tên hoặc mã sản phẩm khác." />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {products.map((product) => (
@@ -64,7 +64,7 @@ export function ProductGrid({ keyword, products, loading, onKeywordChange, onAdd
                   </div>
                   <div className="mt-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-primary">{formatCurrency(product.salePrice)}</span>
-                    <span className="erp-badge border-slate-200 bg-slate-100 text-slate-600">Ton {product.stockQuantity}</span>
+                    <span className="erp-badge border-slate-200 bg-slate-100 text-slate-600">Tồn {product.stockQuantity}</span>
                   </div>
                   {product.pricePolicyName && (
                     <div className="mt-2 rounded-md bg-orange-50 px-2 py-1 text-xs text-primary">

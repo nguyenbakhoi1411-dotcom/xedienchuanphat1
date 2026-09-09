@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/dashboard")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class DashboardController {
     private final DashboardService service;
 
@@ -53,3 +54,4 @@ public class DashboardController {
         return service.dashboard(new DashboardFilter(fromDate, toDate, month, timeRange, branchId, employeeId, productCategory));
     }
 }
+

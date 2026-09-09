@@ -96,17 +96,32 @@ public class FixedAssetService {
 
         List<FixedAsset> activeAssets = assetRepository.findByStatus("ACTIVE");
         List<FixedAssetDtos.DepreciationLineResult> results = new ArrayList<>();
-
+        
         for (FixedAsset asset : activeAssets) {
-            // Bỏ qua nếu đã khấu hao tháng này
-            if (depreciationRepository.existsByAsset_IdAndDepreciationYearAndDepreciationMonth(asset.getId(), year, month)) {
-                results.add(new FixedAssetDtos.DepreciationLineResult(asset.getId(), asset.getAssetCode(), asset.getAssetName(), BigDecimal.ZERO, "SKIPPED"));
+            // 1. Kiểm tra ngày đưa vào sử dụng
+            LocalDate runMonthDate = LocalDate.of(year, month, 1);
+            if (asset.getPurchaseDate() != null && asset.getPurchaseDate().withDayOfMonth(1).isAfter(runMonthDate)) {
+                results.add(new FixedAssetDtos.DepreciationLineResult(asset.getId(), asset.getAssetCode(), asset.getAssetName(), BigDecimal.ZERO, "SKIPPED_NOT_STARTED"));
                 continue;
             }
-            // Bỏ qua nếu giá trị còn lại <= giá trị thanh lý
-            if (asset.getBookValue().compareTo(asset.getResidualValue()) <= 0) {
+
+            // 2. Kiểm tra trạng thái ACTIVE
+            if (!"ACTIVE".equals(asset.getStatus())) {
+                results.add(new FixedAssetDtos.DepreciationLineResult(asset.getId(), asset.getAssetCode(), asset.getAssetName(), BigDecimal.ZERO, "SKIPPED_NOT_ACTIVE"));
+                continue;
+            }
+
+            // 3. Kiểm tra số tháng đã khấu hao
+            long depreciatedMonths = depreciationRepository.countByAsset_Id(asset.getId());
+            if (depreciatedMonths >= asset.getUsefulLifeMonths() || asset.getBookValue().compareTo(asset.getResidualValue()) <= 0) {
                 asset.setStatus("FULLY_DEPRECIATED");
                 results.add(new FixedAssetDtos.DepreciationLineResult(asset.getId(), asset.getAssetCode(), asset.getAssetName(), BigDecimal.ZERO, "FULLY_DEPRECIATED"));
+                continue;
+            }
+
+            // Bỏ qua nếu đã khấu hao tháng này (Idempotency check)
+            if (depreciationRepository.existsByAsset_IdAndDepreciationYearAndDepreciationMonth(asset.getId(), year, month)) {
+                results.add(new FixedAssetDtos.DepreciationLineResult(asset.getId(), asset.getAssetCode(), asset.getAssetName(), BigDecimal.ZERO, "SKIPPED_ALREADY_RUN"));
                 continue;
             }
 

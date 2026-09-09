@@ -6,12 +6,15 @@ import { cn } from '@/lib/utils';
 import { CashFlowReport } from '../types';
 
 interface CashFlowViewerProps {
-  report: CashFlowReport;
+  report?: CashFlowReport;
   isLoading?: boolean;
+  fromDate?: string;
+  toDate?: string;
 }
 
-export function CashFlowViewer({ report, isLoading = false }: CashFlowViewerProps) {
-  if (isLoading) {
+export function CashFlowViewer({ report: _report, isLoading = false, fromDate, toDate }: CashFlowViewerProps) {
+  const report = _report as any;
+  if (isLoading || !report) {
     return (
       <div className="space-y-4">
         {[...Array(8)].map((_, i) => (
@@ -53,6 +56,17 @@ export function CashFlowViewer({ report, isLoading = false }: CashFlowViewerProp
     </>
   );
 
+  const fmtDate = (d: string | null | undefined) => {
+    if (!d) return '';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return d;
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -60,7 +74,12 @@ export function CashFlowViewer({ report, isLoading = false }: CashFlowViewerProp
         <h2 className="font-semibold text-gray-900">
           <div className="flex items-center gap-2">
             <TrendingUp size={20} className="text-blue-600" />
-            Báo cáo lưu chuyển tiền tệ (B03-DN) - Phương pháp trực tiếp
+            <span>Báo cáo lưu chuyển tiền tệ (B03-DN) - Phương pháp trực tiếp</span>
+            {fromDate && toDate && (
+              <span className="text-xs text-gray-500 font-normal">
+                (Từ ngày {fmtDate(fromDate)} đến ngày {fmtDate(toDate)})
+              </span>
+            )}
           </div>
         </h2>
         <div className="flex items-center gap-2">

@@ -20,7 +20,7 @@ export function VoucherTable({
   onPageChange: (page: number) => void;
 }) {
   if (loading) return <div className="space-y-3 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>;
-  if (!data || data.items.length === 0) return <div className="p-4"><EmptyState title="Khong co chung tu" description="Tao phieu moi hoac thay doi bo loc." /></div>;
+  if (!data || data.items.length === 0) return <div className="p-4"><EmptyState title="Không có chứng từ" description="Tạo phiếu mới hoặc thay đổi bộ lọc." /></div>;
 
   return (
     <>

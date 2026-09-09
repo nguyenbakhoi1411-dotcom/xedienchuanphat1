@@ -4,6 +4,7 @@ import com.chuanphat.warranty.core.entity.InventoryCount;
 import com.chuanphat.warranty.core.enums.InventoryCountStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -12,6 +13,8 @@ public interface InventoryCountRepository extends JpaRepository<InventoryCount, 
     Page<InventoryCount> findByBranchId(Long branchId, Pageable pageable);
 
     Page<InventoryCount> findByBranchIdAndStatus(Long branchId, InventoryCountStatus status, Pageable pageable);
+
+    List<InventoryCount> findByStatusAndCreatedAtAfter(InventoryCountStatus status, java.time.OffsetDateTime date);
 
     Page<InventoryCount> findByStatus(InventoryCountStatus status, Pageable pageable);
 

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/inventory/goods-issues")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class GoodsIssueController {
 
     private final GoodsIssueService service;
@@ -64,3 +65,4 @@ public class GoodsIssueController {
         return service.cancel(id);
     }
 }
+

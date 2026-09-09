@@ -57,7 +57,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Map<String, Object>> handleUnexpected(Exception exception, HttpServletRequest request) {
-        operationService.recordError(ErrorSeverity.ERROR, "SYSTEM", exception, request.getRequestURI(), currentUser());
+        exception.printStackTrace(); operationService.recordError(ErrorSeverity.ERROR, "SYSTEM", exception, request.getRequestURI(), currentUser());
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
     }
 

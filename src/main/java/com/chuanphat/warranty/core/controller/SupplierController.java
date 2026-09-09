@@ -11,9 +11,11 @@ import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class SupplierController {
 
     private final SupplierService supplierService;
@@ -39,6 +41,12 @@ public class SupplierController {
         return supplierService.list(keyword, page, size);
     }
 
+    /** Autocomplete — tra ve toi da 10 NCC khop voi q */
+    @GetMapping("/suppliers/search")
+    public List<SupplierDto> search(@RequestParam(required = false, defaultValue = "") String q) {
+        return supplierService.search(q);
+    }
+
     @GetMapping("/suppliers/{id}")
     public SupplierDto get(@PathVariable Long id) {
         return supplierService.get(id);
@@ -59,4 +67,10 @@ public class SupplierController {
     public SupplierDto deactivate(@PathVariable Long id) {
         return supplierService.deactivate(id);
     }
+
+    @PostMapping("/suppliers/{id}/activate")
+    public SupplierDto activate(@PathVariable Long id) {
+        return supplierService.activate(id);
+    }
 }
+

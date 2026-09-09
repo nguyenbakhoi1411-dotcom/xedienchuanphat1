@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/hr")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class HrController {
     private final HrService hrService;
 
@@ -117,3 +118,4 @@ public class HrController {
         return hrService.calculateKpi(employeeId, month, year);
     }
 }
+

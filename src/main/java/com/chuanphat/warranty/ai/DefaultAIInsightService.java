@@ -7,12 +7,18 @@ import com.chuanphat.warranty.audit.service.AuditLogService;
 import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
@@ -22,29 +28,43 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DefaultAIInsightService implements AIInsightService {
+
+    private static final Logger log = LoggerFactory.getLogger(DefaultAIInsightService.class);
+    private static final String CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
+    private static final String CLAUDE_MODEL = "claude-3-5-sonnet-20241022";
+
     private final JdbcTemplate jdbcTemplate;
     private final BranchSecurity branchSecurity;
     private final AuditLogService auditLogService;
     private final boolean enabled;
     private final String mode;
+    private final String apiKey;
 
     public DefaultAIInsightService(
             JdbcTemplate jdbcTemplate,
             BranchSecurity branchSecurity,
             AuditLogService auditLogService,
             @Value("${app.ai.enabled:false}") boolean enabled,
-            @Value("${app.ai.mode:mock}") String mode
+            @Value("${app.ai.mode:mock}") String mode,
+            @Value("${app.ai.anthropic-key:}") String apiKey
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.branchSecurity = branchSecurity;
         this.auditLogService = auditLogService;
         this.enabled = enabled;
         this.mode = mode;
+        // Fallback to ANTHROPIC_API_KEY env var if property not set
+        this.apiKey = (apiKey != null && !apiKey.isBlank()) ? apiKey
+                : System.getenv("ANTHROPIC_API_KEY") != null ? System.getenv("ANTHROPIC_API_KEY") : "";
     }
 
     @Override
     public AiDtos.AssistantStatus status() {
-        return new AiDtos.AssistantStatus(enabled, mode, enabled ? "AI Assistant dang bat" : "AI Assistant dang tat theo cau hinh he thong", quickQuestions());
+        boolean claudeReady = "claude".equalsIgnoreCase(mode) && !apiKey.isBlank();
+        String msg = !enabled ? "AI Assistant dang tat theo cau hinh he thong"
+                : claudeReady ? "AI Assistant dang hoat dong voi Claude AI"
+                : "AI Assistant dang hoat dong voi phan tich du lieu thong minh";
+        return new AiDtos.AssistantStatus(enabled, mode, msg, quickQuestions());
     }
 
     @Override
@@ -55,11 +75,22 @@ public class DefaultAIInsightService implements AIInsightService {
         }
         String question = request == null ? "" : safeQuestion(request.question());
         if (question.isBlank()) {
-            throw new BusinessException("Question is required");
+            throw new BusinessException("Vui lòng nhập câu hỏi");
         }
         Long scopedBranchId = branchSecurity.scopedBranchId(request.branchId());
         String normalized = normalize(question);
         String intent = detectIntent(normalized);
+
+        // If claude mode with valid key — send enriched context to Claude
+        if ("claude".equalsIgnoreCase(mode) && !apiKey.isBlank()) {
+            AiDtos.AssistantResponse claudeResp = askClaude(question, intent, scopedBranchId);
+            if (claudeResp != null) {
+                audit(question, intent, claudeResp.answer());
+                return claudeResp;
+            }
+        }
+
+        // Fallback to rule-based responses
         AiDtos.AssistantResponse response = switch (intent) {
             case "PROFIT_RESTRICTED" -> noPermission("VIEW_PROFIT", "/reports");
             case "REVENUE_TODAY" -> revenueToday(scopedBranchId);
@@ -78,132 +109,264 @@ public class DefaultAIInsightService implements AIInsightService {
         return response;
     }
 
+    // ─── Anthropic Claude integration ────────────────────────────────────────
+
+    private AiDtos.AssistantResponse askClaude(String question, String intent, Long branchId) {
+        try {
+            String contextJson = buildContextJson(intent, branchId);
+            String systemPrompt = """
+                    Bạn là trợ lý AI phân tích kinh doanh cho chuỗi đại lý xe máy Chuẩn Phát tại Nghệ An.
+                    Bạn nhận dữ liệu thực từ hệ thống quản lý và trả lời bằng tiếng Việt, ngắn gọn, chính xác, thân thiện.
+                    Quy tắc:
+                    - Luôn trả lời bằng tiếng Việt
+                    - Không bịa đặt số liệu — chỉ dùng dữ liệu được cung cấp
+                    - Nếu dữ liệu trống, thông báo "Chưa có dữ liệu" một cách rõ ràng
+                    - Trả lời dưới 300 từ, súc tích
+                    - Đề xuất hành động cụ thể khi phù hợp
+                    - KHÔNG thực hiện bất kỳ thao tác ghi/xóa/duyệt nào — chỉ phân tích
+                    """;
+
+            String userMessage = String.format(
+                    "Câu hỏi: %s\n\nDữ liệu thực từ hệ thống (JSON):\n%s",
+                    question, contextJson
+            );
+
+            String requestBody = String.format("""
+                    {
+                        "model": "%s",
+                        "max_tokens": 1024,
+                        "system": %s,
+                        "messages": [{"role": "user", "content": %s}]
+                    }
+                    """,
+                    CLAUDE_MODEL,
+                    escapeJson(systemPrompt),
+                    escapeJson(userMessage)
+            );
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest httpReq = HttpRequest.newBuilder()
+                    .uri(URI.create(CLAUDE_API_URL))
+                    .header("x-api-key", apiKey)
+                    .header("anthropic-version", "2023-06-01")
+                    .header("content-type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> resp = client.send(httpReq, HttpResponse.BodyHandlers.ofString());
+
+            if (resp.statusCode() == 200) {
+                String body = resp.body();
+                String answer = extractClaudeAnswer(body);
+                return response(intent, answer, List.of(), List.of(),
+                        List.of(link("Mở báo cáo liên quan", resolveReportLink(intent))),
+                        quickQuestions(), null);
+            } else {
+                log.warn("Claude API returned status {}: {}", resp.statusCode(), resp.body());
+            }
+        } catch (Exception e) {
+            log.warn("Claude API call failed, falling back to rule-based: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    private String buildContextJson(String intent, Long branchId) {
+        Map<String, Object> ctx = new LinkedHashMap<>();
+        ctx.put("date", LocalDate.now().toString());
+        ctx.put("branchId", branchId);
+
+        try {
+            switch (intent) {
+                case "REVENUE_TODAY" -> {
+                    ctx.put("todayRevenue", money("select coalesce(sum(total_amount),0) from sales_orders where status <> 'CANCELLED' and order_date = ? and (? is null or branch_id = ?)", LocalDate.now(), branchId, branchId));
+                    ctx.put("todayOrders", money("select count(*) from sales_orders where status <> 'CANCELLED' and order_date = ? and (? is null or branch_id = ?)", LocalDate.now(), branchId, branchId));
+                    ctx.put("monthRevenue", money("select coalesce(sum(total_amount),0) from sales_orders where status <> 'CANCELLED' and order_date >= date_trunc('month', current_date) and (? is null or branch_id = ?)", branchId, branchId));
+                }
+                case "SLOW_STOCK" -> {
+                    List<Map<String, Object>> rows = list("select p.product_name, coalesce(sum(s.quantity_on_hand),0) qty from inventory_stocks s join products p on p.id = s.product_id where (? is null or s.branch_id = ?) group by p.id, p.product_name having qty > 0 order by qty asc limit 10", branchId, branchId);
+                    ctx.put("slowStock", rows);
+                }
+                case "OVERDUE_DEBT" -> {
+                    ctx.put("overdueAmount", money("select coalesce(sum(r.debit_amount - r.credit_amount),0) from receivables r join customers c on c.id = r.customer_id where r.status <> 'PAID' and r.due_date < current_date and (? is null or c.branch_id = ?)", branchId, branchId));
+                    ctx.put("overdueCustomers", money("select count(distinct r.customer_id) from receivables r join customers c on c.id = r.customer_id where r.status <> 'PAID' and r.due_date < current_date and (? is null or c.branch_id = ?)", branchId, branchId));
+                }
+                case "PURCHASE_SUGGESTION" -> {
+                    List<Map<String, Object>> rows = list("select p.product_name, coalesce(sum(s.quantity_on_hand),0) stock, coalesce(sum(case when so.order_date >= dateadd('day',-30,current_date) then soi.quantity else 0 end),0) sold30d from products p left join inventory_stocks s on s.product_id = p.id and (? is null or s.branch_id = ?) left join sales_order_items soi on soi.product_id = p.id left join sales_orders so on so.id = soi.order_id and so.status <> 'CANCELLED' group by p.id, p.product_name order by sold30d desc limit 10", branchId, branchId);
+                    ctx.put("stockVsSales", rows);
+                }
+                default -> {
+                    ctx.put("monthRevenue", money("select coalesce(sum(total_amount),0) from sales_orders where status <> 'CANCELLED' and order_date >= dateadd('day',-30,current_date) and (? is null or branch_id = ?)", branchId, branchId));
+                    ctx.put("monthOrders", money("select count(*) from sales_orders where status <> 'CANCELLED' and order_date >= dateadd('day',-30,current_date) and (? is null or branch_id = ?)", branchId, branchId));
+                    ctx.put("lowStockItems", money("select count(*) from inventory_stocks where quantity_on_hand <= min_quantity and (? is null or branch_id = ?)", branchId, branchId));
+                    ctx.put("overdueDebt", money("select coalesce(sum(r.debit_amount - r.credit_amount),0) from receivables r where r.status <> 'PAID' and r.due_date < current_date", new Object[0]));
+                    ctx.put("cashBalance", money("select coalesce((select coalesce(sum(amount),0) from cash_receipts where status='CONFIRMED') - (select coalesce(sum(amount),0) from cash_payments where status='CONFIRMED'), 0)"));
+                    ctx.put("todayPayments", money("select coalesce(sum(amount),0) from cash_payments where status='CONFIRMED' and payment_date = current_date and (? is null or branch_id = ?)", branchId, branchId));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Context build partial error: {}", e.getMessage());
+        }
+        return mapToJson(ctx);
+    }
+
+    private String extractClaudeAnswer(String responseBody) {
+        // Parse: {"content":[{"type":"text","text":"..."}],...}
+        try {
+            int textIdx = responseBody.indexOf("\"text\":");
+            if (textIdx < 0) return "Không thể phân tích phản hồi từ AI.";
+            int start = responseBody.indexOf('"', textIdx + 7) + 1;
+            int end = start;
+            while (end < responseBody.length()) {
+                char c = responseBody.charAt(end);
+                if (c == '"' && responseBody.charAt(end - 1) != '\\') break;
+                end++;
+            }
+            return responseBody.substring(start, end)
+                    .replace("\\n", "\n")
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\");
+        } catch (Exception e) {
+            return "Không thể phân tích phản hồi từ AI.";
+        }
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) return "\"\"";
+        return "\"" + value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+                + "\"";
+    }
+
+    private String mapToJson(Map<String, Object> map) {
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(entry.getKey()).append("\":");
+            Object v = entry.getValue();
+            if (v == null) sb.append("null");
+            else if (v instanceof Number) sb.append(v);
+            else if (v instanceof List<?> list) sb.append(listToJson(list));
+            else sb.append(escapeJson(v.toString()));
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private String listToJson(List<?> list) {
+        StringBuilder sb = new StringBuilder("[");
+        boolean first = true;
+        for (Object item : list) {
+            if (!first) sb.append(",");
+            first = false;
+            if (item instanceof Map<?, ?> m) {
+                sb.append("{");
+                boolean ff = true;
+                for (Map.Entry<?, ?> e : m.entrySet()) {
+                    if (!ff) sb.append(",");
+                    ff = false;
+                    sb.append("\"").append(e.getKey()).append("\":");
+                    Object v = e.getValue();
+                    if (v == null) sb.append("null");
+                    else if (v instanceof Number) sb.append(v);
+                    else sb.append(escapeJson(v.toString()));
+                }
+                sb.append("}");
+            } else {
+                sb.append(escapeJson(item == null ? "" : item.toString()));
+            }
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private String resolveReportLink(String intent) {
+        return switch (intent) {
+            case "REVENUE_TODAY" -> "/reports?type=SALES";
+            case "SLOW_STOCK" -> "/reports?type=SLOW_MOVING_STOCK";
+            case "OVERDUE_DEBT" -> "/reports?type=CUSTOMER_DEBT_AGING";
+            case "PURCHASE_SUGGESTION" -> "/reports?type=EXECUTIVE_OPERATION";
+            case "WARRANTY_TOP_MODEL" -> "/reports?type=WARRANTY_ANALYSIS";
+            default -> "/dashboard";
+        };
+    }
+
+    // ─── Rule-based responses (fallback) ─────────────────────────────────────
+
     private AiDtos.AssistantResponse revenueToday(Long branchId) {
         LocalDate today = LocalDate.now();
-        BigDecimal revenue = money("""
-                select coalesce(sum(total_amount),0)
-                from sales_orders
-                where status <> 'CANCELLED' and order_date = ? and (? is null or branch_id = ?)
-                """, today, branchId, branchId);
-        BigDecimal orders = money("""
-                select count(*)
-                from sales_orders
-                where status <> 'CANCELLED' and order_date = ? and (? is null or branch_id = ?)
-                """, today, branchId, branchId);
-        return response("REVENUE_TODAY", "Doanh thu hom nay la " + formatMoney(revenue) + " voi " + orders.toPlainString() + " don hang.",
-                List.of(metric("Doanh thu", revenue, "VND"), metric("Don hang", orders, "don")),
-                List.of(), List.of(link("Mo bao cao doanh thu", "/reports?type=SALES")), List.of("Kiem tra them doanh thu theo nhan vien neu can dieu phoi ca ban hang."), null);
+        BigDecimal revenue = money("select coalesce(sum(total_amount),0) from sales_orders where status <> 'CANCELLED' and order_date = ? and (? is null or branch_id = ?)", today, branchId, branchId);
+        BigDecimal orders = money("select count(*) from sales_orders where status <> 'CANCELLED' and order_date = ? and (? is null or branch_id = ?)", today, branchId, branchId);
+        return response("REVENUE_TODAY",
+                "Doanh thu hôm nay là " + formatMoney(revenue) + " với " + orders.toPlainString() + " đơn hàng.",
+                List.of(metric("Doanh thu", revenue, "VND"), metric("Đơn hàng", orders, "đơn")),
+                List.of(), List.of(link("Mở báo cáo doanh thu", "/reports?type=SALES")),
+                List.of("Kiểm tra thêm doanh thu theo nhân viên nếu cần điều phối ca bán hàng."), null);
     }
 
     private AiDtos.AssistantResponse bestBranch() {
-        Map<String, Object> row = one("""
-                select coalesce(b.name, concat('Chi nhanh #', so.branch_id)) branchName, coalesce(sum(so.total_amount),0) revenue
-                from sales_orders so
-                left join branches b on b.id = so.branch_id
-                where so.status <> 'CANCELLED' and so.order_date >= ?
-                group by so.branch_id, b.name
-                order by revenue desc
-                limit 1
-                """, LocalDate.now().minusDays(30));
-        String branch = text(row, "branchName", "Chua co du lieu");
+        Map<String, Object> row = one("select coalesce(b.name, concat('Chi nhánh #', so.branch_id)) branchName, coalesce(sum(so.total_amount),0) revenue from sales_orders so left join branches b on b.id = so.branch_id where so.status <> 'CANCELLED' and so.order_date >= ? group by so.branch_id, b.name order by revenue desc limit 1", LocalDate.now().minusDays(30));
+        String branch = text(row, "branchName", "Chưa có dữ liệu");
         BigDecimal revenue = decimal(row.get("revenue"));
-        return response("BEST_BRANCH", "Trong 30 ngay gan day, " + branch + " dang ban tot nhat voi doanh thu " + formatMoney(revenue) + ".",
-                List.of(metric("Doanh thu chi nhanh top", revenue, "VND")), List.of(), List.of(link("Mo bao cao theo chi nhanh", "/reports?type=BRANCH_PERFORMANCE")),
-                List.of("So sanh them so don va bien loi nhuan neu tai khoan co quyen xem loi nhuan."), null);
+        return response("BEST_BRANCH",
+                "Trong 30 ngày gần đây, " + branch + " đang bán tốt nhất với doanh thu " + formatMoney(revenue) + ".",
+                List.of(metric("Doanh thu chi nhánh top", revenue, "VND")), List.of(),
+                List.of(link("Mở báo cáo theo chi nhánh", "/reports?type=BRANCH_PERFORMANCE")),
+                List.of("So sánh thêm số đơn và biên lợi nhuận nếu tài khoản có quyền xem lợi nhuận."), null);
     }
 
     private AiDtos.AssistantResponse slowStock(Long branchId) {
-        List<Map<String, Object>> rows = list("""
-                select p.product_name productName, coalesce(sum(s.quantity_on_hand),0) quantityOnHand,
-                       max(ps.import_date) lastImportDate
-                from inventory_stocks s
-                join products p on p.id = s.product_id
-                left join product_serials ps on ps.product_id = p.id and ps.branch_id = s.branch_id
-                where (? is null or s.branch_id = ?)
-                group by p.id, p.product_name
-                having coalesce(sum(s.quantity_on_hand),0) > 0
-                order by max(ps.import_date) asc nulls first, quantityOnHand desc
-                limit 5
-                """, branchId, branchId);
-        return response("SLOW_STOCK", rows.isEmpty() ? "Chua thay xe ton lau trong pham vi du lieu hien co." : "Top xe can xem lai vi ton lau hoac ton nhieu: " + joinNames(rows, "productName") + ".",
-                List.of(), List.of(), List.of(link("Mo bao cao hang ton lau", "/reports?type=SLOW_MOVING_STOCK")),
-                rows.stream().map(row -> "Kiem tra " + text(row, "productName", "san pham") + " dang ton " + decimal(row.get("quantityOnHand")).toPlainString()).toList(), null);
+        List<Map<String, Object>> rows = list("select p.product_name productName, coalesce(sum(s.quantity_on_hand),0) quantityOnHand, max(ps.import_date) lastImportDate from inventory_stocks s join products p on p.id = s.product_id left join product_serials ps on ps.product_id = p.id and ps.branch_id = s.branch_id where (? is null or s.branch_id = ?) group by p.id, p.product_name having coalesce(sum(s.quantity_on_hand),0) > 0 order by max(ps.import_date) asc nulls first, quantityOnHand desc limit 5", branchId, branchId);
+        return response("SLOW_STOCK",
+                rows.isEmpty() ? "Chưa thấy xe tồn lâu trong phạm vi dữ liệu hiện có." : "Top xe cần xem lại vì tồn lâu hoặc tồn nhiều: " + joinNames(rows, "productName") + ".",
+                List.of(), List.of(), List.of(link("Mở báo cáo hàng tồn lâu", "/reports?type=SLOW_MOVING_STOCK")),
+                rows.stream().map(row -> "Kiểm tra " + text(row, "productName", "sản phẩm") + " đang tồn " + decimal(row.get("quantityOnHand")).toPlainString()).toList(), null);
     }
 
     private AiDtos.AssistantResponse overdueDebt(Long branchId) {
-        BigDecimal amount = money("""
-                select coalesce(sum(r.debit_amount - r.credit_amount),0)
-                from receivables r
-                join customers c on c.id = r.customer_id
-                where r.status <> 'PAID' and r.due_date < ? and (? is null or c.branch_id = ?)
-                """, LocalDate.now(), branchId, branchId);
-        BigDecimal customers = money("""
-                select count(distinct r.customer_id)
-                from receivables r
-                join customers c on c.id = r.customer_id
-                where r.status <> 'PAID' and r.due_date < ? and (? is null or c.branch_id = ?)
-                """, LocalDate.now(), branchId, branchId);
-        return response("OVERDUE_DEBT", "Cong no qua han hien la " + formatMoney(amount) + " tren " + customers.toPlainString() + " khach hang.",
-                List.of(metric("No qua han", amount, "VND"), metric("Khach qua han", customers, "khach")),
-                amount.compareTo(BigDecimal.ZERO) > 0 ? List.of("Can uu tien nhac no cac khoan qua han lon.") : List.of(),
-                List.of(link("Mo bao cao cong no", "/reports?type=CUSTOMER_DEBT_AGING")), List.of(), null);
+        BigDecimal amount = money("select coalesce(sum(r.debit_amount - r.credit_amount),0) from receivables r join customers c on c.id = r.customer_id where r.status <> 'PAID' and r.due_date < ? and (? is null or c.branch_id = ?)", LocalDate.now(), branchId, branchId);
+        BigDecimal customers = money("select count(distinct r.customer_id) from receivables r join customers c on c.id = r.customer_id where r.status <> 'PAID' and r.due_date < ? and (? is null or c.branch_id = ?)", LocalDate.now(), branchId, branchId);
+        return response("OVERDUE_DEBT",
+                "Công nợ quá hạn hiện là " + formatMoney(amount) + " trên " + customers.toPlainString() + " khách hàng.",
+                List.of(metric("Nợ quá hạn", amount, "VND"), metric("Khách quá hạn", customers, "khách")),
+                amount.compareTo(BigDecimal.ZERO) > 0 ? List.of("Cần ưu tiên nhắc nợ các khoản quá hạn lớn.") : List.of(),
+                List.of(link("Mở báo cáo công nợ", "/reports?type=CUSTOMER_DEBT_AGING")), List.of(), null);
     }
 
     private AiDtos.AssistantResponse warrantyTopModel(Long branchId) {
-        Map<String, Object> row = one("""
-                select p.product_name productName, count(*) tickets
-                from service_tickets st
-                join product_serials ps on ps.id = st.serial_id
-                join products p on p.id = ps.product_id
-                where st.service_type = 'WARRANTY' and st.received_date >= ? and (? is null or st.branch_id = ?)
-                group by p.id, p.product_name
-                order by tickets desc
-                limit 1
-                """, LocalDate.now().minusDays(90), branchId, branchId);
-        String model = text(row, "productName", "Chua co du lieu");
+        Map<String, Object> row = one("select p.product_name productName, count(*) tickets from service_tickets st join product_serials ps on ps.id = st.serial_id join products p on p.id = ps.product_id where st.service_type = 'WARRANTY' and st.received_date >= ? and (? is null or st.branch_id = ?) group by p.id, p.product_name order by tickets desc limit 1", LocalDate.now().minusDays(90), branchId, branchId);
+        String model = text(row, "productName", "Chưa có dữ liệu");
         BigDecimal tickets = decimal(row.get("tickets"));
-        return response("WARRANTY_TOP_MODEL", "Mau xe bao hanh nhieu nhat 90 ngay gan day la " + model + " voi " + tickets.toPlainString() + " phieu.",
-                List.of(metric("Phieu bao hanh", tickets, "phieu")), tickets.compareTo(BigDecimal.ZERO) > 0 ? List.of("Nen doi chieu lo serial va nha cung cap cua mau nay.") : List.of(),
-                List.of(link("Mo bao cao bao hanh", "/reports?type=WARRANTY_ANALYSIS")), List.of(), null);
+        return response("WARRANTY_TOP_MODEL",
+                "Mẫu xe bảo hành nhiều nhất 90 ngày gần đây là " + model + " với " + tickets.toPlainString() + " phiếu.",
+                List.of(metric("Phiếu bảo hành", tickets, "phiếu")),
+                tickets.compareTo(BigDecimal.ZERO) > 0 ? List.of("Nên đối chiếu lô serial và nhà cung cấp của mẫu này.") : List.of(),
+                List.of(link("Mở báo cáo bảo hành", "/reports?type=WARRANTY_ANALYSIS")), List.of(), null);
     }
 
     private AiDtos.AssistantResponse employeeConversion(Long branchId) {
-        Map<String, Object> row = one("""
-                select coalesce(e.full_name, u.full_name, concat('Nhan vien #', so.employee_id)) employeeName,
-                       count(*) orders, coalesce(sum(so.total_amount),0) revenue
-                from sales_orders so
-                left join employees e on e.id = so.employee_id
-                left join app_users u on u.id = so.employee_id
-                where so.status <> 'CANCELLED' and so.order_date >= ? and (? is null or so.branch_id = ?)
-                group by so.employee_id, e.full_name, u.full_name
-                order by orders desc, revenue desc
-                limit 1
-                """, LocalDate.now().minusDays(30), branchId, branchId);
-        return response("EMPLOYEE_CONVERSION", text(row, "employeeName", "Chua co du lieu") + " dang co ket qua chot tot nhat 30 ngay gan day theo so don.",
-                List.of(metric("So don", decimal(row.get("orders")), "don"), metric("Doanh thu", decimal(row.get("revenue")), "VND")),
-                List.of(), List.of(link("Mo KPI nhan vien", "/hr")), List.of("Neu co du lieu lead/bao gia, nen doi chieu ty le chuyen doi that."), null);
+        Map<String, Object> row = one("select coalesce(e.full_name, u.full_name, concat('Nhân viên #', so.employee_id)) employeeName, count(*) orders, coalesce(sum(so.total_amount),0) revenue from sales_orders so left join employees e on e.id = so.employee_id left join app_users u on u.id = so.employee_id where so.status <> 'CANCELLED' and so.order_date >= ? and (? is null or so.branch_id = ?) group by so.employee_id, e.full_name, u.full_name order by orders desc, revenue desc limit 1", LocalDate.now().minusDays(30), branchId, branchId);
+        return response("EMPLOYEE_CONVERSION",
+                text(row, "employeeName", "Chưa có dữ liệu") + " đang có kết quả chốt tốt nhất 30 ngày gần đây theo số đơn.",
+                List.of(metric("Số đơn", decimal(row.get("orders")), "đơn"), metric("Doanh thu", decimal(row.get("revenue")), "VND")),
+                List.of(), List.of(link("Mở KPI nhân viên", "/hr")),
+                List.of("Nếu có dữ liệu lead/báo giá, nên đối chiếu tỷ lệ chuyển đổi thật."), null);
     }
 
     private AiDtos.AssistantResponse purchaseSuggestion(Long branchId) {
-        List<Map<String, Object>> rows = list("""
-                select p.id productId, p.product_name productName,
-                       coalesce(sum(s.quantity_on_hand),0) stockQty,
-                       coalesce(sum(case when so.order_date >= ? then soi.quantity else 0 end),0) soldQty
-                from products p
-                left join inventory_stocks s on s.product_id = p.id and (? is null or s.branch_id = ?)
-                left join sales_order_items soi on soi.product_id = p.id
-                left join sales_orders so on so.id = soi.order_id and so.status <> 'CANCELLED' and (? is null or so.branch_id = ?)
-                group by p.id, p.product_name
-                having coalesce(sum(case when so.order_date >= ? then soi.quantity else 0 end),0) > coalesce(sum(s.quantity_on_hand),0)
-                order by soldQty desc
-                limit 5
-                """, LocalDate.now().minusDays(30), branchId, branchId, branchId, branchId, LocalDate.now().minusDays(30));
+        List<Map<String, Object>> rows = list("select p.id productId, p.product_name productName, coalesce(sum(s.quantity_on_hand),0) stockQty, coalesce(sum(case when so.order_date >= ? then soi.quantity else 0 end),0) soldQty from products p left join inventory_stocks s on s.product_id = p.id and (? is null or s.branch_id = ?) left join sales_order_items soi on soi.product_id = p.id left join sales_orders so on so.id = soi.order_id and so.status <> 'CANCELLED' and (? is null or so.branch_id = ?) group by p.id, p.product_name having coalesce(sum(case when so.order_date >= ? then soi.quantity else 0 end),0) > coalesce(sum(s.quantity_on_hand),0) order by soldQty desc limit 5", LocalDate.now().minusDays(30), branchId, branchId, branchId, branchId, LocalDate.now().minusDays(30));
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("items", rows);
-        return response("PURCHASE_SUGGESTION", rows.isEmpty() ? "Chua co mat hang nao can goi y nhap them theo toc do ban 30 ngay." : "Nen xem xet nhap them: " + joinNames(rows, "productName") + ".",
-                List.of(), List.of(), List.of(link("Mo bao cao du bao nhap hang", "/reports?type=EXECUTIVE_OPERATION")),
-                rows.stream().map(row -> text(row, "productName", "San pham") + ": ban 30 ngay " + decimal(row.get("soldQty")).toPlainString() + ", ton " + decimal(row.get("stockQty")).toPlainString()).toList(),
-                new AiDtos.ProposedAction("CREATE_PURCHASE_RECOMMENDATION", "De xuat nhap hang", "AI chi tao de xuat tham khao. Nguoi dung phai xac nhan truoc khi lap PO.", payload, true));
+        return response("PURCHASE_SUGGESTION",
+                rows.isEmpty() ? "Chưa có mặt hàng nào cần gợi ý nhập thêm theo tốc độ bán 30 ngày." : "Nên xem xét nhập thêm: " + joinNames(rows, "productName") + ".",
+                List.of(), List.of(), List.of(link("Mở báo cáo dự báo nhập hàng", "/reports?type=EXECUTIVE_OPERATION")),
+                rows.stream().map(row -> text(row, "productName", "Sản phẩm") + ": bán 30 ngày " + decimal(row.get("soldQty")).toPlainString() + ", tồn " + decimal(row.get("stockQty")).toPlainString()).toList(),
+                new AiDtos.ProposedAction("CREATE_PURCHASE_RECOMMENDATION", "Đề xuất nhập hàng", "AI chỉ tạo đề xuất tham khảo. Người dùng phải xác nhận trước khi lập PO.", payload, true));
     }
 
     private AiDtos.AssistantResponse anomalies(Long branchId) {
@@ -211,65 +374,77 @@ public class DefaultAIInsightService implements AIInsightService {
         BigDecimal cancelled = money("select count(*) from sales_orders where status = 'CANCELLED' and order_date >= ? and (? is null or branch_id = ?)", LocalDate.now().minusDays(7), branchId, branchId);
         BigDecimal negativeStock = money("select count(*) from inventory_stocks where quantity_on_hand < 0 and (? is null or branch_id = ?)", branchId, branchId);
         BigDecimal warrantyCost = money("select coalesce(sum(warranty_cost),0) from service_tickets where received_date >= ? and (? is null or branch_id = ?)", LocalDate.now().minusDays(30), branchId, branchId);
-        if (cancelled.compareTo(new BigDecimal("5")) > 0) warnings.add("Don huy 7 ngay gan day cao: " + cancelled.toPlainString());
-        if (negativeStock.compareTo(BigDecimal.ZERO) > 0) warnings.add("Co " + negativeStock.toPlainString() + " dong ton kho am.");
-        if (warrantyCost.compareTo(new BigDecimal("50000000")) > 0) warnings.add("Chi phi bao hanh 30 ngay vuot nguong: " + formatMoney(warrantyCost));
-        return response("ANOMALY", warnings.isEmpty() ? "Chua thay bat thuong lon theo nguong mac dinh." : "Co " + warnings.size() + " canh bao can kiem tra.",
-                List.of(metric("Don huy 7 ngay", cancelled, "don"), metric("Ton kho am", negativeStock, "dong"), metric("Chi phi bao hanh 30 ngay", warrantyCost, "VND")),
-                warnings, List.of(link("Mo dashboard dieu hanh", "/reports?type=EXECUTIVE_OPERATION")), List.of("Nen cau hinh nguong canh bao rieng theo tung chi nhanh khi co du lieu lich su."), null);
+        if (cancelled.compareTo(new BigDecimal("5")) > 0) warnings.add("Đơn hủy 7 ngày gần đây cao: " + cancelled.toPlainString());
+        if (negativeStock.compareTo(BigDecimal.ZERO) > 0) warnings.add("Có " + negativeStock.toPlainString() + " dòng tồn kho âm.");
+        if (warrantyCost.compareTo(new BigDecimal("50000000")) > 0) warnings.add("Chi phí bảo hành 30 ngày vượt ngưỡng: " + formatMoney(warrantyCost));
+        return response("ANOMALY",
+                warnings.isEmpty() ? "Chưa thấy bất thường lớn theo ngưỡng mặc định." : "Có " + warnings.size() + " cảnh báo cần kiểm tra.",
+                List.of(metric("Đơn hủy 7 ngày", cancelled, "đơn"), metric("Tồn kho âm", negativeStock, "dòng"), metric("Chi phí bảo hành 30 ngày", warrantyCost, "VND")),
+                warnings, List.of(link("Mở dashboard điều hành", "/reports?type=EXECUTIVE_OPERATION")),
+                List.of("Nên cấu hình ngưỡng cảnh báo riêng theo từng chi nhánh khi có đủ dữ liệu lịch sử."), null);
     }
 
     private AiDtos.AssistantResponse customerCare(Long branchId) {
         BigDecimal inactive = money("select count(*) from customers where (? is null or branch_id = ?) and (last_purchase_date is null or last_purchase_date < ?)", branchId, branchId, LocalDate.now().minusDays(120));
         BigDecimal vip = money("select count(*) from customers where (? is null or branch_id = ?) and tier in ('VIP','GOLD')", branchId, branchId);
-        return response("CUSTOMER_CARE", "Co " + inactive.toPlainString() + " khach lau chua mua lai va " + vip.toPlainString() + " khach VIP nen cham soc.",
-                List.of(metric("Khach lau chua mua", inactive, "khach"), metric("Khach VIP", vip, "khach")),
-                List.of(), List.of(link("Mo CRM", "/crm"), link("Mo danh sach khach hang", "/customers")),
-                List.of("Loc khach co bao hanh sap het han de goi bao duong.", "Uu tien khach VIP co lich su mua xe gia tri cao."), null);
+        return response("CUSTOMER_CARE",
+                "Có " + inactive.toPlainString() + " khách lâu chưa mua lại và " + vip.toPlainString() + " khách VIP nên chăm sóc.",
+                List.of(metric("Khách lâu chưa mua", inactive, "khách"), metric("Khách VIP", vip, "khách")),
+                List.of(), List.of(link("Mở CRM", "/crm"), link("Mở danh sách khách hàng", "/customers")),
+                List.of("Lọc khách có bảo hành sắp hết hạn để gọi bảo dưỡng.", "Ưu tiên khách VIP có lịch sử mua xe giá trị cao."), null);
     }
 
     private AiDtos.AssistantResponse actionProposal(String question) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("question", safeQuestion(question));
-        return response("ACTION_PROPOSAL", "AI khong tu tao, sua, xoa hoac duyet chung tu. Toi chi co the tao de xuat va can ban xac nhan tren man hinh nghiep vu phu hop.",
-                List.of(), List.of("Thao tac ghi du lieu bi chan cho den khi nguoi dung xac nhan."), List.of(),
-                List.of("Mo man hinh nghiep vu lien quan, kiem tra du lieu, sau do thao tac bang quyen cua ban."),
-                new AiDtos.ProposedAction("REQUIRES_USER_CONFIRMATION", "Can xac nhan thu cong", "Khong co thay doi du lieu nao duoc thuc hien.", payload, true));
+        return response("ACTION_PROPOSAL",
+                "AI không tự tạo, sửa, xóa hoặc duyệt chứng từ. Tôi chỉ có thể tạo đề xuất và cần bạn xác nhận trên màn hình nghiệp vụ phù hợp.",
+                List.of(), List.of("Thao tác ghi dữ liệu bị chặn cho đến khi người dùng xác nhận."), List.of(),
+                List.of("Mở màn hình nghiệp vụ liên quan, kiểm tra dữ liệu, sau đó thao tác bằng quyền của bạn."),
+                new AiDtos.ProposedAction("REQUIRES_USER_CONFIRMATION", "Cần xác nhận thủ công", "Không có thay đổi dữ liệu nào được thực hiện.", payload, true));
     }
 
     private AiDtos.AssistantResponse overview(Long branchId) {
         BigDecimal revenue = money("select coalesce(sum(total_amount),0) from sales_orders where status <> 'CANCELLED' and order_date >= ? and (? is null or branch_id = ?)", LocalDate.now().minusDays(30), branchId, branchId);
         BigDecimal lowStock = money("select count(*) from inventory_stocks where quantity_on_hand <= min_quantity and (? is null or branch_id = ?)", branchId, branchId);
-        return response("OVERVIEW", "Toi co the tra loi nhanh ve doanh thu, ton kho, cong no, bao hanh, KPI va canh bao bat thuong. Trong 30 ngay gan day doanh thu la " + formatMoney(revenue) + ".",
-                List.of(metric("Doanh thu 30 ngay", revenue, "VND"), metric("Mat hang sap het", lowStock, "dong")),
-                List.of("AI chi ho tro tham khao, khong thay the phe duyet nghiep vu."), List.of(link("Mo dashboard", "/dashboard")),
-                quickQuestions(), null);
+        return response("OVERVIEW",
+                "Tôi có thể trả lời nhanh về doanh thu, tồn kho, công nợ, bảo hành, KPI và cảnh báo bất thường. Trong 30 ngày gần đây doanh thu là " + formatMoney(revenue) + ".",
+                List.of(metric("Doanh thu 30 ngày", revenue, "VND"), metric("Mặt hàng sắp hết", lowStock, "dòng")),
+                List.of("AI chỉ hỗ trợ tham khảo, không thay thế phê duyệt nghiệp vụ."),
+                List.of(link("Mở dashboard", "/dashboard")), quickQuestions(), null);
     }
 
     private AiDtos.AssistantResponse noPermission(String permission, String href) {
-        return response("PROFIT_RESTRICTED", "Tai khoan hien tai khong co quyen " + permission + ", nen AI khong hien thi loi nhuan/gia von.",
-                List.of(), List.of("Du lieu nhay cam da duoc an theo phan quyen."), List.of(link("Mo bao cao", href)), List.of(), null);
+        return response("PROFIT_RESTRICTED",
+                "Tài khoản hiện tại không có quyền " + permission + ", nên AI không hiển thị lợi nhuận/giá vốn.",
+                List.of(), List.of("Dữ liệu nhạy cảm đã được ẩn theo phân quyền."),
+                List.of(link("Mở báo cáo", href)), List.of(), null);
     }
 
     private AiDtos.AssistantResponse disabled() {
-        return response("DISABLED", "AI Assistant dang tat theo cau hinh he thong.", List.of(), List.of(), List.of(), List.of(), null);
+        return response("DISABLED", "AI Assistant đang tắt theo cấu hình hệ thống.",
+                List.of(), List.of(), List.of(), List.of(), null);
     }
+
+    // ─── Intent detection ────────────────────────────────────────────────────
 
     private String detectIntent(String question) {
         if ((question.contains("loi nhuan") || question.contains("lai")) && !hasAuthority("VIEW_PROFIT")) return "PROFIT_RESTRICTED";
         if (question.contains("gia von") && !hasAuthority("VIEW_COST_PRICE")) return "PROFIT_RESTRICTED";
-        if (containsAny(question, "doanh thu hom nay", "hom nay bao nhieu")) return "REVENUE_TODAY";
+        if (containsAny(question, "doanh thu hom nay", "hom nay bao nhieu", "so thang truoc", "doanh thu")) return "REVENUE_TODAY";
         if (containsAny(question, "chi nhanh nao ban tot", "ban tot nhat")) return "BEST_BRANCH";
-        if (containsAny(question, "ton lau", "hang cham ban", "xe nao ton")) return "SLOW_STOCK";
-        if (containsAny(question, "no qua han", "cong no qua han")) return "OVERDUE_DEBT";
+        if (containsAny(question, "ton lau", "hang cham ban", "xe nao ton", "sap het", "ton dong")) return "SLOW_STOCK";
+        if (containsAny(question, "no qua han", "cong no qua han", "don dang ton dong")) return "OVERDUE_DEBT";
         if (containsAny(question, "bao hanh nhieu", "loi nhieu")) return "WARRANTY_TOP_MODEL";
         if (containsAny(question, "ty le chot", "nhan vien nao")) return "EMPLOYEE_CONVERSION";
-        if (containsAny(question, "goi y nhap", "can nhap", "nhap hang")) return "PURCHASE_SUGGESTION";
+        if (containsAny(question, "goi y nhap", "can nhap", "nhap hang", "hang nao sap het")) return "PURCHASE_SUGGESTION";
         if (containsAny(question, "bat thuong", "canh bao", "giam gia qua", "ton kho am", "huy don nhieu")) return "ANOMALY";
         if (containsAny(question, "cham soc", "vip", "lau chua mua", "sap het bao hanh")) return "CUSTOMER_CARE";
-        if (containsAny(question, "tao", "sua", "xoa", "huy don", "duyet", "lap phieu", "lap don", "nhap hang ngay")) return "ACTION_PROPOSAL";
+        if (containsAny(question, "tao", "sua", "xoa", "huy don", "duyet", "lap phieu", "lap don")) return "ACTION_PROPOSAL";
         return "OVERVIEW";
     }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private AiDtos.AssistantResponse response(String intent, String answer, List<AiDtos.Metric> metrics, List<String> warnings, List<AiDtos.Link> links, List<String> suggestions, AiDtos.ProposedAction proposedAction) {
         return new AiDtos.AssistantResponse(true, intent, answer, metrics, warnings, links, suggestions, proposedAction);
@@ -285,12 +460,12 @@ public class DefaultAIInsightService implements AIInsightService {
 
     private List<String> quickQuestions() {
         return List.of(
-                "Doanh thu hom nay bao nhieu?",
-                "Chi nhanh nao ban tot nhat?",
-                "Xe nao ton lau?",
-                "Khach nao no qua han?",
-                "Mau xe nao bao hanh nhieu?",
-                "Can goi y nhap hang khong?"
+                "Doanh thu so tháng trước?",
+                "Đơn nào đang tồn đọng?",
+                "Hàng nào sắp hết?",
+                "Chi nhánh nào bán tốt nhất?",
+                "Khách nào nợ quá hạn?",
+                "Gợi ý nhập hàng không?"
         );
     }
 
@@ -303,7 +478,8 @@ public class DefaultAIInsightService implements AIInsightService {
 
     private String normalize(String value) {
         String lower = value == null ? "" : value.toLowerCase(Locale.ROOT);
-        return java.text.Normalizer.normalize(lower, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        return java.text.Normalizer.normalize(lower, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
     }
 
     private String safeQuestion(String value) {
@@ -338,7 +514,12 @@ public class DefaultAIInsightService implements AIInsightService {
     }
 
     private String joinNames(List<Map<String, Object>> rows, String key) {
-        return rows.stream().map(row -> text(row, key, "")).filter(value -> !value.isBlank()).limit(5).reduce((left, right) -> left + ", " + right).orElse("chua co du lieu");
+        return rows.stream()
+                .map(row -> text(row, key, ""))
+                .filter(value -> !value.isBlank())
+                .limit(5)
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("chưa có dữ liệu");
     }
 
     private String formatMoney(BigDecimal value) {
@@ -347,11 +528,18 @@ public class DefaultAIInsightService implements AIInsightService {
 
     private boolean hasAuthority(String authority) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null && authentication.getAuthorities().stream().anyMatch(item -> authority.equals(item.getAuthority()));
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(item -> authority.equals(item.getAuthority()));
     }
 
     private void audit(String question, String intent, String answer) {
-        auditLogService.record(new CreateAuditLogRequest(currentUsername(), AuditAction.AI_ASSISTANT_QUERY, AuditModule.SYSTEM, "AIAssistant", intent, sanitize(question), sanitize(answer), null, null));
+        try {
+            auditLogService.record(new CreateAuditLogRequest(
+                    currentUsername(), AuditAction.AI_ASSISTANT_QUERY, AuditModule.SYSTEM,
+                    "AIAssistant", intent, sanitize(question), sanitize(answer), null, null));
+        } catch (Exception e) {
+            log.debug("Audit log failed: {}", e.getMessage());
+        }
     }
 
     private String sanitize(String value) {

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/roles")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class RoleController {
     private final UserAdminService service;
 
@@ -29,3 +30,4 @@ public class RoleController {
         return service.updateRolePermissions(code, request);
     }
 }
+

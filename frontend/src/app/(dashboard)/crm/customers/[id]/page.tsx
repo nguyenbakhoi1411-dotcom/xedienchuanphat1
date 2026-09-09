@@ -63,7 +63,8 @@ function TabButton({ active, onClick, children, badge }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Customer360Page() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = params?.id;
   const router = useRouter();
   const [data, setData] = useState<Customer360 | null>(null);
   const [loading, setLoading] = useState(true);

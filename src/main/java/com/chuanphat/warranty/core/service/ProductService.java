@@ -7,6 +7,7 @@ import com.chuanphat.warranty.core.dto.ProductDto;
 import com.chuanphat.warranty.core.dto.ProductSerialDto;
 import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.ProductSerial;
+import com.chuanphat.warranty.core.entity.ProductComboItem;
 import com.chuanphat.warranty.core.enums.ProductCategory;
 import com.chuanphat.warranty.core.enums.RecordStatus;
 import com.chuanphat.warranty.core.enums.SerialStatus;
@@ -188,13 +189,28 @@ public class ProductService {
         product.setCategory(request.category());
         product.setBrand(request.brand());
         product.setModel(request.model());
-        product.setColor(request.color());
-        product.setBatteryCapacity(request.batteryCapacity());
-        product.setMotorPower(request.motorPower());
+        product.setAttributes(request.attributes());
         product.setImportPrice(request.importPrice());
         product.setSalePrice(request.salePrice());
         product.setWarrantyMonths(request.warrantyMonths());
         product.setStatus(request.status() == null ? RecordStatus.ACTIVE : request.status());
+        product.setOrigin(request.origin());
+        product.setPurchaseDescription(request.purchaseDescription());
+        product.setSalesDescription(request.salesDescription());
+        product.setSpecialItemType(request.specialItemType());
+        product.setWarrantyPeriod(request.warrantyPeriod());
+
+        if (request.comboItems() != null) {
+            product.getComboItems().clear();
+            for (com.chuanphat.warranty.core.dto.ProductComboItemDto itemDto : request.comboItems()) {
+                ProductComboItem comboItem = new ProductComboItem();
+                comboItem.setComboProduct(product);
+                comboItem.setDetailProduct(get(itemDto.detailProductId()));
+                comboItem.setQuantity(itemDto.quantity());
+                comboItem.setUnit(itemDto.unit());
+                product.getComboItems().add(comboItem);
+            }
+        }
     }
 
     private boolean hasAuthority(String authority) {

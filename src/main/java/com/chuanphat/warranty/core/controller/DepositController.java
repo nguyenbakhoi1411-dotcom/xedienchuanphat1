@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/sales/deposits")
+@PreAuthorize("hasAnyRole('ADMIN')")
 public class DepositController {
 
     private final DepositService depositService;
@@ -83,3 +84,4 @@ public class DepositController {
 
     record ConvertDepositRequest(Long salesOrderId, String salesOrderNo) {}
 }
+

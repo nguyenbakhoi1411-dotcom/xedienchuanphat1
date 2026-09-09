@@ -24,3 +24,37 @@ export function useExportReport() {
     }) => reportsApi.exportReport(type, format, filters)
   });
 }
+
+export function useFinancialBalanceSheet(params: {
+  fromDate: string;
+  toDate: string;
+  branchId?: number | "ALL";
+  compareWithPrevious?: boolean;
+}) {
+  return useQuery({
+    queryKey: ["reports", "financial", "balance-sheet", params],
+    queryFn: () => reportsApi.getBalanceSheet(params)
+  });
+}
+
+export function useFinancialProfitLoss(params: {
+  fromDate: string;
+  toDate: string;
+  branchId?: number | "ALL";
+}) {
+  return useQuery({
+    queryKey: ["reports", "financial", "profit-loss", params],
+    queryFn: () => reportsApi.getProfitLoss(params)
+  });
+}
+
+export function useFinancialCashFlow(params: {
+  fromDate: string;
+  toDate: string;
+  branchId?: number | "ALL";
+}) {
+  return useQuery({
+    queryKey: ["reports", "financial", "cash-flow", params],
+    queryFn: () => reportsApi.getCashFlow(params)
+  });
+}

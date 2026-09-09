@@ -5,10 +5,10 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/cn";
 import { formatCurrency } from "@/lib/format";
-import type { InventoryListParams, InventoryStock, PageResponse } from "./types";
+import type { InventoryListParams, InventoryDTO, PageResponse } from "./types";
 
 type InventoryStockTableProps = {
-  data?: PageResponse<InventoryStock>;
+  data?: PageResponse<InventoryDTO>;
   params: InventoryListParams;
   loading: boolean;
   onPageChange: (page: number) => void;
@@ -26,7 +26,7 @@ export function InventoryStockTable({ data, params, loading, onPageChange }: Inv
   if (!data || data.items.length === 0) {
     return (
       <div className="p-4">
-        <EmptyState title="Khong co du lieu ton kho" description="Thu thay doi bo loc hoac tao giao dich nhap kho." />
+        <EmptyState title="Không có dữ liệu tồn kho" description="Thu thay doi bo loc hoac tao giao dich nhap kho." />
       </div>
     );
   }
@@ -37,49 +37,45 @@ export function InventoryStockTable({ data, params, loading, onPageChange }: Inv
         <table className="w-full min-w-[920px] text-left text-sm">
           <thead className="bg-background text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-3 font-semibold">San pham</th>
-              <th className="px-4 py-3 font-semibold">Chi nhanh</th>
-              <th className="px-4 py-3 font-semibold">Kho</th>
-              <th className="px-4 py-3 text-right font-semibold">Ton kho</th>
-              <th className="px-4 py-3 text-right font-semibold">Giu cho</th>
-              <th className="px-4 py-3 text-right font-semibold">Kha dung</th>
-              <th className="px-4 py-3 text-right font-semibold">Muc toi thieu</th>
-              <th className="px-4 py-3 text-right font-semibold">Gia von TB</th>
-              <th className="px-4 py-3 text-right font-semibold">Gia tri ton</th>
-              <th className="px-4 py-3 font-semibold">Canh bao</th>
-              <th className="px-4 py-3 font-semibold">Cap nhat</th>
+              <th className="px-4 py-3 font-semibold">Sản phẩm</th>
+              <th className="px-4 py-3 font-semibold">Đơn vị tính</th>
+              <th className="px-4 py-3 text-right font-semibold">Tồn kho</th>
+              <th className="px-4 py-3 text-right font-semibold">Mức tối thiểu</th>
+              <th className="px-4 py-3 text-right font-semibold">Giá vốn TB</th>
+              <th className="px-4 py-3 text-right font-semibold">Giá trị tồn</th>
+              <th className="px-4 py-3 font-semibold">Cảnh báo</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {data.items.map((item) => {
-              const lowStock = item.availableQuantity <= item.minimumStock;
+              const tonKho = item.ton_kho_hien_tai;
+              const toiThieu = item.ton_kho_toi_thieu;
+              
+              let rowClass = "hover:bg-slate-50";
+              let badge = null;
+              
+              if (tonKho === 0) {
+                rowClass = cn(rowClass, "bg-red-50 border-l-4 border-red-500");
+                badge = <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">Hết hàng</span>;
+              } else if (tonKho > 0 && tonKho <= toiThieu) {
+                rowClass = cn(rowClass, "bg-amber-50 border-l-4 border-amber-400");
+                badge = <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700"><AlertTriangle className="h-3.5 w-3.5" />Sắp hết</span>;
+              } else {
+                badge = <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">Còn hàng</span>;
+              }
+
               return (
-                <tr key={item.id} className={cn("hover:bg-orange-50/60", lowStock && "bg-red-50/30")}>
+                <tr key={item.san_pham_id} className={rowClass}>
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-text">{item.productName}</div>
-                    <div className="mt-1 text-xs text-slate-500">{item.productCode} · {item.category}</div>
+                    <div className="font-semibold text-text">{item.ten_san_pham}</div>
+                    <div className="mt-1 text-xs text-slate-500">{item.ma_san_pham} · {item.loai_san_pham}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{item.branchName}</td>
-                  <td className="px-4 py-3 text-slate-700">{item.warehouseName || "Kho chinh"}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-text">{item.quantityOnHand}</td>
-                  <td className="px-4 py-3 text-right text-slate-700">{item.reservedQuantity}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-text">{item.availableQuantity}</td>
-                  <td className="px-4 py-3 text-right text-slate-700">{item.minimumStock}</td>
-                  <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(item.averageCost)}</td>
-                  <td className="px-4 py-3 text-right font-medium text-text">{formatCurrency(item.averageCost * item.quantityOnHand)}</td>
-                  <td className="px-4 py-3">
-                    {lowStock ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        Ton thap
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-                        Du hang
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{item.updatedAt}</td>
+                  <td className="px-4 py-3 text-slate-700">{item.don_vi_tinh}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-text">{tonKho}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{toiThieu}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(item.gia_von_binh_quan)}</td>
+                  <td className="px-4 py-3 text-right font-medium text-text">{formatCurrency(item.gia_tri_ton_kho)}</td>
+                  <td className="px-4 py-3">{badge}</td>
                 </tr>
               );
             })}

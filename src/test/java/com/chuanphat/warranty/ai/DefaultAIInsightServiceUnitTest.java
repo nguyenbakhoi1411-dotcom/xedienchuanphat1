@@ -28,7 +28,7 @@ class DefaultAIInsightServiceUnitTest {
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
         branchSecurity = mock(BranchSecurity.class);
-        service = new DefaultAIInsightService(jdbcTemplate, branchSecurity, mock(AuditLogService.class), true, "mock");
+        service = new DefaultAIInsightService(jdbcTemplate, branchSecurity, mock(AuditLogService.class), true, "mock", "");
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 "sales",
                 "n/a",

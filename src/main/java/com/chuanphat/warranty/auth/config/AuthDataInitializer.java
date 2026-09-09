@@ -65,7 +65,7 @@ public class AuthDataInitializer {
                     "LOCK_ACCOUNTING_PERIOD", "UNLOCK_ACCOUNTING_PERIOD", "EXPORT_REPORT", "VIEW_ALL_BRANCHES",
                     "MANAGE_PERMISSIONS", "VIEW_ACCOUNTING", "EDIT_ACCOUNTING", "VIEW_CUSTOMER_DEBT",
                     "EDIT_INVENTORY", "APPROVE_STOCK_ADJUSTMENT", "APPROVE_PURCHASE_ORDER",
-                    "APPROVE_STOCK_TRANSFER", "VIEW_AUDIT_LOG", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE"
+                    "APPROVE_STOCK_TRANSFER", "VIEW_AUDIT_LOG", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE", "OPENING_BALANCE_MANAGE"
             );
             for (String code : permissions) {
                 permissionRepository.findByCode(code).orElseGet(() -> permissionRepository.save(new Permission(code, module(code), action(code))));
@@ -89,7 +89,7 @@ public class AuthDataInitializer {
                     "ACCOUNTING_REPORT", "ACCOUNTING_EXPORT", "REPORT_VIEW", "REPORT_EXPORT", "EXPORT_REPORT",
                     "AUDIT_VIEW", "VIEW_AUDIT_LOG", "VIEW_ALL_BRANCHES", "VIEW_COST_PRICE", "VIEW_PROFIT",
                     "VIEW_CUSTOMER_DEBT", "VIEW_ACCOUNTING", "APPROVE_DISCOUNT", "APPROVE_PRICE_POLICY",
-                    "CANCEL_PRICE_POLICY", "LOCK_ACCOUNTING_PERIOD", "UNLOCK_ACCOUNTING_PERIOD", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE");
+                    "CANCEL_PRICE_POLICY", "LOCK_ACCOUNTING_PERIOD", "UNLOCK_ACCOUNTING_PERIOD", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE", "OPENING_BALANCE_MANAGE");
             ensureRole(roleRepository, permissionRepository, "BRANCH_MANAGER", "Quan ly chi nhanh",
                     "DASHBOARD_VIEW", "BRANCH_VIEW", "PRODUCT_VIEW", "PRODUCT_CREATE", "PRODUCT_UPDATE",
                     "INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "INVENTORY_TRANSFER", "INVENTORY_APPROVE", "INVENTORY_TRANSFER_APPROVE", "INVENTORY_STOCKTAKE",
@@ -105,7 +105,7 @@ public class AuthDataInitializer {
             ensureRole(roleRepository, permissionRepository, "ACCOUNTANT", "Ke toan",
                     "DASHBOARD_VIEW", "ACCOUNTING_VIEW", "ACCOUNTING_CREATE", "ACCOUNTING_POST", "ACCOUNTING_CANCEL", "ACCOUNTING_REPORT", "ACCOUNTING_EXPORT",
                     "RECEIPT_CREATE", "PAYMENT_CREATE", "REPORT_VIEW", "REPORT_EXPORT", "CUSTOMER_VIEW", "SUPPLIER_VIEW",
-                    "VIEW_ACCOUNTING", "EDIT_ACCOUNTING", "VIEW_CUSTOMER_DEBT", "LOCK_ACCOUNTING_PERIOD", "UNLOCK_ACCOUNTING_PERIOD", "EXPORT_REPORT", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE");
+                    "VIEW_ACCOUNTING", "EDIT_ACCOUNTING", "VIEW_CUSTOMER_DEBT", "LOCK_ACCOUNTING_PERIOD", "UNLOCK_ACCOUNTING_PERIOD", "EXPORT_REPORT", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE", "OPENING_BALANCE_MANAGE");
             ensureRole(roleRepository, permissionRepository, "TECHNICIAN", "Ky thuat vien",
                     "WARRANTY_VIEW", "WARRANTY_MANAGE", "CUSTOMER_VIEW", "INVOICE_EXPORT", "UPLOAD_FILE", "AI_ASSISTANT_USE");
             ensureRole(roleRepository, permissionRepository, "SALES_STAFF", "Nhan vien ban hang",
@@ -130,6 +130,17 @@ public class AuthDataInitializer {
                 admin.setRoles(new java.util.LinkedHashSet<>(List.of(adminRole)));
                 admin.setStatus(AppUser.Status.ACTIVE);
                 userRepository.save(admin);
+                
+                AppUser salesUser = userRepository.findByUsernameIgnoreCase("sales").orElseGet(AppUser::new);
+                salesUser.setUsername("sales");
+                salesUser.setEmail("sales@chuanphat.vn");
+                salesUser.setFullName("Sales Chuan Phat");
+                salesUser.setPasswordHash(passwordEncoder.encode("123456"));
+                Role salesRole = roleRepository.findByCode("SALES_STAFF").orElseThrow();
+                salesUser.setRole(salesRole);
+                salesUser.setRoles(new java.util.LinkedHashSet<>(List.of(salesRole)));
+                salesUser.setStatus(AppUser.Status.ACTIVE);
+                userRepository.save(salesUser);
             }
         };
     }

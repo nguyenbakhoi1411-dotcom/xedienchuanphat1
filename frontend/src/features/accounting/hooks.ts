@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { accountingApi } from "./api";
-import type { AccountingFilters, CreatePaymentPayload, CreateReceiptPayload, DebtFilters } from "./types";
+import type { AccountingFilters, CreatePaymentPayload, CreateReceiptPayload, DebtFilters, OpeningBalanceRow, OpeningBalanceLockPayload } from "./types";
 
 export function useAccountingOverview() {
   return useQuery({ queryKey: ["accounting", "overview"], queryFn: () => accountingApi.overview() });
@@ -66,3 +66,32 @@ function useAccountingMutation<TPayload>(mutationFn: (payload: TPayload) => Prom
     onError: (error) => toast.error(error instanceof Error ? error.message : "Khong the thuc hien thao tac")
   });
 }
+
+export function useOpeningBalances(periodId: number, branchId?: number) {
+  return useQuery({
+    queryKey: ["accounting", "opening-balances", periodId, branchId],
+    queryFn: () => accountingApi.getOpeningBalances(periodId, branchId),
+    enabled: Boolean(periodId)
+  });
+}
+
+export function useBulkUpsertOpeningBalances() {
+  return useAccountingMutation<OpeningBalanceRow[]>(
+    (payload) => accountingApi.bulkUpsertOpeningBalances(payload),
+    "Đã lưu số dư đầu kỳ"
+  );
+}
+
+export function useLockOpeningBalances() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { payload: OpeningBalanceLockPayload; branchId?: number }) =>
+      accountingApi.lockOpeningBalances(payload.payload, payload.branchId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["accounting"] });
+      toast.success("Đã khóa số dư đầu kỳ");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Không thể khóa số dư đầu kỳ")
+  });
+}
+

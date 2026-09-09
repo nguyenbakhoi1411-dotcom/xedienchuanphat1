@@ -1,21 +1,83 @@
+"use client";
+
 import type { ReactNode } from "react";
-import { Inbox } from "lucide-react";
+import { cn } from "@/lib/cn";
+import { PackageSearch, FileX, SearchX, BarChart3 } from "lucide-react";
 
 type EmptyStateProps = {
-  title: string;
+  title?: string;
   description?: string;
+  icon?: "package" | "file" | "search" | "chart" | ReactNode;
   action?: ReactNode;
+  className?: string;
+  compact?: boolean;
 };
 
-export function EmptyState({ title, description, action }: EmptyStateProps) {
+const icons = {
+  package: PackageSearch,
+  file: FileX,
+  search: SearchX,
+  chart: BarChart3,
+};
+
+export function EmptyState({
+  title = "Không có dữ liệu",
+  description = "Chưa có dữ liệu nào để hiển thị.",
+  icon = "package",
+  action,
+  className,
+  compact = false,
+}: EmptyStateProps) {
+  const IconComponent = typeof icon === "string" && icon in icons ? icons[icon as keyof typeof icons] : null;
+
   return (
-    <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-orange-200 bg-orange-50/35 px-4 py-8 text-center">
-      <span className="flex h-11 w-11 items-center justify-center rounded-lg border border-orange-200 bg-white text-primary shadow-sm">
-        <Inbox className="h-5 w-5" />
-      </span>
-      <h3 className="mt-3 text-sm font-semibold text-text">{title}</h3>
-      {description && <p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center text-center",
+        compact ? "py-10 gap-3" : "py-16 gap-4",
+        className
+      )}
+    >
+      {/* Icon container */}
+      <div
+        className={cn(
+          "flex items-center justify-center rounded-2xl",
+          compact ? "h-14 w-14" : "h-20 w-20"
+        )}
+        style={{
+          background: "linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)",
+          border: "1px solid #FED7AA",
+        }}
+      >
+        {IconComponent ? (
+          <IconComponent
+            className={cn(compact ? "h-6 w-6" : "h-9 w-9")}
+            style={{ color: "#F97316" }}
+          />
+        ) : (
+          icon
+        )}
+      </div>
+
+      {/* Text */}
+      <div className="max-w-xs">
+        <h3
+          className={cn(
+            "font-semibold text-slate-700",
+            compact ? "text-sm" : "text-base"
+          )}
+        >
+          {title}
+        </h3>
+        {description && (
+          <p className={cn("mt-1 text-slate-400", compact ? "text-xs" : "text-sm")}>
+            {description}
+          </p>
+        )}
+      </div>
+
+      {/* Action */}
+      {action && <div className="mt-1">{action}</div>}
     </div>
   );
 }

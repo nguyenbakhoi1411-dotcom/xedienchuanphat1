@@ -9,6 +9,8 @@ export type RoleCode =
   | "WAREHOUSE_STAFF"
   | "ACCOUNTANT"
   | "TECHNICIAN"
+  | "USER"
+  | "CASHIER"
   | "MARKETING_STAFF"
   | "HR_MANAGER"
   | "AUDITOR";

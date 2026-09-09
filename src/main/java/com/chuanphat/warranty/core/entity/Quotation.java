@@ -56,8 +56,31 @@ public class Quotation {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal vatRate = new BigDecimal("10.00");
+
+    @Column(nullable = false, precision = 14, scale = 2)
+    private BigDecimal vatAmount = BigDecimal.ZERO;
+
     @Column(length = 50)
     private String voucherCode;
+
+    @Column(length = 30)
+    private String customerCode;
+
+    @Column(length = 255)
+    private String customerName;
+
+    @Column(length = 500)
+    private String address;
+
+    @Column(length = 50)
+    private String taxCode;
+
+    @Column(length = 255)
+    private String contactName;
+
+    private Long orderId;
 
     @Column(length = 500)
     private String note;
@@ -89,6 +112,10 @@ public class Quotation {
     public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+    public BigDecimal getVatRate() { return vatRate; }
+    public void setVatRate(BigDecimal vatRate) { this.vatRate = vatRate; }
+    public BigDecimal getVatAmount() { return vatAmount; }
+    public void setVatAmount(BigDecimal vatAmount) { this.vatAmount = vatAmount; }
     public String getVoucherCode() { return voucherCode; }
     public void setVoucherCode(String voucherCode) { this.voucherCode = voucherCode; }
     public String getNote() { return note; }
@@ -96,4 +123,17 @@ public class Quotation {
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public List<QuotationItem> getItems() { return items; }
     public void addItem(QuotationItem item) { items.add(item); item.setQuotation(this); }
+
+    public String getCustomerCode() { return customerCode; }
+    public void setCustomerCode(String customerCode) { this.customerCode = customerCode; }
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+    public String getTaxCode() { return taxCode; }
+    public void setTaxCode(String taxCode) { this.taxCode = taxCode; }
+    public String getContactName() { return contactName; }
+    public void setContactName(String contactName) { this.contactName = contactName; }
+    public Long getOrderId() { return orderId; }
+    public void setOrderId(Long orderId) { this.orderId = orderId; }
 }

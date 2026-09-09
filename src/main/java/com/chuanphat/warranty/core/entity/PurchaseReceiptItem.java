@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.entity;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * Dong hang trong phieu nhap kho.
@@ -27,11 +28,29 @@ public class PurchaseReceiptItem {
     @Column(nullable = false)
     private int quantity = 1;
 
-    @Column(nullable = false, precision = 14, scale = 2)
+    @Column(nullable = false, precision = 18, scale = 0)
     private BigDecimal unitCost = BigDecimal.ZERO;
 
-    @Column(nullable = false, precision = 14, scale = 2)
+    @Column(nullable = false, precision = 18, scale = 0)
     private BigDecimal lineTotal = BigDecimal.ZERO;
+
+    /** Gia von BQ truoc khi nhap */
+    @Column(precision = 18, scale = 0)
+    private BigDecimal giaVonTruocNhap;
+
+    /** Gia von BQ moi sau khi nhap (binh quan gia quyen) */
+    @Column(precision = 18, scale = 0)
+    private BigDecimal giaVonSauNhap;
+
+    /** Lien ket den dong hang trong don mua (de trace) */
+    private Long purchaseOrderItemId;
+
+    /** So lo (thuc pham) */
+    @Column(length = 50)
+    private String lotNo;
+
+    /** Han su dung (thuc pham) */
+    private LocalDate expiryDate;
 
     /** So khung xe dien — bat buoc khi product.category = ELECTRIC_MOTORBIKE */
     @Column(length = 80)
@@ -62,7 +81,13 @@ public class PurchaseReceiptItem {
     public BigDecimal getUnitCost() { return unitCost; }
     public void setUnitCost(BigDecimal unitCost) { this.unitCost = unitCost == null ? BigDecimal.ZERO : unitCost; }
     public BigDecimal getLineTotal() { return lineTotal; }
-    public void setLineTotal(BigDecimal lineTotal) { this.lineTotal = lineTotal; }
+    public void setLineTotal(BigDecimal lineTotal) { this.lineTotal = lineTotal == null ? BigDecimal.ZERO : lineTotal; }
+    public BigDecimal getGiaVonTruocNhap() { return giaVonTruocNhap; }
+    public void setGiaVonTruocNhap(BigDecimal v) { this.giaVonTruocNhap = v; }
+    public BigDecimal getGiaVonSauNhap() { return giaVonSauNhap; }
+    public void setGiaVonSauNhap(BigDecimal v) { this.giaVonSauNhap = v; }
+    public Long getPurchaseOrderItemId() { return purchaseOrderItemId; }
+    public void setPurchaseOrderItemId(Long v) { this.purchaseOrderItemId = v; }
     public String getFrameNumber() { return frameNumber; }
     public void setFrameNumber(String frameNumber) { this.frameNumber = frameNumber; }
     public String getEngineNumber() { return engineNumber; }
@@ -71,6 +96,10 @@ public class PurchaseReceiptItem {
     public void setBatterySerial(String batterySerial) { this.batterySerial = batterySerial; }
     public String getSerialNumber() { return serialNumber; }
     public void setSerialNumber(String serialNumber) { this.serialNumber = serialNumber; }
+    public String getLotNo() { return lotNo; }
+    public void setLotNo(String lotNo) { this.lotNo = lotNo; }
+    public LocalDate getExpiryDate() { return expiryDate; }
+    public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
 }

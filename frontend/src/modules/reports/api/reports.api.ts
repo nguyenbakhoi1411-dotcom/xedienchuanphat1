@@ -118,8 +118,8 @@ export class ReportsAPI {
     asOf: string,
     compareTo?: string,
   ): Promise<BalanceSheetReport> {
-    const response = await this.api.get('/financial/balance-sheet', {
-      params: { asOf, compareTo },
+    const response = await this.api.get('/kt-can-doi-ps', {
+      params: { fromDate: asOf },
     });
     return response.data;
   }
@@ -133,8 +133,8 @@ export class ReportsAPI {
     compareFrom?: string,
     compareTo?: string,
   ): Promise<IncomeStatementReport> {
-    const response = await this.api.get('/financial/income-statement', {
-      params: { from, to, compareFrom, compareTo },
+    const response = await this.api.get('/bh-tong-hop', {
+      params: { fromDate: from, toDate: to },
     });
     return response.data;
   }
@@ -147,8 +147,8 @@ export class ReportsAPI {
     to: string,
     method?: 'direct' | 'indirect',
   ): Promise<CashFlowReport> {
-    const response = await this.api.get('/financial/cash-flow', {
-      params: { from, to, method },
+    const response = await this.api.get('/tien-luu-chuyen', {
+      params: { fromDate: from, toDate: to },
     });
     return response.data;
   }
@@ -163,21 +163,21 @@ export class ReportsAPI {
     from: string,
     to: string,
   ): Promise<GeneralLedgerReport> {
-    const response = await this.api.get('/general-ledger/ledger', {
-      params: { accountCode, from, to },
+    const response = await this.api.get('/kt-so-cai', {
+      params: { accountCode, fromDate: from, toDate: to },
     });
     return response.data;
   }
 
   /**
-   * Bảng cân đối số phát sinh (Trial Balance)
+   * Bảng cân đối số phát sinh (Bảng cân đối số phát sinh)
    */
   async getTrialBalance(
     asOf: string,
     level?: number,
   ): Promise<TrialBalanceReport> {
-    const response = await this.api.get('/general-ledger/trial-balance', {
-      params: { asOf, level },
+    const response = await this.api.get('/kt-can-doi-ps', {
+      params: { fromDate: asOf },
     });
     return response.data;
   }
@@ -214,15 +214,15 @@ export class ReportsAPI {
   // ============ SALES REPORTS ============
 
   async getSalesByProduct(from: string, to: string): Promise<any> {
-    const response = await this.api.get('/sales/by-product', {
-      params: { from, to },
+    const response = await this.api.get('/bh-san-pham', {
+      params: { fromDate: from, toDate: to },
     });
     return response.data;
   }
 
   async getSalesByCustomer(from: string, to: string): Promise<any> {
-    const response = await this.api.get('/sales/by-customer', {
-      params: { from, to },
+    const response = await this.api.get('/bh-khach-hang', {
+      params: { fromDate: from, toDate: to },
     });
     return response.data;
   }
@@ -253,15 +253,15 @@ export class ReportsAPI {
   // ============ PURCHASE REPORTS ============
 
   async getPurchaseByVendor(from: string, to: string): Promise<any> {
-    const response = await this.api.get('/purchase/by-vendor', {
-      params: { from, to },
+    const response = await this.api.get('/mh-ncc', {
+      params: { fromDate: from, toDate: to },
     });
     return response.data;
   }
 
   async getPurchaseDetail(from: string, to: string): Promise<any> {
-    const response = await this.api.get('/purchase/detail', {
-      params: { from, to },
+    const response = await this.api.get('/mh-chi-tiet', {
+      params: { fromDate: from, toDate: to },
     });
     return response.data;
   }
@@ -269,15 +269,15 @@ export class ReportsAPI {
   // ============ INVENTORY REPORTS ============
 
   async getInventorySummary(asOf: string): Promise<any> {
-    const response = await this.api.get('/inventory/summary', {
-      params: { asOf },
+    const response = await this.api.get('/kho-tong-hop', {
+      params: { toDate: asOf },
     });
     return response.data;
   }
 
   async getStockCard(productId: string, from: string, to: string): Promise<any> {
-    const response = await this.api.get(`/inventory/stock-card/${productId}`, {
-      params: { from, to },
+    const response = await this.api.get('/kho-the', {
+      params: { productId, fromDate: from, toDate: to },
     });
     return response.data;
   }
@@ -290,15 +290,15 @@ export class ReportsAPI {
   // ============ PAYROLL REPORTS ============
 
   async getPayrollSummary(period: string): Promise<any> {
-    const response = await this.api.get('/payroll/summary', {
-      params: { period },
+    const response = await this.api.get('/tl-bang-thanh-toan', {
+      params: { fromDate: period + '-01' },
     });
     return response.data;
   }
 
   async getPayrollSlip(employeeId: string, period: string): Promise<any> {
-    const response = await this.api.get('/payroll/slip', {
-      params: { employeeId, period },
+    const response = await this.api.get('/tl-tong-hop', {
+      params: { employeeId, fromDate: period + '-01', toDate: period + '-28' },
     });
     return response.data;
   }
@@ -325,3 +325,5 @@ export class ReportsAPI {
 
 // Export singleton instance
 export const reportsAPI = new ReportsAPI();
+export const reportsApi = reportsAPI;
+

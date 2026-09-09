@@ -67,4 +67,16 @@ public class SalesReturnItem {
     public void setLineAmount(BigDecimal lineAmount) { this.lineAmount = lineAmount; }
     public ReturnSerialDisposition getSerialDisposition() { return serialDisposition; }
     public void setSerialDisposition(ReturnSerialDisposition serialDisposition) { this.serialDisposition = serialDisposition; }
+    public void setRefundPrice(java.math.BigDecimal p) { this.refundPrice = p; }
+    public java.math.BigDecimal getRefundPrice() { return refundPrice; }
+    public void setReason(String r) { this.reason = r; }
+    public java.math.BigDecimal getTotalRefund() { return totalRefund; }
+    private java.math.BigDecimal refundPrice;
+    private String reason;
+    private java.math.BigDecimal totalRefund;
+
+    public void setTotalRefund(java.math.BigDecimal p) { this.totalRefund = p; }
 }
+
+
+

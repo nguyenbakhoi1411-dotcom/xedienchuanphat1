@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.entity;
 
 import com.chuanphat.warranty.core.enums.TransferStatus;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,7 +12,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.util.ArrayList;
+import java.util.List;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -63,6 +67,23 @@ public class InventoryTransfer {
     @Column(length = 500)
     private String note;
 
+    /** Bổ sung AMIS fields */
+    @Column(length = 120)
+    private String transporter; // Người vận chuyển
+
+    @Column(length = 120)
+    private String transportVehicle; // Phương tiện vận chuyển
+
+    @Column(length = 120)
+    private String transportContract; // Hợp đồng vận chuyển
+
+    @Column(length = 80)
+    private String transferType; // Loại xuất chuyển (Nội bộ, Gửi bán đại lý...)
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "transfer_id", insertable = false, updatable = false)
+    private List<InventoryTransferItem> items = new ArrayList<>();
+
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -110,6 +131,18 @@ public class InventoryTransfer {
     public void setApprovalRequired(boolean approvalRequired) { this.approvalRequired = approvalRequired; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+
+    public String getTransporter() { return transporter; }
+    public void setTransporter(String transporter) { this.transporter = transporter; }
+    public String getTransportVehicle() { return transportVehicle; }
+    public void setTransportVehicle(String transportVehicle) { this.transportVehicle = transportVehicle; }
+    public String getTransportContract() { return transportContract; }
+    public void setTransportContract(String transportContract) { this.transportContract = transportContract; }
+    public String getTransferType() { return transferType; }
+    public void setTransferType(String transferType) { this.transferType = transferType; }
+    public java.util.List<InventoryTransferItem> getItems() { return items; }
+    public void setItems(java.util.List<InventoryTransferItem> items) { this.items = items; }
+
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }

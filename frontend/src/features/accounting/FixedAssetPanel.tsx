@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountingApi } from "./api";
-import type { FixedAsset, CreateFixedAssetPayload } from "./types";
+import type { FixedAsset, CreateFixedAssetPayload, DepreciationRunResult, DepreciationLine, DepreciationMethod } from "./types";
+import { useCurrentUser } from "@/lib/auth/useCurrentUser";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + " ₫";
 const fmtDate = (s: string) => s?.slice(0, 10);
@@ -38,20 +41,27 @@ type FormState = {
 
 export function FixedAssetPanel() {
   const qc = useQueryClient();
+  const user = useCurrentUser();
   const now = new Date();
   const [showForm, setShowForm] = useState(false);
   const [showDeprModal, setShowDeprModal] = useState(false);
   const [deprYear, setDeprYear] = useState(now.getFullYear());
   const [deprMonth, setDeprMonth] = useState(now.getMonth() + 1);
-  const [deprResult, setDeprResult] = useState<any | null>(null);
+  const [deprResult, setDeprResult] = useState<DepreciationRunResult | null>(null);
   const [selected, setSelected] = useState<FixedAsset | null>(null);
 
   const [form, setForm] = useState<FormState>({
     assetName: "", category: "VEHICLE", purchaseDate: now.toISOString().slice(0, 10),
     costAmount: "", residualValue: "0", usefulLifeMonths: "60",
-    depreciationMethod: "STRAIGHT_LINE", branchId: 1,
+    depreciationMethod: "STRAIGHT_LINE", branchId: user?.branchId ?? 1,
     purchaseOrderNo: "", supplierName: "", note: "",
   });
+
+  useEffect(() => {
+    if (user?.branchId) {
+      setForm((f) => ({ ...f, branchId: user.branchId as number }));
+    }
+  }, [user?.branchId]);
 
   const { data: assets, isLoading } = useQuery<FixedAsset[]>({
     queryKey: ["fixed-assets"],
@@ -73,7 +83,7 @@ export function FixedAssetPanel() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fixed-assets"] }); setSelected(null); },
   });
 
-  const resetForm = () => setForm({ assetName: "", category: "VEHICLE", purchaseDate: now.toISOString().slice(0, 10), costAmount: "", residualValue: "0", usefulLifeMonths: "60", depreciationMethod: "STRAIGHT_LINE", branchId: 1, purchaseOrderNo: "", supplierName: "", note: "" });
+  const resetForm = () => setForm({ assetName: "", category: "VEHICLE", purchaseDate: now.toISOString().slice(0, 10), costAmount: "", residualValue: "0", usefulLifeMonths: "60", depreciationMethod: "STRAIGHT_LINE", branchId: user?.branchId ?? 1, purchaseOrderNo: "", supplierName: "", note: "" });
 
   const handleCreate = () => {
     if (!form.assetName || !form.costAmount) return;
@@ -81,7 +91,7 @@ export function FixedAssetPanel() {
       assetName: form.assetName, category: form.category,
       purchaseDate: form.purchaseDate, costAmount: Number(form.costAmount),
       residualValue: Number(form.residualValue), usefulLifeMonths: Number(form.usefulLifeMonths),
-      depreciationMethod: form.depreciationMethod as any,
+      depreciationMethod: form.depreciationMethod as DepreciationMethod,
       branchId: form.branchId, purchaseOrderNo: form.purchaseOrderNo,
       supplierName: form.supplierName, note: form.note,
     });
@@ -102,7 +112,7 @@ export function FixedAssetPanel() {
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={() => setShowDeprModal(true)} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid rgba(251,191,36,0.4)", background: "rgba(251,191,36,0.1)", color: "#fbbf24", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-            🔄 Chạy khấu hao
+            Chạy khấu hao
           </button>
           <button onClick={() => setShowForm(true)} style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
             + Thêm TSCĐ
@@ -139,9 +149,29 @@ export function FixedAssetPanel() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={10} style={{ textAlign: "center", padding: 40, color: "#475569" }}>Đang tải...</td></tr>
+              Array.from({ length: 5 }).map((_, idx) => (
+                <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-16 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-32 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-20 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-24 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-20 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-20 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-20 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-16 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-20 bg-slate-800" /></td>
+                  <td style={{ padding: "10px 12px" }}><Skeleton className="h-4 w-12 bg-slate-800" /></td>
+                </tr>
+              ))
             ) : !list.length ? (
-              <tr><td colSpan={10} style={{ textAlign: "center", padding: 40, color: "#475569" }}>Chưa có tài sản cố định</td></tr>
+              <tr>
+                <td colSpan={10} style={{ padding: 40 }}>
+                  <EmptyState
+                    title="Chưa có tài sản cố định"
+                    description="Hãy thêm tài sản cố định mới để theo dõi khấu hao và thanh lý."
+                  />
+                </td>
+              </tr>
             ) : list.map((asset, i) => {
               const st = STATUS_META[asset.status] ?? { label: asset.status, color: "#94a3b8" };
               const deprPct = asset.costAmount > 0 ? (asset.accumulatedDepreciation / asset.costAmount) * 100 : 0;
@@ -184,7 +214,7 @@ export function FixedAssetPanel() {
       {showDeprModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div style={{ background: "#0f172a", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 16, padding: 28, width: 440, maxWidth: "90vw" }}>
-            <h3 style={{ color: "#fbbf24", marginTop: 0, fontSize: 16 }}>🔄 Chạy khấu hao tháng</h3>
+            <h3 style={{ color: "#fbbf24", marginTop: 0, fontSize: 16 }}>Chạy khấu hao tháng</h3>
             <p style={{ color: "#94a3b8", fontSize: 13, margin: "0 0 16px" }}>Hệ thống sẽ tính và ghi bút toán khấu hao cho tất cả TSCĐ đang hoạt động. Idempotent — an toàn nếu chạy lại.</p>
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ flex: 1 }}>
@@ -203,9 +233,9 @@ export function FixedAssetPanel() {
 
             {deprResult && (
               <div style={{ marginTop: 16, background: "rgba(34,197,94,0.08)", borderRadius: 10, padding: 14, border: "1px solid rgba(34,197,94,0.2)" }}>
-                <div style={{ color: "#22c55e", fontWeight: 700, fontSize: 13, marginBottom: 10 }}>✅ Kết quả tháng {deprResult.month}/{deprResult.year}</div>
+                <div style={{ color: "#22c55e", fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Kết quả tháng {deprResult.month}/{deprResult.year}</div>
                 <div style={{ maxHeight: 200, overflowY: "auto" }}>
-                  {deprResult.lines.map((l: any) => (
+                  {deprResult.lines.map((l: DepreciationLine) => (
                     <div key={l.assetId} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: 12 }}>
                       <span style={{ color: "#94a3b8" }}>{l.assetName}</span>
                       <span style={{ color: l.result === "POSTED" ? "#22c55e" : l.result === "SKIPPED" ? "#f59e0b" : "#64748b", fontWeight: 700 }}>
@@ -237,7 +267,7 @@ export function FixedAssetPanel() {
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div style={{ background: "#0f172a", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 16, padding: 28, width: 520, maxWidth: "90vw", maxHeight: "90vh", overflowY: "auto" }}>
-            <h3 style={{ color: "#f1f5f9", marginTop: 0, fontSize: 17 }}>➕ Thêm tài sản cố định</h3>
+            <h3 style={{ color: "#f1f5f9", marginTop: 0, fontSize: 17 }}>Thêm tài sản cố định</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={lbl}>Tên TSCĐ</label>

@@ -14,13 +14,15 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
     Page<SalesOrder> findByBranchId(Long branchId, Pageable pageable);
+    
+    long countByCustomerId(Long customerId);
 
-    @Query(value = """
+        @Query(value = """
             select new com.chuanphat.warranty.core.dto.SalesOrderListResponse(
                 so.id, so.orderNo, so.branchId, so.customerId, so.employeeId, q.id,
                 so.orderDate, so.status, so.subtotal, so.discountAmount, so.voucherCode,
                 so.totalAmount, so.paidAmount, so.paymentStatus, so.reservationUntil,
-                so.createdAt, so.note, count(soi.id)
+                so.createdAt, so.note, so.deliveryStatus, so.ecommercePlatform, so.shopName, so.storeCode, count(soi.id)
             )
             from SalesOrder so
             left join so.quotation q
@@ -28,7 +30,7 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
             group by so.id, so.orderNo, so.branchId, so.customerId, so.employeeId, q.id,
                 so.orderDate, so.status, so.subtotal, so.discountAmount, so.voucherCode,
                 so.totalAmount, so.paidAmount, so.paymentStatus, so.reservationUntil,
-                so.createdAt, so.note
+                so.createdAt, so.note, so.deliveryStatus, so.ecommercePlatform, so.shopName, so.storeCode
             """)
     Page<SalesOrderListResponse> findList(Pageable pageable);
 
@@ -37,7 +39,7 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
                 so.id, so.orderNo, so.branchId, so.customerId, so.employeeId, q.id,
                 so.orderDate, so.status, so.subtotal, so.discountAmount, so.voucherCode,
                 so.totalAmount, so.paidAmount, so.paymentStatus, so.reservationUntil,
-                so.createdAt, so.note, count(soi.id)
+                so.createdAt, so.note, so.deliveryStatus, so.ecommercePlatform, so.shopName, so.storeCode, count(soi.id)
             )
             from SalesOrder so
             left join so.quotation q
@@ -46,7 +48,7 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
             group by so.id, so.orderNo, so.branchId, so.customerId, so.employeeId, q.id,
                 so.orderDate, so.status, so.subtotal, so.discountAmount, so.voucherCode,
                 so.totalAmount, so.paidAmount, so.paymentStatus, so.reservationUntil,
-                so.createdAt, so.note
+                so.createdAt, so.note, so.deliveryStatus, so.ecommercePlatform, so.shopName, so.storeCode
             """)
     Page<SalesOrderListResponse> findListByBranchId(Long branchId, Pageable pageable);
 
@@ -56,6 +58,8 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
     Optional<SalesOrder> findWithItemsById(Long id);
 
     List<SalesOrder> findByCustomerIdOrderByOrderDateDesc(Long customerId);
+    
+    List<SalesOrder> findByCustomerIdAndStatus(Long customerId, com.chuanphat.warranty.core.enums.SalesOrderStatus status);
 
     long countByEmployeeIdAndOrderDateBetween(Long employeeId, LocalDate from, LocalDate to);
 

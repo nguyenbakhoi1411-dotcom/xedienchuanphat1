@@ -158,6 +158,9 @@ public class PurchaseReceiptService {
 
         for (PurchaseReceiptItem item : receipt.getItems()) {
             Product product = item.getProduct();
+            BigDecimal beforeCost = inventoryService.getAverageCost(receipt.getBranchId(), effectiveWarehouse.getId(), product.getId());
+            item.setGiaVonTruocNhap(beforeCost);
+
             if (product.getCategory() == ProductCategory.ELECTRIC_MOTORBIKE) {
                 // Xe dien: tao serial
                 confirmVehicleItem(receipt, item, product, effectiveWarehouse);
@@ -166,6 +169,9 @@ public class PurchaseReceiptService {
                 inventoryService.increase(receipt.getBranchId(), effectiveWarehouse, product,
                         item.getQuantity(), item.getUnitCost());
             }
+
+            BigDecimal afterCost = inventoryService.getAverageCost(receipt.getBranchId(), effectiveWarehouse.getId(), product.getId());
+            item.setGiaVonSauNhap(afterCost);
         }
 
         receipt.setStatus(ReceiptStatus.CONFIRMED);

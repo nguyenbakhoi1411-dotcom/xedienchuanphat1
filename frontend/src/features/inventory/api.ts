@@ -1,267 +1,414 @@
-import { api } from "@/lib/api/axios";
+import api from "@/lib/api/axios";
 import type {
-  Branch,
   ExportStockPayload,
   ImportStockPayload,
   InventoryHistoryParams,
   InventoryListParams,
-  InventoryStock,
+  InventoryDTO,
+  InventorySummaryDTO,
   InventoryTransaction,
-  InventoryTransactionType,
   PageResponse,
   StockCountPayload,
-  TransferStockPayload
+  TransferStockPayload,
+  PurchaseReceiptSummary,
+  PurchaseReceiptDetail,
+  CreatePurchaseReceiptPayload,
+  GoodsIssueSummary,
+  GoodsIssueDetail,
+  CreateGoodsIssuePayload,
+  InventoryTransferSummary,
+  InventoryTransferDetail,
+  InventoryCountSummary,
+  InventoryCountDetail,
+  ProductCatalogItem,
+  ProductCatalogSummary,
+  InventoryStats,
+  StockSummaryRow,
+  StockDetailRow,
 } from "./types";
 
-const enableMock = process.env.NEXT_PUBLIC_ENABLE_MOCK === "true";
+// Branch name cache populated lazily from /api/branches
+const _branchCache = new Map<number, string>();
 
-export const branches: Branch[] = [
-  { id: 1, name: "Go Vap" },
-  { id: 2, name: "Thu Duc" },
-  { id: 3, name: "Quan 7" }
-];
-
-const productNames = {
-  1: { productCode: "CP-S1", productName: "Xe may dien CP S1", category: "Xe may dien" },
-  2: { productCode: "CP-CITY", productName: "Xe may dien CP City", category: "Xe may dien" },
-  3: { productCode: "PIN-LFP-72", productName: "Binh ac quy LFP 72V", category: "Pin / Ac quy" },
-  4: { productCode: "SAC-NHANH", productName: "Bo sac nhanh", category: "Bo sac" }
-};
-
-let stocks: InventoryStock[] = [
-  stock(1, 1, 1, 28, 8, 11800000),
-  stock(2, 2, 1, 9, 8, 11800000),
-  stock(3, 1, 2, 14, 6, 9800000),
-  stock(4, 3, 2, 4, 6, 9800000),
-  stock(5, 1, 3, 5, 10, 4200000),
-  stock(6, 2, 3, 2, 10, 4200000),
-  stock(7, 1, 4, 35, 12, 950000)
-];
-
-let transactions: InventoryTransaction[] = [
-  tx(1, "IMPORT", "NK-2026-001", "2026-06-01", 1, undefined, 1, 12, "Nhap xe moi"),
-  tx(2, "TRANSFER_OUT", "CK-2026-001", "2026-06-03", 1, 1, 2, 4, "Chuyen xe sang Thu Duc"),
-  tx(3, "EXPORT", "XK-2026-001", "2026-06-04", 3, 1, undefined, 3, "Xuat ban hang"),
-  tx(4, "STOCKTAKE", "KK-2026-001", "2026-06-05", 4, undefined, 3, 4, "Kiem kho dinh ky")
-];
+async function ensureBranchCache(): Promise<void> {
+  if (_branchCache.size > 0) return;
+  try {
+    const res = await api.get<{ items: Array<{ id: number; name: string }> }>("/api/branches", {
+      params: { page: 0, pageSize: 100 },
+    });
+    for (const b of res.data.items) _branchCache.set(b.id, b.name);
+  } catch {
+    // silently ignore — branchName() will fall back to id string
+  }
+}
 
 export const inventoryApi = {
-  async listStock(params: InventoryListParams): Promise<PageResponse<InventoryStock>> {
-    if (!enableMock) {
-      const response = await api.get<PageResponse<InventoryStock & { minQuantity?: number }>>("/api/inventory/stocks", {
-        params: {
-          branchId: params.branchId === "ALL" ? undefined : params.branchId,
-          warehouseId: params.warehouseId === "ALL" ? undefined : params.warehouseId,
-          page: Math.max(params.page - 1, 0),
-          pageSize: params.pageSize
-        }
-      });
-      return {
-        ...response.data,
-        page: response.data.page + 1,
-        items: response.data.items.map((item) => ({
-          ...item,
-          branchName: branches.find((branch) => branch.id === item.branchId)?.name ?? String(item.branchId),
-          warehouseName: item.warehouseName ?? "",
-          productCode: item.productCode ?? String(item.productId),
-          category: item.category ?? "",
-          minimumStock: item.minimumStock ?? item.minQuantity ?? 0,
-          reservedQuantity: item.reservedQuantity ?? 0,
-          availableQuantity: item.availableQuantity ?? item.quantityOnHand,
-          maxQuantity: item.maxQuantity ?? 0,
-          averageCost: item.averageCost ?? 0,
-          updatedAt: item.updatedAt ?? ""
-        }))
-      };
-    }
-    await wait();
-    const keyword = params.keyword.trim().toLowerCase();
-    const filtered = stocks
-      .filter((item) => {
-        const matchKeyword =
-          keyword.length === 0 ||
-          item.productName.toLowerCase().includes(keyword) ||
-          item.productCode.toLowerCase().includes(keyword);
-        const matchBranch = params.branchId === "ALL" || item.branchId === params.branchId;
-        const matchLowStock = !params.lowStockOnly || item.quantityOnHand <= item.minimumStock;
-        return matchKeyword && matchBranch && matchLowStock;
-      })
-      .sort((a, b) => Number(b.quantityOnHand <= b.minimumStock) - Number(a.quantityOnHand <= a.minimumStock));
-    return paginate(filtered, params.page, params.pageSize);
+  // ── Legacy endpoints ──────────────────────────────────
+  async listStock(params: InventoryListParams): Promise<PageResponse<InventoryDTO>> {
+    const response = await api.get<PageResponse<InventoryDTO>>("/api/inventory/stocks", {
+      params: {
+        branchId: params.branchId === "ALL" ? undefined : params.branchId,
+        warehouseId: params.warehouseId === "ALL" ? undefined : params.warehouseId,
+        page: Math.max(params.page - 1, 0),
+        pageSize: params.pageSize
+      }
+    });
+    return {
+      ...response.data,
+      page: response.data.page + 1,
+    };
+  },
+
+  async getSummary(): Promise<InventorySummaryDTO> {
+    const response = await api.get<InventorySummaryDTO>("/api/inventory/summary");
+    return response.data;
   },
 
   async listHistory(params: InventoryHistoryParams): Promise<PageResponse<InventoryTransaction>> {
-    if (!enableMock) {
-      const response = await api.get<PageResponse<InventoryTransaction & { fromBranchId?: number; toBranchId?: number }>>("/api/inventory/transactions", {
-        params: {
-          branchId: params.branchId === "ALL" ? undefined : params.branchId,
-          type: params.type === "ALL" ? undefined : params.type,
-          page: Math.max(params.page - 1, 0),
-          pageSize: params.pageSize
-        }
-      });
-      const keyword = params.keyword.trim().toLowerCase();
-      const items = response.data.items
-        .map(normalizeTransaction)
-        .filter((item) => {
-          if (!keyword) return true;
-          return item.productName.toLowerCase().includes(keyword) || item.productCode.toLowerCase().includes(keyword) || item.transactionNo.toLowerCase().includes(keyword);
-        });
-      return {
-        ...response.data,
-        page: response.data.page + 1,
-        items
-      };
-    }
-    await wait();
-    const keyword = params.keyword.trim().toLowerCase();
-    const filtered = transactions.filter((item) => {
-      const matchKeyword =
-        keyword.length === 0 ||
-        item.productName.toLowerCase().includes(keyword) ||
-        item.productCode.toLowerCase().includes(keyword) ||
-        item.transactionNo.toLowerCase().includes(keyword);
-      const matchType = params.type === "ALL" || item.type === params.type;
-      const matchBranch =
-        params.branchId === "ALL" ||
-        item.fromBranchName === branchName(params.branchId) ||
-        item.toBranchName === branchName(params.branchId);
-      return matchKeyword && matchType && matchBranch;
+    const response = await api.get<PageResponse<InventoryTransaction & { fromBranchId?: number; toBranchId?: number }>>("/api/inventory/transactions", {
+      params: {
+        branchId: params.branchId === "ALL" ? undefined : params.branchId,
+        type: params.type === "ALL" ? undefined : params.type,
+        page: Math.max(params.page - 1, 0),
+        pageSize: params.pageSize
+      }
     });
-    return paginate(filtered, params.page, params.pageSize);
+    const keyword = params.keyword.trim().toLowerCase();
+    const items = response.data.items
+      .map(normalizeTransaction)
+      .filter((item) => {
+        if (!keyword) return true;
+        return item.productName.toLowerCase().includes(keyword) || item.productCode.toLowerCase().includes(keyword) || item.transactionNo.toLowerCase().includes(keyword);
+      });
+    return {
+      ...response.data,
+      page: response.data.page + 1,
+      items
+    };
   },
 
   async importStock(payload: ImportStockPayload): Promise<void> {
-    if (!enableMock) {
-      await api.post("/api/inventory/import", {
-        branchId: payload.branchId,
-        warehouseId: payload.warehouseId,
-        productId: payload.productId,
-        quantity: payload.quantity,
-        unitCost: payload.unitCost,
-        transactionDate: payload.transactionDate,
-        note: payload.note
-      });
-      return;
-    }
-    await wait();
-    const item = ensureStock(payload.branchId, payload.productId, payload.unitCost);
-    item.quantityOnHand += payload.quantity;
-    item.availableQuantity = item.quantityOnHand - item.reservedQuantity;
-    item.averageCost = payload.unitCost;
-    item.updatedAt = payload.transactionDate;
-    addTransaction("IMPORT", payload.transactionNo, payload.transactionDate, payload.productId, undefined, payload.branchId, payload.quantity, payload.note);
+    await api.post("/api/inventory/import", {
+      branchId: payload.branchId,
+      warehouseId: payload.warehouseId,
+      productId: payload.productId,
+      quantity: payload.quantity,
+      unitCost: payload.unitCost,
+      transactionDate: payload.transactionDate,
+      note: payload.note
+    });
   },
 
   async exportStock(payload: ExportStockPayload): Promise<void> {
-    if (!enableMock) {
-      await api.post("/api/inventory/export", {
-        branchId: payload.branchId,
-        warehouseId: payload.warehouseId,
-        productId: payload.productId,
-        quantity: payload.quantity,
-        transactionDate: payload.transactionDate,
-        note: payload.note
-      });
-      return;
-    }
-    await wait();
-    const item = findStock(payload.branchId, payload.productId);
-    if (!item || item.availableQuantity < payload.quantity) {
-      throw new Error("Ton kho khong du de xuat");
-    }
-    item.quantityOnHand -= payload.quantity;
-    item.availableQuantity = item.quantityOnHand - item.reservedQuantity;
-    item.updatedAt = payload.transactionDate;
-    addTransaction("EXPORT", payload.transactionNo, payload.transactionDate, payload.productId, payload.branchId, undefined, payload.quantity, payload.note);
+    await api.post("/api/inventory/export", {
+      branchId: payload.branchId,
+      warehouseId: payload.warehouseId,
+      productId: payload.productId,
+      quantity: payload.quantity,
+      transactionDate: payload.transactionDate,
+      note: payload.note
+    });
   },
 
   async transferStock(payload: TransferStockPayload): Promise<void> {
-    if (!enableMock) {
-      await api.post("/api/inventory/transfer", {
-        fromBranchId: payload.fromBranchId,
-        fromWarehouseId: payload.fromWarehouseId,
-        toBranchId: payload.toBranchId,
-        toWarehouseId: payload.toWarehouseId,
-        productId: payload.productId,
-        quantity: payload.quantity,
-        transactionDate: payload.transactionDate,
-        note: payload.note
-      });
-      return;
-    }
-    await wait();
-    const from = findStock(payload.fromBranchId, payload.productId);
-    if (!from || from.availableQuantity < payload.quantity) {
-      throw new Error("Ton kho nguon khong du de chuyen");
-    }
-    const to = ensureStock(payload.toBranchId, payload.productId, from.averageCost);
-    from.quantityOnHand -= payload.quantity;
-    to.quantityOnHand += payload.quantity;
-    from.availableQuantity = from.quantityOnHand - from.reservedQuantity;
-    to.availableQuantity = to.quantityOnHand - to.reservedQuantity;
-    from.updatedAt = payload.transactionDate;
-    to.updatedAt = payload.transactionDate;
-    addTransaction("TRANSFER_OUT", payload.transactionNo, payload.transactionDate, payload.productId, payload.fromBranchId, payload.toBranchId, payload.quantity, payload.note);
+    await api.post("/api/inventory/transfer", {
+      fromBranchId: payload.fromBranchId,
+      fromWarehouseId: payload.fromWarehouseId,
+      toBranchId: payload.toBranchId,
+      toWarehouseId: payload.toWarehouseId,
+      productId: payload.productId,
+      quantity: payload.quantity,
+      transactionDate: payload.transactionDate,
+      note: payload.note
+    });
   },
 
   async stockCount(payload: StockCountPayload): Promise<void> {
-    if (!enableMock) {
-      await api.post("/api/inventory/stocktake", {
-        branchId: payload.branchId,
-        warehouseId: payload.warehouseId,
-        productId: payload.productId,
-        countedQuantity: payload.countedQuantity,
-        transactionDate: payload.transactionDate,
-        note: payload.note
-      });
-      return;
-    }
-    await wait();
-    const item = ensureStock(payload.branchId, payload.productId, 0);
-    item.quantityOnHand = payload.countedQuantity;
-    item.availableQuantity = item.quantityOnHand - item.reservedQuantity;
-    item.updatedAt = payload.transactionDate;
-    addTransaction("STOCKTAKE", payload.transactionNo, payload.transactionDate, payload.productId, undefined, payload.branchId, payload.countedQuantity, payload.note);
-  }
+    await api.post("/api/inventory/stocktake", {
+      branchId: payload.branchId,
+      warehouseId: payload.warehouseId,
+      productId: payload.productId,
+      countedQuantity: payload.countedQuantity,
+      transactionDate: payload.transactionDate,
+      note: payload.note
+    });
+  },
+
+  async getStocks(params: {
+    warehouseId?: number | "ALL";
+    branchId?: number | "ALL";
+    keyword?: string;
+    page: number;
+    size: number;
+  }): Promise<PageResponse<InventoryDTO>> {
+    const response = await api.get<PageResponse<InventoryDTO>>("/api/inventory/stocks", {
+      params: {
+        branchId: params.branchId === "ALL" ? undefined : params.branchId,
+        warehouseId: params.warehouseId === "ALL" ? undefined : params.warehouseId,
+        page: params.page,
+        pageSize: params.size
+      }
+    });
+    return response.data;
+  },
+
+  async getMovements(params: {
+    branchId?: number | "ALL";
+    type?: string;
+    page: number;
+    pageSize: number;
+    keyword?: string;
+  }): Promise<PageResponse<InventoryTransaction>> {
+    const response = await api.get<PageResponse<InventoryTransaction>>("/api/inventory/movements", {
+      params: {
+        branchId: params.branchId === "ALL" ? undefined : params.branchId,
+        type: params.type === "ALL" ? undefined : params.type,
+        page: params.page,
+        pageSize: params.pageSize
+      }
+    });
+    return response.data;
+  },
+
+  // ── Inventory Counts ─────────────────────────────────
+  async listCounts(params: {
+    branchId?: number | "ALL";
+    status?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<PageResponse<InventoryCountSummary>> {
+    const response = await api.get<PageResponse<InventoryCountSummary>>("/api/inventory/v2/counts", {
+      params: {
+        branchId: params.branchId === "ALL" ? undefined : params.branchId,
+        status: params.status === "ALL" ? undefined : params.status,
+        page: params.page,
+        pageSize: params.pageSize
+      }
+    });
+    return response.data;
+  },
+
+  async getCountDetail(id: number): Promise<InventoryCountDetail> {
+    const response = await api.get<InventoryCountDetail>(`/api/inventory/v2/counts/${id}`);
+    return response.data;
+  },
+
+  async createCount(data: {
+    branchId: number;
+    warehouseId?: number;
+    note?: string;
+  }): Promise<InventoryCountDetail> {
+    const response = await api.post<InventoryCountDetail>("/api/inventory/v2/counts", data);
+    return response.data;
+  },
+
+  async confirmCount(id: number, items: {
+    productId: number;
+    countedQuantity: number;
+    note?: string;
+  }[]): Promise<InventoryCountDetail> {
+    const response = await api.post<InventoryCountDetail>(`/api/inventory/v2/counts/${id}/confirm`, items);
+    return response.data;
+  },
+
+  // ── Purchase Receipts (Nhập kho) ─────────────────────
+  async listReceipts(params: {
+    branchId?: number;
+    warehouseId?: number;
+    fromDate?: string;
+    toDate?: string;
+    status?: string;
+    receiptType?: string;
+    keyword?: string;
+    page: number;
+    size: number;
+  }): Promise<PageResponse<PurchaseReceiptSummary>> {
+    const response = await api.get<PageResponse<PurchaseReceiptSummary>>("/api/inventory/v2/receipts", {
+      params
+    });
+    return response.data;
+  },
+
+  async getReceiptDetail(id: number): Promise<PurchaseReceiptDetail> {
+    const response = await api.get<PurchaseReceiptDetail>(`/api/inventory/v2/receipts/${id}`);
+    return response.data;
+  },
+
+  async createReceipt(data: CreatePurchaseReceiptPayload): Promise<PurchaseReceiptDetail> {
+    const response = await api.post<PurchaseReceiptDetail>("/api/inventory/v2/receipts", data);
+    return response.data;
+  },
+
+  async updateReceipt(id: number, data: Partial<PurchaseReceiptDetail>): Promise<PurchaseReceiptDetail> {
+    const response = await api.put<PurchaseReceiptDetail>(`/api/inventory/v2/receipts/${id}`, data);
+    return response.data;
+  },
+
+  async confirmReceipt(id: number): Promise<PurchaseReceiptDetail> {
+    const response = await api.post<PurchaseReceiptDetail>(`/api/inventory/v2/receipts/${id}/confirm`);
+    return response.data;
+  },
+
+  async cancelReceipt(id: number): Promise<void> {
+    await api.post(`/api/inventory/v2/receipts/${id}/cancel`);
+  },
+
+  // ── Goods Issues (Xuất kho) ───────────────────────────
+  async listIssues(params: {
+    branchId?: number;
+    warehouseId?: number;
+    fromDate?: string;
+    toDate?: string;
+    status?: string;
+    issueType?: string;
+    keyword?: string;
+    page: number;
+    size: number;
+  }): Promise<PageResponse<GoodsIssueSummary>> {
+    const response = await api.get<PageResponse<GoodsIssueSummary>>("/api/inventory/v2/issues", {
+      params
+    });
+    return response.data;
+  },
+
+  async getIssueDetail(id: number): Promise<GoodsIssueDetail> {
+    const response = await api.get<GoodsIssueDetail>(`/api/inventory/v2/issues/${id}`);
+    return response.data;
+  },
+
+  async createIssue(data: CreateGoodsIssuePayload): Promise<GoodsIssueDetail> {
+    const response = await api.post<GoodsIssueDetail>("/api/inventory/v2/issues", data);
+    return response.data;
+  },
+
+  async updateIssue(id: number, data: Partial<GoodsIssueDetail>): Promise<GoodsIssueDetail> {
+    const response = await api.put<GoodsIssueDetail>(`/api/inventory/v2/issues/${id}`, data);
+    return response.data;
+  },
+
+  async confirmIssue(id: number): Promise<GoodsIssueDetail> {
+    const response = await api.post<GoodsIssueDetail>(`/api/inventory/v2/issues/${id}/issue`);
+    return response.data;
+  },
+
+  async cancelIssue(id: number): Promise<void> {
+    await api.post(`/api/inventory/v2/issues/${id}/cancel`);
+  },
+
+  // ── Inventory Transfers (Chuyển kho) ──────────────────
+  async listTransfers(params: {
+    fromBranchId?: number;
+    toBranchId?: number;
+    fromDate?: string;
+    toDate?: string;
+    status?: string;
+    transferType?: string;
+    keyword?: string;
+    page: number;
+    size: number;
+  }): Promise<PageResponse<InventoryTransferSummary>> {
+    const response = await api.get<PageResponse<InventoryTransferSummary>>("/api/inventory/v2/transfers", {
+      params
+    });
+    return response.data;
+  },
+
+  async getTransferDetail(id: number): Promise<InventoryTransferDetail> {
+    const response = await api.get<InventoryTransferDetail>(`/api/inventory/v2/transfers/${id}`);
+    return response.data;
+  },
+
+  async createTransfer(data: Partial<InventoryTransferDetail>): Promise<InventoryTransferDetail> {
+    const response = await api.post<InventoryTransferDetail>("/api/inventory/v2/transfers", data);
+    return response.data;
+  },
+
+  async confirmTransfer(id: number): Promise<InventoryTransferDetail> {
+    const response = await api.post<InventoryTransferDetail>(`/api/inventory/v2/transfers/${id}/approve`);
+    return response.data;
+  },
+
+  async cancelTransfer(id: number): Promise<void> {
+    await api.post(`/api/inventory/v2/transfers/${id}/cancel`);
+  },
+
+  // ── Product Catalog (Hàng hóa) ────────────────────────
+  async listProducts(params: {
+    productGroup?: string;
+    productNature?: string;
+    warehouseId?: number;
+    keyword?: string;
+    hasStock?: boolean;
+    lowStock?: boolean;
+    outOfStock?: boolean;
+    page: number;
+    size: number;
+  }): Promise<PageResponse<ProductCatalogItem>> {
+    const response = await api.get<PageResponse<ProductCatalogItem>>("/api/inventory/v2/products", {
+      params
+    });
+    return response.data;
+  },
+
+  async getProductSummary(): Promise<ProductCatalogSummary> {
+    const response = await api.get<ProductCatalogSummary>("/api/inventory/v2/products/summary");
+    return response.data;
+  },
+
+  async getProductGroups(): Promise<string[]> {
+    const response = await api.get<string[]>("/api/inventory/v2/products/groups");
+    return response.data;
+  },
+
+  // ── Dashboard Stats ───────────────────────────────────
+  async getStats(params: { branchId?: number; asOfDate?: string }): Promise<InventoryStats> {
+    const response = await api.get<InventoryStats>("/api/inventory/v2/stats", { params });
+    return response.data;
+  },
+
+  // ── Reports ───────────────────────────────────────────
+  async getStockSummaryReport(params: {
+    branchId?: number;
+    warehouseId?: number;
+    asOfDate?: string;
+    productGroup?: string;
+    keyword?: string;
+  }): Promise<StockSummaryRow[]> {
+    const response = await api.get<StockSummaryRow[]>("/api/inventory/v2/reports/stock-summary", { params });
+    return response.data;
+  },
+
+  async getStockDetailReport(params: {
+    branchId?: number;
+    warehouseId?: number;
+    productId?: number;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<{ openingBalance: number; transactions: StockDetailRow[]; closingBalance: number }> {
+    const response = await api.get<{ openingBalance: number; transactions: StockDetailRow[]; closingBalance: number }>(
+      "/api/inventory/v2/reports/stock-detail",
+      { params }
+    );
+    return response.data;
+  },
+
+  // ── Warehouses ────────────────────────────────────────
+  async listWarehouses(params: {
+    branchId?: number;
+    status?: string;
+    keyword?: string;
+    page?: number;
+    size?: number;
+  }): Promise<{ items: unknown[]; totalItems: number; totalPages: number }> {
+    const response = await api.get<{ items: unknown[]; totalItems: number; totalPages: number }>(
+      "/api/inventory/v2/warehouses",
+      { params }
+    );
+    return response.data;
+  },
 };
 
-function stock(id: number, branchId: number, productId: keyof typeof productNames, quantity: number, minimum: number, cost: number): InventoryStock {
-  const product = productNames[productId];
-  return {
-    id,
-    branchId,
-    branchName: branchName(branchId),
-    productId,
-    ...product,
-    warehouseId: branchId * 10 + 1,
-    warehouseName: `${branchName(branchId)} - Kho chinh`,
-    quantityOnHand: quantity,
-    reservedQuantity: 0,
-    availableQuantity: quantity,
-    minimumStock: minimum,
-    maxQuantity: minimum * 5,
-    averageCost: cost,
-    updatedAt: "2026-06-06"
-  };
-}
-
-function tx(id: number, type: InventoryTransactionType, transactionNo: string, date: string, productId: keyof typeof productNames, fromBranchId: number | undefined, toBranchId: number | undefined, quantity: number, note: string): InventoryTransaction {
-  const product = productNames[productId];
-  return {
-    id,
-    type,
-    transactionNo,
-    transactionDate: date,
-    ...product,
-    fromBranchId,
-    toBranchId,
-    fromBranchName: fromBranchId ? branchName(fromBranchId) : undefined,
-    toBranchName: toBranchId ? branchName(toBranchId) : undefined,
-    quantity,
-    note
-  };
-}
+// ── Normalizers ──
 
 function normalizeTransaction(transaction: InventoryTransaction): InventoryTransaction {
   return {
@@ -273,34 +420,6 @@ function normalizeTransaction(transaction: InventoryTransaction): InventoryTrans
   };
 }
 
-function addTransaction(type: InventoryTransactionType, transactionNo: string, date: string, productId: number, fromBranchId: number | undefined, toBranchId: number | undefined, quantity: number, note: string) {
-  const nextId = Math.max(0, ...transactions.map((item) => item.id)) + 1;
-  transactions = [tx(nextId, type, transactionNo, date, productId as keyof typeof productNames, fromBranchId, toBranchId, quantity, note), ...transactions];
-}
-
-function ensureStock(branchId: number, productId: number, averageCost: number) {
-  const current = findStock(branchId, productId);
-  if (current) return current;
-  const next = stock(Math.max(...stocks.map((item) => item.id)) + 1, branchId, productId as keyof typeof productNames, 0, 5, averageCost);
-  stocks = [...stocks, next];
-  return next;
-}
-
-function findStock(branchId: number, productId: number) {
-  return stocks.find((item) => item.branchId === branchId && item.productId === productId);
-}
-
 function branchName(branchId: number) {
-  return branches.find((item) => item.id === branchId)?.name ?? "Khong xac dinh";
-}
-
-function paginate<T>(items: T[], page: number, pageSize: number): PageResponse<T> {
-  const totalItems = items.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const start = (page - 1) * pageSize;
-  return { items: items.slice(start, start + pageSize), page, pageSize, totalItems, totalPages };
-}
-
-function wait() {
-  return new Promise((resolve) => setTimeout(resolve, 350));
+  return _branchCache.get(branchId) ?? String(branchId);
 }
