@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getCurrentUser } from "@/lib/auth/token";
+import { canViewAllBranches, getCurrentUser } from "@/lib/auth/token";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { serialsApi } from "@/features/serials/api";
 import { SerialDetailModal } from "@/features/serials/SerialDetailModal";
@@ -32,6 +32,7 @@ const VND = (n?: number | null) =>
 export default function SerialsPage() {
   const router = useRouter();
   const currentUser = getCurrentUser();
+  const canSelectBranch = canViewAllBranches(currentUser);
 
   const [keyword, setKeyword] = useState("");
   const [branchId, setBranchId] = useState<number | undefined>(currentUser?.branchId ?? undefined);
@@ -152,7 +153,7 @@ export default function SerialsPage() {
           ))}
         </select>
 
-        {currentUser?.role === "ADMIN" && (
+        {canSelectBranch && (
           <select
             value={branchId ?? ""}
             onChange={(e) => { setBranchId(e.target.value ? Number(e.target.value) : undefined); setPage(0); }}

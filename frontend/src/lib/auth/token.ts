@@ -65,6 +65,11 @@ export function getCurrentUser(): AuthUser | null {
   }
 }
 
+export function canViewAllBranches(user: AuthUser | null) {
+  if (!user) return false;
+  return user.permissions.includes("VIEW_ALL_BRANCHES") || user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+}
+
 export function getAccessToken() {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(ACCESS_TOKEN_KEY) ?? window.sessionStorage.getItem(ACCESS_TOKEN_KEY);

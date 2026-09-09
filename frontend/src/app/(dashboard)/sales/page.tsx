@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { getCurrentUser } from "@/lib/auth/token";
+import { canViewAllBranches, getCurrentUser } from "@/lib/auth/token";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { CartPanel } from "@/features/sales/CartPanel";
 import { CustomerSelectModal } from "@/features/sales/CustomerSelectModal";
@@ -52,7 +52,8 @@ export default function SalesPage() {
     }
   }, [currentUser, router]);
 
-  const activeBranchId = currentUser?.role === "ADMIN" ? selectedBranchId : currentUser?.branchId ?? null;
+  const canSelectBranch = canViewAllBranches(currentUser);
+  const activeBranchId = canSelectBranch ? selectedBranchId : currentUser?.branchId ?? null;
   const products = usePosProducts(debouncedProductKeyword, activeBranchId ?? 0);
   const customers = usePosCustomers(debouncedCustomerKeyword);
   const createInvoice = useCreateInvoice();
@@ -122,7 +123,7 @@ export default function SalesPage() {
             Ban xe dien, chon serial, thanh toan va tao hoa don tai quay.
           </p>
         </div>
-        {currentUser?.role === "ADMIN" && (
+        {canSelectBranch && (
           <select
             value={selectedBranchId}
             onChange={(event) => setSelectedBranchId(Number(event.target.value))}
