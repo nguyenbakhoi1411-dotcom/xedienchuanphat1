@@ -1,0 +1,2 @@
+ALTER TABLE purchase_receipts
+    ADD COLUMN IF NOT EXISTS version BIGINT DEFAULT 0;

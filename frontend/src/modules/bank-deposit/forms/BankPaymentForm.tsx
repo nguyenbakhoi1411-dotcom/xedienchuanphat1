@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCreateBankPayment, useBankAccounts } from '../hooks';
-import { CreateBankPaymentRequest, paymentSubTypes } from '../types';
+import { CreateBankPaymentRequest, PartnerType, paymentSubTypes } from '../types';
 
 // Validation schema
 const bankPaymentSchema = z.object({
@@ -58,6 +58,7 @@ export function BankPaymentForm({ onSuccess, onError }: BankPaymentFormProps) {
         amount: typeof data.amount === 'string' ? parseFloat(data.amount as any) : data.amount,
         exchangeRate: data.exchangeRate || 1,
         currency: data.currency || 'VND',
+        partnerType: data.partnerType as PartnerType | undefined,
       };
 
       createPayment(payload, {

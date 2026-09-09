@@ -7,10 +7,12 @@ import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/purchase-orders")
+@PreAuthorize("hasRole('ADMIN')")
 public class PurchaseOrderController {
 
     private final PurchaseOrderService poService;

@@ -58,6 +58,7 @@ export function BankReceiptForm({ onSuccess, onError }: BankReceiptFormProps) {
         amount: typeof data.amount === 'string' ? parseFloat(data.amount as any) : data.amount,
         exchangeRate: data.exchangeRate || 1,
         currency: data.currency || 'VND',
+        partnerType: data.partnerType as PartnerType | undefined,
       };
 
       createReceipt(payload, {

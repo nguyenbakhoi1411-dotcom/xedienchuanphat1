@@ -2,18 +2,9 @@
 
 import React from 'react';
 import { Calendar, AlertCircle, Clock } from 'lucide-react';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
-import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-
-export interface DeadlineItem {
-  id: string;
-  name: string;
-  dueDate: string;
-  description?: string;
-  priority: 'high' | 'medium' | 'low';
-  completed?: boolean;
-}
+import { formatDate } from '../lib/date';
+import type { DeadlineItem } from '../types';
 
 interface DeadlineWidgetProps {
   deadlines: DeadlineItem[];
@@ -35,11 +26,11 @@ export function DeadlineWidget({
     return dateA.getTime() - dateB.getTime();
   });
 
-  const getDeadlineStatus = (dueDate: string) => {
+  const getDeadlineStatus = (dueDate: string | Date) => {
     const deadline = new Date(dueDate);
     deadline.setHours(0, 0, 0, 0);
 
-    if (isAfter(today, deadline)) {
+    if (today.getTime() > deadline.getTime()) {
       return 'overdue';
     }
 
@@ -60,7 +51,7 @@ export function DeadlineWidget({
     return 'text-gray-600 bg-gray-50 border-gray-200';
   };
 
-  const getDaysRemaining = (dueDate: string) => {
+  const getDaysRemaining = (dueDate: string | Date) => {
     const deadline = new Date(dueDate);
     deadline.setHours(0, 0, 0, 0);
     const daysRemaining = Math.ceil(
@@ -89,7 +80,7 @@ export function DeadlineWidget({
           {sortedDeadlines.slice(0, maxItems).map((deadline) => {
             const status = getDeadlineStatus(deadline.dueDate);
             const daysRemaining = getDaysRemaining(deadline.dueDate);
-            const statusColor = getStatusColor(status, deadline.priority);
+            const statusColor = getStatusColor(status, deadline.priority || deadline.urgency || 'medium');
 
             return (
               <div
@@ -106,13 +97,13 @@ export function DeadlineWidget({
                     <Clock size={14} className="flex-shrink-0 mt-0.5" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate">{deadline.name}</p>
+                    <p className="text-xs font-semibold truncate">{deadline.name || deadline.title}</p>
                     {deadline.description && (
                       <p className="text-xs opacity-75 line-clamp-1">{deadline.description}</p>
                     )}
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs">
-                        {format(new Date(deadline.dueDate), 'dd/MM/yyyy', { locale: vi })}
+                        {formatDate(new Date(deadline.dueDate), 'dd/MM/yyyy')}
                       </span>
                       <span className="text-xs font-semibold">
                         {status === 'overdue' && 'Quá hạn'}

@@ -4,7 +4,7 @@ export { SearchBar } from './SearchBar';
 export { TabFilter } from './TabFilter';
 export type { ReportGroup } from './TabFilter';
 export { DeadlineWidget } from './DeadlineWidget';
-export type { DeadlineItem } from './DeadlineWidget';
+export type { DeadlineItem } from '../types';
 export { ReportGrid } from './ReportGrid';
 export type { ReportItem } from './ReportGrid';
 export { RecentReportsSection, RecentReportItem } from './RecentReportsSection';

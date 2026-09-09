@@ -3,14 +3,14 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { PeriodSelector, BalanceSheetViewer } from '../../components';
-import { useBalanceSheet } from '../../hooks';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { PeriodSelector, BalanceSheetViewer } from '../components';
+import { useBalanceSheet } from '../hooks';
+import { formatDate } from '../lib/date';
 
 export function BalanceSheetPage() {
   const router = useRouter();
   const today = new Date();
-  const [asOf, setAsOf] = useState(format(today, 'yyyy-MM-dd'));
+  const [asOf, setAsOf] = useState(formatDate(today, 'yyyy-MM-dd'));
   const [compareTo, setCompareTo] = useState<string | undefined>();
   const [currencyUnit, setCurrencyUnit] = useState<'vnd' | 'thousands' | 'millions'>('vnd');
 

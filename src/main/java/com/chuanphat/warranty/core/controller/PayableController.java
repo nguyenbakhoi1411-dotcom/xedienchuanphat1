@@ -7,10 +7,12 @@ import com.chuanphat.warranty.core.enums.PayableStatus;
 import com.chuanphat.warranty.core.service.PayableService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/payables")
+@PreAuthorize("hasRole('ADMIN')")
 public class PayableController {
 
     private final PayableService payableService;

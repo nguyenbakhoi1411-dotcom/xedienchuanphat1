@@ -126,6 +126,8 @@ export interface BalanceSheetItem {
   previousPeriod?: number;
   difference?: number;
   note?: string;
+  children?: BalanceSheetItem[];
+  isTotalRow?: boolean;
 }
 
 export interface BalanceSheetReport {
@@ -137,21 +139,28 @@ export interface BalanceSheetReport {
   currencyUnit: CurrencyUnit;
   
   assets: {
-    currentAssets: BalanceSheetItem[];
-    fixedAssets: BalanceSheetItem[];
-    totalAssets: number;
+    currentAssets?: BalanceSheetItem[];
+    fixedAssets?: BalanceSheetItem[];
+    totalAssets?: number;
+    previousTotalAssets?: number;
+    [key: string]: any;
   };
 
   liabilitiesEquity: {
-    currentLiabilities: BalanceSheetItem[];
-    longTermLiabilities: BalanceSheetItem[];
-    equity: BalanceSheetItem[];
-    totalLiabilitiesEquity: number;
+    currentLiabilities?: BalanceSheetItem[];
+    longTermLiabilities?: BalanceSheetItem[];
+    equity?: BalanceSheetItem[];
+    totalLiabilitiesEquity?: number;
+    liabilities?: BalanceSheetItem[];
+    total?: number;
+    previousTotal?: number;
+    [key: string]: any;
   };
 
   isBalanced: boolean;
   balanceError?: number;
   notes?: string;
+  [key: string]: any;
 }
 
 // ============ Income Statement (B02) ============
@@ -160,11 +169,14 @@ export interface IncomeStatementItem {
   code: string;
   name: string;
   currentValue: number;
+  currentPeriod?: number;
+  previousPeriod?: number;
   previousValue?: number;
   difference?: number;
   percentChange?: number;
   note?: string;
   isTotalRow?: boolean;
+  [key: string]: any;
 }
 
 export interface IncomeStatementReport {
@@ -212,6 +224,11 @@ export interface IncomeStatementReport {
     operatingMargin?: number;
     netProfitMargin?: number;
   };
+  revenueSection?: IncomeStatementItem[];
+  grossProfitSection?: IncomeStatementItem[];
+  operatingExpensesSection?: IncomeStatementItem[];
+  otherExpensesSection?: IncomeStatementItem[];
+  [key: string]: any;
 }
 
 // ============ Cash Flow (B03) ============
@@ -255,6 +272,7 @@ export interface CashFlowReport {
 
   isReconciled?: boolean;
   reconciliationError?: number;
+  [key: string]: any;
 }
 
 // ============ General Ledger ============
@@ -343,8 +361,9 @@ export interface FavoriteReport {
 }
 
 export interface RecentReport {
+  id: string;
   reportId: string;
-  viewedAt: Date;
+  viewedAt: string;
   viewCount: number;
 }
 
@@ -352,12 +371,14 @@ export interface RecentReport {
 
 export interface DeadlineItem {
   id: string;
-  title: string;
+  name?: string;
+  title?: string;
   description: string;
-  dueDate: Date;
-  urgency: 'low' | 'medium' | 'high';
-  type: 'tax' | 'insurance' | 'financial' | 'other';
-  completed: boolean;
+  dueDate: string | Date;
+  priority?: 'low' | 'medium' | 'high';
+  urgency?: 'low' | 'medium' | 'high';
+  type?: 'tax' | 'insurance' | 'financial' | 'other';
+  completed?: boolean;
 }
 
 // ============ Export Options ============

@@ -78,8 +78,8 @@ MERGE INTO permissions (id, code, module, action) KEY(id) VALUES
 MERGE INTO roles (id, code, name) KEY(id) VALUES
 (1, 'ADMIN', 'Quan tri he thong'),
 (2, 'BRANCH_MANAGER', 'Quan ly chi nhanh'),
-(3, 'SALES', 'Nhan vien ban hang'),
-(4, 'WAREHOUSE', 'Thu kho'),
+(3, 'SALES_STAFF', 'Nhan vien ban hang'),
+(4, 'WAREHOUSE_STAFF', 'Thu kho'),
 (5, 'ACCOUNTANT', 'Ke toan'),
 (6, 'TECHNICIAN', 'Ky thuat vien'),
 (7, 'USER', 'Nguoi dung');

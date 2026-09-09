@@ -10,10 +10,12 @@ import com.chuanphat.warranty.core.service.SupplierService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
+@PreAuthorize("hasRole('ADMIN')")
 public class SupplierController {
 
     private final SupplierService supplierService;

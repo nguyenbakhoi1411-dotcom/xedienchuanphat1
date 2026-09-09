@@ -43,7 +43,7 @@ class ErpPermissionControllerTest {
                                         Map.of("branchId", 1, "accessLevel", "MANAGE"),
                                         Map.of("branchId", 2, "accessLevel", "VIEW")
                                 ),
-                                "roles", List.of("SALES", "WAREHOUSE"),
+                                "roles", List.of("SALES_STAFF", "WAREHOUSE_STAFF"),
                                 "status", "ACTIVE",
                                 "password", "ChangeMe@123"
                         ))))

@@ -9,6 +9,7 @@ import com.chuanphat.warranty.auth.dto.LogoutRequest;
 import com.chuanphat.warranty.auth.dto.RefreshTokenRequest;
 import com.chuanphat.warranty.auth.dto.ResetPasswordRequest;
 import com.chuanphat.warranty.auth.service.AuthService;
+import com.chuanphat.warranty.security.PublicEndpoint;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
+@PublicEndpoint
 public class AuthController {
     private final AuthService authService;
 
