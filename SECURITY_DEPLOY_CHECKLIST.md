@@ -6,6 +6,15 @@
 - Do not enable `EXPOSE_RESET_TOKEN` in production.
 - Keep database, mail and admin bootstrap credentials outside source control.
 
+## Pre-Deploy Credential Gate
+- Generate a new random `JWT_SECRET` for the target environment before the first deploy.
+- Do not use any value that has appeared in git history, including old dev defaults or sanitized examples.
+- Set the first admin password to a strong unique value through `BOOTSTRAP_ADMIN_PASSWORD`.
+- Do not use `Admin@123`, `123456`, or any demo password from repository history in dev, staging, or production.
+- Store real `JWT_SECRET`, database passwords, mail credentials, and API keys only in environment variables or the deployment secret manager.
+- Warn real users before rotating `JWT_SECRET`; existing JWT access tokens signed with the old secret will become invalid and users must sign in again.
+- After the first successful admin login, set `BOOTSTRAP_ADMIN_ENABLED=false` and restart the backend.
+
 ## Authentication
 - Confirm JWT access token TTL is short via `JWT_ACCESS_TOKEN_SECONDS` (default 900 seconds).
 - Confirm refresh token rotation works and old refresh tokens are rejected.
