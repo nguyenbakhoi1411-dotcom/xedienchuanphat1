@@ -50,7 +50,7 @@ jobs:
             if [ -n "$report" ]; then
               message="$(sed -n '1,120p' "$report" | python3 -c "import sys; s=sys.stdin.read(); print(s.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))")"
               echo "::error title=Surefire failure report::$message"
-              causes="$(grep -nE 'Caused by|Exception|ERROR|FAILURE|Flyway|BeanCreation|UnsatisfiedDependency' "$report" | tail -n 80 | python3 -c "import sys; s=sys.stdin.read(); print(s.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))")"
+              causes="$(grep -nE 'Caused by|Flyway|Migration|PSQLException|SQLGrammarException|entityManagerFactory|Failed to initialize' "$report" | sed -E 's/^(.{0,500}).*$/\1.../' | tail -n 40 | python3 -c "import sys; s=sys.stdin.read(); print(s.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))")"
               echo "::error title=Surefire likely root causes::$causes"
               tail_message="$(tail -n 120 "$report" | python3 -c "import sys; s=sys.stdin.read(); print(s.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))")"
               echo "::error title=Surefire failure tail::$tail_message"
