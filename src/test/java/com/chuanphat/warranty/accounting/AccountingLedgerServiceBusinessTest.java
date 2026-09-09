@@ -101,6 +101,29 @@ class AccountingLedgerServiceBusinessTest {
         assertThatThrownBy(() -> service.createJournalEntry(request)).isInstanceOf(BusinessException.class);
     }
 
+    @Test
+    void journalEntryAccountingPeriodComesFromEntryDate() {
+        JournalEntryRequest request = new JournalEntryRequest(
+                LocalDate.of(2025, 12, 31),
+                JournalReferenceType.MANUAL,
+                "MAN-2",
+                "period check",
+                List.of(
+                        new JournalEntryLineRequest("111", new BigDecimal("1000000"), BigDecimal.ZERO, "cash"),
+                        new JournalEntryLineRequest("511", BigDecimal.ZERO, new BigDecimal("1000000"), "revenue")
+                )
+        );
+
+        service.createJournalEntry(request);
+
+        ArgumentCaptor<JournalEntry> captor = ArgumentCaptor.forClass(JournalEntry.class);
+        Mockito.verify(journalEntryRepository).save(captor.capture());
+        JournalEntry entry = captor.getValue();
+        assertThat(entry.getEntryDate()).isEqualTo(LocalDate.of(2025, 12, 31));
+        assertThat(entry.getAccountingYear()).isEqualTo(2025);
+        assertThat(entry.getAccountingMonth()).isEqualTo(12);
+    }
+
     private void assertBalancedAfter(Runnable action) {
         ArgumentCaptor<JournalEntry> captor = ArgumentCaptor.forClass(JournalEntry.class);
         action.run();

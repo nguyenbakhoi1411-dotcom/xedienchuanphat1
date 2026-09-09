@@ -331,6 +331,7 @@ public class InventoryService {
         transaction.setUnitCost(unitCost);
         transaction.setTotalCost((unitCost == null ? BigDecimal.ZERO : unitCost).multiply(BigDecimal.valueOf(quantity)));
         transaction.setNote(note);
+        transaction.setCreatedBy("system");
         return transactionRepository.save(transaction);
     }
 }

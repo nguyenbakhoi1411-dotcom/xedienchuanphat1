@@ -34,6 +34,10 @@ public class JournalEntry {
 
     private Long branchId;
 
+    private Integer accountingYear;
+
+    private Integer accountingMonth;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
     private JournalReferenceType referenceType = JournalReferenceType.MANUAL;
@@ -80,6 +84,10 @@ public class JournalEntry {
     public void setEntryCode(String entryCode) { this.entryCode = entryCode; }
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+    public Integer getAccountingYear() { return accountingYear; }
+    public void setAccountingYear(Integer accountingYear) { this.accountingYear = accountingYear; }
+    public Integer getAccountingMonth() { return accountingMonth; }
+    public void setAccountingMonth(Integer accountingMonth) { this.accountingMonth = accountingMonth; }
     public JournalReferenceType getReferenceType() { return referenceType; }
     public void setReferenceType(JournalReferenceType referenceType) { this.referenceType = referenceType; }
     public String getReferenceId() { return referenceId; }
