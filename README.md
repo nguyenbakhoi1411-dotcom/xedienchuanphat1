@@ -169,11 +169,11 @@ Migration files tại `src/main/resources/db/migration/`:
 #### Dev (tùy chọn override)
 
 ```bash
-# Không bắt buộc — dev chạy ổn với giá trị mặc định
-JWT_SECRET=dev-only-change-before-production-64-character-secret
+# Chỉ đặt local, không commit giá trị thật vào repo
+JWT_SECRET=CHANGE_ME_DEV_ONLY_LOCAL_JWT_SECRET_NOT_FOR_SHARED_ENVIRONMENTS
 BOOTSTRAP_ADMIN_ENABLED=true
 BOOTSTRAP_ADMIN_USERNAME=admin
-BOOTSTRAP_ADMIN_PASSWORD=Admin@123
+BOOTSTRAP_ADMIN_PASSWORD=CHANGE_ME_LOCAL_ADMIN_PASSWORD
 ```
 
 #### Production (BẮT BUỘC đầy đủ)
@@ -369,15 +369,17 @@ server {
 > ⚠️ **Tài khoản này chỉ tồn tại trong profile `dev`.**  
 > **Production TUYỆT ĐỐI KHÔNG seed dữ liệu demo.**
 
-| Username | Password | Role | Chi nhánh |
-|----------|----------|------|-----------| 
-| `admin` | `Admin@123` | SUPER_ADMIN | Tất cả |
-| `manager1` | `Demo@123` | BRANCH_MANAGER | Chi nhánh 1 |
-| `sales1` | `Demo@123` | SALES_STAFF | Chi nhánh 1 |
-| `warehouse1` | `Demo@123` | WAREHOUSE_STAFF | Chi nhánh 1 |
-| `accountant1` | `Demo@123` | ACCOUNTANT | Chi nhánh 1 |
-| `technician1` | `Demo@123` | TECHNICIAN | Chi nhánh 1 |
-| `sales2` | `Demo@123` | SALES_STAFF | Chi nhánh 2 |
+| Username | Role | Chi nhánh |
+|----------|------|-----------|
+| `admin` | SUPER_ADMIN | Tất cả |
+| `manager1` | BRANCH_MANAGER | Chi nhánh 1 |
+| `sales1` | SALES_STAFF | Chi nhánh 1 |
+| `warehouse1` | WAREHOUSE_STAFF | Chi nhánh 1 |
+| `accountant1` | ACCOUNTANT | Chi nhánh 1 |
+| `technician1` | TECHNICIAN | Chi nhánh 1 |
+| `sales2` | SALES_STAFF | Chi nhánh 2 |
+
+Password demo phải được cấp qua môi trường local hoặc dữ liệu seed nội bộ đã được phê duyệt; không dùng password mẫu trong repo cho môi trường thật.
 
 ---
 
@@ -389,7 +391,7 @@ Content-Type: application/json
 
 {
   "identifier": "admin",
-  "password": "Admin@123",
+  "password": "<local-admin-password>",
   "rememberMe": true
 }
 ```
