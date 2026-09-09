@@ -111,9 +111,9 @@ SELECT role_id, permission_id FROM (
 );
 
 MERGE INTO app_users (id, username, email, phone, full_name, password_hash, branch_id, role_id, status, created_at) KEY(id) VALUES
-(1, 'admin', 'admin@chuanphat.vn', '0909000001', 'Admin Chuan Phat', '{noop}123456', NULL, 1, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(2, 'sales', 'sales@chuanphat.vn', '0909000002', 'Sales Chuan Phat', '{noop}123456', NULL, 3, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
-(3, 'checker', 'checker@chuanphat.vn', '0909000003', 'Checker Chuan Phat', '{noop}123456', NULL, 2, 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00');
+(1, 'admin', 'admin@chuanphat.vn', '0909000001', 'Admin Chuan Phat', '{bcrypt}$2a$10$7EqJtq98hPqEX7fNZaFWoOhi/3zO4IdbQGtoK9PHT7y.gD1yP7z8m', NULL, 1, 'INACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(2, 'sales', 'sales@chuanphat.vn', '0909000002', 'Sales Chuan Phat', '{bcrypt}$2a$10$7EqJtq98hPqEX7fNZaFWoOhi/3zO4IdbQGtoK9PHT7y.gD1yP7z8m', NULL, 3, 'INACTIVE', TIMESTAMP '2026-01-01 08:00:00'),
+(3, 'checker', 'checker@chuanphat.vn', '0909000003', 'Checker Chuan Phat', '{bcrypt}$2a$10$7EqJtq98hPqEX7fNZaFWoOhi/3zO4IdbQGtoK9PHT7y.gD1yP7z8m', NULL, 2, 'INACTIVE', TIMESTAMP '2026-01-01 08:00:00');
 
 MERGE INTO branches (id, code, name, address, phone, status, created_at) KEY(id) VALUES
 (1, 'CP-LVT', 'Chuẩn Phát Lê Viết Thuật', 'Số 389 Lê Viết Thuật, Vinh Lộc, Nghệ An', '0832032555', 'ACTIVE', TIMESTAMP '2026-01-01 08:00:00'),

@@ -22,6 +22,7 @@ public class AuthDataInitializer {
     private final String bootstrapAdminEmail;
     private final String bootstrapAdminPhone;
     private final String bootstrapAdminFullName;
+    private final String bootstrapSalesPassword;
 
     public AuthDataInitializer(
             @Value("${app.security.bootstrap-admin.enabled:false}") boolean bootstrapAdminEnabled,
@@ -29,7 +30,8 @@ public class AuthDataInitializer {
             @Value("${app.security.bootstrap-admin.password:}") String bootstrapAdminPassword,
             @Value("${app.security.bootstrap-admin.email:}") String bootstrapAdminEmail,
             @Value("${app.security.bootstrap-admin.phone:}") String bootstrapAdminPhone,
-            @Value("${app.security.bootstrap-admin.full-name:}") String bootstrapAdminFullName
+            @Value("${app.security.bootstrap-admin.full-name:}") String bootstrapAdminFullName,
+            @Value("${app.security.bootstrap-sales.password:}") String bootstrapSalesPassword
     ) {
         this.bootstrapAdminEnabled = bootstrapAdminEnabled;
         this.bootstrapAdminUsername = bootstrapAdminUsername;
@@ -37,6 +39,7 @@ public class AuthDataInitializer {
         this.bootstrapAdminEmail = bootstrapAdminEmail;
         this.bootstrapAdminPhone = bootstrapAdminPhone;
         this.bootstrapAdminFullName = bootstrapAdminFullName;
+        this.bootstrapSalesPassword = bootstrapSalesPassword;
     }
 
     @Bean
@@ -131,16 +134,18 @@ public class AuthDataInitializer {
                 admin.setStatus(AppUser.Status.ACTIVE);
                 userRepository.save(admin);
                 
-                AppUser salesUser = userRepository.findByUsernameIgnoreCase("sales").orElseGet(AppUser::new);
-                salesUser.setUsername("sales");
-                salesUser.setEmail("sales@chuanphat.vn");
-                salesUser.setFullName("Sales Chuan Phat");
-                salesUser.setPasswordHash(passwordEncoder.encode("123456"));
-                Role salesRole = roleRepository.findByCode("SALES_STAFF").orElseThrow();
-                salesUser.setRole(salesRole);
-                salesUser.setRoles(new java.util.LinkedHashSet<>(List.of(salesRole)));
-                salesUser.setStatus(AppUser.Status.ACTIVE);
-                userRepository.save(salesUser);
+                if (!bootstrapSalesPassword.isBlank()) {
+                    AppUser salesUser = userRepository.findByUsernameIgnoreCase("sales").orElseGet(AppUser::new);
+                    salesUser.setUsername("sales");
+                    salesUser.setEmail("sales@chuanphat.vn");
+                    salesUser.setFullName("Sales Chuan Phat");
+                    salesUser.setPasswordHash(passwordEncoder.encode(bootstrapSalesPassword));
+                    Role salesRole = roleRepository.findByCode("SALES_STAFF").orElseThrow();
+                    salesUser.setRole(salesRole);
+                    salesUser.setRoles(new java.util.LinkedHashSet<>(List.of(salesRole)));
+                    salesUser.setStatus(AppUser.Status.ACTIVE);
+                    userRepository.save(salesUser);
+                }
             }
         };
     }
