@@ -84,8 +84,7 @@ export default function LoginPage() {
             </div>
 
             <p className="mt-5 text-center text-xs leading-5 text-slate-500">
-              Tai khoan demo: <span className="font-medium text-text">admin</span> /{" "}
-              <span className="font-medium text-text">Admin@123</span>
+              Tai khoan demo chi dung cho profile dev noi bo.
             </p>
           </div>
         </section>

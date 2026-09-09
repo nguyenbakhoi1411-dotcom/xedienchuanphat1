@@ -5,7 +5,7 @@
 - Dev seed uses `spring.sql.init.continue-on-error=false`.
 - Production build uses `SPRING_PROFILES_ACTIVE=prod` and a PostgreSQL database, not H2.
 - Frontend production env has `NEXT_PUBLIC_ENABLE_MOCK=false` and `NEXT_PUBLIC_ENABLE_MOCK_LOGIN=false`.
-- Login seed account works: `admin` / `Admin@123`.
+- Login seed account works with credentials supplied through local environment or approved dev-only seed data.
 
 ## Auth
 - Login succeeds with valid credentials and returns access/refresh tokens.
