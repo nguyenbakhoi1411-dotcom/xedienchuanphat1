@@ -16,23 +16,23 @@ public class MarketingCampaign {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 160)
+    @Column(name = "campaign_name", nullable = false, length = 160)
     private String name;
 
-    @Column(nullable = false, length = 50)
+    @Column(name = "channel", nullable = false, length = 50)
     private String source;
 
     private LocalDate startDate;
 
     private LocalDate endDate;
 
-    @Column(nullable = false, precision = 18, scale = 2)
+    @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal budget = BigDecimal.ZERO;
 
     @Column(nullable = false, length = 20)
     private String status = "PLANNED";
 
-    @Column(length = 1000)
+    @Column(length = 500)
     private String note;
 
     public Long getId() { return id; }
