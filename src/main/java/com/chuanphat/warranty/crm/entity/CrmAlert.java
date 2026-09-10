@@ -37,7 +37,7 @@ public class CrmAlert {
     @Column(nullable = false, length = 20)
     private String severity = "INFO"; // INFO | WARNING | URGENT
 
-    @Column(nullable = false)
+    @Column(name = "is_dismissed", nullable = false)
     private boolean dismissed = false;
 
     @Column(length = 120)
