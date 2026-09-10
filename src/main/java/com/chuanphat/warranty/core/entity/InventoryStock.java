@@ -42,7 +42,7 @@ public class InventoryStock {
     @Column(name = "min_quantity", nullable = false)
     private int minStockLevel = 1;
 
-    @Column(nullable = false, columnDefinition = "integer default 0")
+    @Column(name = "max_quantity", nullable = false, columnDefinition = "integer default 0")
     private int maxStockLevel;
 
     @Column(nullable = false)
