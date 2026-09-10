@@ -55,7 +55,7 @@ public class FixedAsset {
     private String depreciationMethod = "STRAIGHT_LINE";
 
     /** Khấu hao lũy kế */
-    @Column(nullable = false, precision = 18, scale = 2)
+    @Column(name = "accumulated_depr", nullable = false, precision = 18, scale = 2)
     private BigDecimal accumulatedDepreciation = BigDecimal.ZERO;
 
     /** Giá trị còn lại = costAmount - accumulatedDepreciation */
@@ -71,11 +71,11 @@ public class FixedAsset {
     private String accountCode = "211";
 
     /** TK hao mòn lũy kế (VD: 214) */
-    @Column(nullable = false, length = 20)
+    @Column(name = "depr_account_code", nullable = false, length = 20)
     private String depreciationAccountCode = "214";
 
     /** TK chi phí khấu hao (VD: 642) */
-    @Column(nullable = false, length = 20)
+    @Column(name = "expense_account", nullable = false, length = 20)
     private String expenseAccountCode = "642";
 
     @Column(length = 80)
