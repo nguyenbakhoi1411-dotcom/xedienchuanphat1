@@ -12,9 +12,9 @@ public class KPI {
     private Long id;
     @Column(nullable = false)
     private Long employeeId;
-    @Column(name = "kpi_month", nullable = false)
+    @Column(nullable = false)
     private Integer month;
-    @Column(name = "kpi_year", nullable = false)
+    @Column(nullable = false)
     private Integer year;
     private Integer leadsHandled = 0;
     private Integer quotationsSent = 0;
