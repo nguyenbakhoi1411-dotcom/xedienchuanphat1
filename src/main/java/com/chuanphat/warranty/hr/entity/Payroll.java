@@ -18,9 +18,9 @@ public class Payroll {
     private Long employeeId;
     @Column(nullable = false)
     private Long branchId;
-    @Column(name = "payroll_month", nullable = false)
+    @Column(nullable = false)
     private Integer month;
-    @Column(name = "payroll_year", nullable = false)
+    @Column(nullable = false)
     private Integer year;
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal baseSalary = BigDecimal.ZERO;
