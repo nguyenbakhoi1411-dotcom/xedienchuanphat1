@@ -278,32 +278,13 @@ class SalesProfessionalFlowTest {
     }
 
     @Test
-    void salesStaffDiscountAboveThresholdWaitsForApprovalBeforePayment() throws Exception {
-        MvcResult orderResult = mockMvc.perform(post("/api/sales/orders")
-                        .with(salesUser())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "branchId", 1,
-                                "customerId", 1,
-                                "employeeId", 102,
-                                "orderDate", LocalDate.now().toString(),
-                                "discountAmount", new BigDecimal("1000000.00"),
-                                "confirm", true,
-                                "issueInvoice", false,
-                                "items", List.of(Map.of(
-                                        "productId", 31,
-                                        "quantity", 1
-                                ))
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("WAITING_DISCOUNT_APPROVAL"))
-                .andExpect(jsonPath("$.discountApprovalStatus").value("PENDING"))
-                .andExpect(jsonPath("$.paidAmount").value(0))
-                .andExpect(jsonPath("$.stockIssued").value(false))
-                .andReturn();
+    void salesStaffDiscountAboveThresholdWaitsForApproval() throws Exception {
+        createSalesOrderWaitingDiscountApproval();
+    }
 
-        JsonNode order = objectMapper.readTree(orderResult.getResponse().getContentAsString());
-        long orderId = order.get("id").asLong();
+    @Test
+    void waitingDiscountApprovalBlocksConfirmPaymentDeliverAndInvoiceDirectApis() throws Exception {
+        long orderId = createSalesOrderWaitingDiscountApproval();
 
         mockMvc.perform(patch("/api/sales/orders/{id}/confirm", orderId)
                         .with(salesUser())
@@ -333,6 +314,11 @@ class SalesProfessionalFlowTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("status", "ISSUED"))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void orderCreatorCannotApproveOwnDiscount() throws Exception {
+        long orderId = createSalesOrderWaitingDiscountApproval();
 
         mockMvc.perform(patch("/api/sales/orders/{id}/approve-discount", orderId)
                         .with(salesSelfApprover())
@@ -347,6 +333,34 @@ class SalesProfessionalFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.discountApprovalStatus").value("APPROVED"));
+    }
+
+    private long createSalesOrderWaitingDiscountApproval() throws Exception {
+        MvcResult orderResult = mockMvc.perform(post("/api/sales/orders")
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "branchId", 1,
+                                "customerId", 1,
+                                "employeeId", 102,
+                                "orderDate", LocalDate.now().toString(),
+                                "discountAmount", new BigDecimal("1000000.00"),
+                                "confirm", true,
+                                "issueInvoice", false,
+                                "items", List.of(Map.of(
+                                        "productId", 31,
+                                        "quantity", 1
+                                ))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WAITING_DISCOUNT_APPROVAL"))
+                .andExpect(jsonPath("$.discountApprovalStatus").value("PENDING"))
+                .andExpect(jsonPath("$.paidAmount").value(0))
+                .andExpect(jsonPath("$.stockIssued").value(false))
+                .andReturn();
+
+        JsonNode order = objectMapper.readTree(orderResult.getResponse().getContentAsString());
+        return order.get("id").asLong();
     }
 
     private void assertSerialStatus(long serialId, SerialStatus expected) {
