@@ -8,6 +8,7 @@ import com.chuanphat.warranty.audit.dto.CreateAuditLogRequest;
 import com.chuanphat.warranty.audit.enums.AuditAction;
 import com.chuanphat.warranty.audit.enums.AuditModule;
 import com.chuanphat.warranty.audit.service.AuditLogService;
+import com.chuanphat.warranty.auth.entity.AppUser;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.dto.ConvertQuotationRequest;
@@ -256,6 +257,9 @@ public class SalesService {
         if (order.getStatus() == SalesOrderStatus.CANCELLED || order.getStatus() == SalesOrderStatus.RETURNED) {
             throw new BusinessException("Order cannot be delivered in status " + order.getStatus());
         }
+        if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+            throw new BusinessException("Order is waiting for discount approval");
+        }
         issueStockIfNeeded(order);
         order.setStatus(SalesOrderStatus.DELIVERED);
         order.setDeliveredAt(OffsetDateTime.now());
@@ -275,7 +279,11 @@ public class SalesService {
         if (order.getStatus() != SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
             throw new BusinessException("Order is not waiting for discount approval");
         }
-        String approver = branchSecurity.currentUser().getUsername();
+        AppUser approverUser = branchSecurity.currentUser();
+        if (approverUser.getId().equals(order.getEmployeeId())) {
+            throw new BusinessException("Order creator cannot approve their own discount");
+        }
+        String approver = approverUser.getUsername();
         order.setDiscountApprovalStatus(DiscountApprovalStatus.APPROVED);
         order.setApprovedBy(approver);
         order.setApprovedAt(OffsetDateTime.now());
@@ -745,6 +753,9 @@ public class SalesService {
         if (order.getStatus() == SalesOrderStatus.CANCELLED || order.getStatus() == SalesOrderStatus.RETURNED) {
             throw new BusinessException("Order cannot be confirmed in status " + order.getStatus());
         }
+        if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+            throw new BusinessException("Order is waiting for discount approval");
+        }
         if (order.getStatus() == SalesOrderStatus.DRAFT) {
             order.setConfirmedAt(OffsetDateTime.now());
         }
@@ -819,6 +830,9 @@ public class SalesService {
     }
 
     private Invoice createInvoiceEntity(SalesOrder order, CreateInvoiceRequest request) {
+        if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+            throw new BusinessException("Order is waiting for discount approval");
+        }
         Invoice existing = invoiceRepository.findByOrder_Id(order.getId()).orElse(null);
         if (existing != null) {
             return existing;

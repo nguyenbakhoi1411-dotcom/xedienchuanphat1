@@ -305,6 +305,15 @@ class SalesProfessionalFlowTest {
         JsonNode order = objectMapper.readTree(orderResult.getResponse().getContentAsString());
         long orderId = order.get("id").asLong();
 
+        mockMvc.perform(patch("/api/sales/orders/{id}/confirm", orderId)
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reservationUntil", OffsetDateTime.now().plusHours(2).toString(),
+                                "reason", "Direct confirm should be blocked"
+                        ))))
+                .andExpect(status().isBadRequest());
+
         mockMvc.perform(post("/api/sales/orders/{id}/payments", orderId)
                         .with(salesUser())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -313,6 +322,22 @@ class SalesProfessionalFlowTest {
                                 "amount", new BigDecimal("100.00"),
                                 "paymentDate", LocalDate.now().toString()
                         ))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/deliver", orderId)
+                        .with(salesUser()))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/sales/orders/{id}/invoice", orderId)
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("status", "ISSUED"))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/approve-discount", orderId)
+                        .with(salesSelfApprover())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("note", "Self approval should be blocked"))))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(patch("/api/sales/orders/{id}/approve-discount", orderId)
@@ -339,6 +364,19 @@ class SalesProfessionalFlowTest {
                         new SimpleGrantedAuthority("SALES_CANCEL"),
                         new SimpleGrantedAuthority("SALES_RETURN"),
                         new SimpleGrantedAuthority("INVOICE_ISSUE"),
+                        new SimpleGrantedAuthority("PRODUCT_VIEW"),
+                        new SimpleGrantedAuthority("CUSTOMER_VIEW")
+                )
+        );
+    }
+
+    private RequestPostProcessor salesSelfApprover() {
+        return user("sales1").authorities(
+                List.of(
+                        new SimpleGrantedAuthority("ROLE_USER"),
+                        new SimpleGrantedAuthority("SALES_VIEW"),
+                        new SimpleGrantedAuthority("SALES_UPDATE"),
+                        new SimpleGrantedAuthority("SALES_DISCOUNT_APPROVE"),
                         new SimpleGrantedAuthority("PRODUCT_VIEW"),
                         new SimpleGrantedAuthority("CUSTOMER_VIEW")
                 )
