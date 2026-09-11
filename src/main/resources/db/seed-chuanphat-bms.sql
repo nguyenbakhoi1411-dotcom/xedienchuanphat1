@@ -207,7 +207,7 @@ SELECT X,
        DATEADD('DAY', -MOD(X, 365), TIMESTAMP '2026-06-06 10:00:00')
 FROM SYSTEM_RANGE(1, 100);
 
-MERGE INTO inventory_stocks (id, branch_id, warehouse_id, product_id, quantity_on_hand, reserved_quantity, available_quantity, min_quantity, max_stock_level, updated_at) KEY(id)
+MERGE INTO inventory_stocks (id, branch_id, warehouse_id, product_id, quantity_on_hand, reserved_quantity, available_quantity, min_quantity, max_quantity, updated_at) KEY(id)
 SELECT (b.X - 1) * 50 + p.X,
        b.X,
        b.X,
@@ -480,7 +480,7 @@ MERGE INTO vouchers (id, code, name, discount_type, discount_value, minimum_orde
 (1, 'CPWELCOME', 'Uu dai khach hang moi', 'AMOUNT', 500000, 10000000, DATE '2026-06-01', DATE '2026-12-31', 200, 12, 'ACTIVE'),
 (2, 'PIN10', 'Giam gia pin lithium', 'PERCENT', 10, 3000000, DATE '2026-06-01', DATE '2026-09-30', 100, 8, 'ACTIVE');
 
-MERGE INTO marketing_campaigns (id, name, source, start_date, end_date, budget, status, note) KEY(id) VALUES
+MERGE INTO marketing_campaigns (id, campaign_name, channel, start_date, end_date, budget, status, note) KEY(id) VALUES
 (1, 'Facebook Lead Thang 6', 'FACEBOOK', DATE '2026-06-01', DATE '2026-06-30', 25000000, 'RUNNING', 'Tap trung xe may dien CP S1'),
 (2, 'Zalo cham soc khach cu', 'ZALO', DATE '2026-06-05', DATE '2026-07-05', 8000000, 'PLANNED', 'Nhac bao duong va doi pin');
 

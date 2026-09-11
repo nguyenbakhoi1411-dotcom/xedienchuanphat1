@@ -202,6 +202,7 @@ public class SalesService {
         BigDecimal subtotal = addOrderItems(order, request.items());
         BigDecimal discount = resolveDiscount(order.getBranchId(), subtotal, order.getVoucherCode(), orderProductIds(order), nullToZero(request.discountAmount()));
         applyTotals(order, subtotal, discount);
+        checkAndMarkDiscountApproval(order, nullToZero(request.discountAmount()));
         validatePayments(order.getTotalAmount(), normalizedPayments(request));
 
         SalesOrder saved = salesOrderRepository.save(order);
@@ -209,7 +210,7 @@ public class SalesService {
         notificationService.notifyAllOnce("NEW_ORDER", NotificationSeverity.SUCCESS, "SALES", saved.getId(), "Don hang moi", "Don " + saved.getOrderNo() + " vua duoc tao");
 
         boolean shouldConfirm = request.confirm() == null || Boolean.TRUE.equals(request.confirm());
-        if (shouldConfirm) {
+        if (shouldConfirm && saved.getStatus() != SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
             confirmOrder(saved, new SalesOrderStatusRequest(saved.getReservationUntil(), null), false);
             consumeVoucher(saved);
             for (PaymentEntryRequest payment : normalizedPayments(request)) {
@@ -218,7 +219,7 @@ public class SalesService {
         }
 
         boolean shouldIssueInvoice = request.issueInvoice() == null ? shouldConfirm : Boolean.TRUE.equals(request.issueInvoice());
-        if (shouldIssueInvoice) {
+        if (shouldIssueInvoice && saved.getStatus() != SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
             createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
         }
 
@@ -279,8 +280,8 @@ public class SalesService {
         order.setApprovedBy(approver);
         order.setApprovedAt(OffsetDateTime.now());
         order.setApprovalNote(note);
-        order.setStatus(SalesOrderStatus.CONFIRMED);
-        order.setConfirmedAt(OffsetDateTime.now());
+        order.setStatus(SalesOrderStatus.DRAFT);
+        confirmOrder(order, new SalesOrderStatusRequest(order.getReservationUntil(), null), false);
         audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesOrder", order.getId(), "Approved discount: " + note, order.getOrderNo());
         notificationService.notifyAllOnce("DISCOUNT_APPROVED", NotificationSeverity.SUCCESS, "SALES", order.getId(),
                 "Giam gia da duoc duyet", "Don " + order.getOrderNo() + " da duoc " + approver + " duyet giam gia");
@@ -769,6 +770,9 @@ public class SalesService {
         if (order.getStatus() == SalesOrderStatus.CANCELLED || order.getStatus() == SalesOrderStatus.RETURNED) {
             throw new BusinessException("Cannot add payment to order in status " + order.getStatus());
         }
+        if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+            throw new BusinessException("Order is waiting for discount approval");
+        }
         recordOrderAccounting(order);
         BigDecimal amount = request.amount();
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -1222,8 +1226,8 @@ public class SalesService {
      *   - Khong throw exception (don van duoc luu, cho quan ly duyet)
      * Neu co quyen APPROVE hoac discount hop le: khong lam gi.
      */
-    private void checkAndMarkDiscountApproval(SalesOrder order) {
-        BigDecimal discount = order.getDiscountAmount();
+    private void checkAndMarkDiscountApproval(SalesOrder order, BigDecimal manualDiscount) {
+        BigDecimal discount = nullToZero(manualDiscount);
         BigDecimal subtotal = order.getSubtotal();
         if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) == 0) return;
         if (discount == null || discount.compareTo(BigDecimal.ZERO) <= 0) return;
