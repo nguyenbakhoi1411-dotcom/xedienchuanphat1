@@ -81,6 +81,10 @@ public class Customer {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal totalDebt = BigDecimal.ZERO;
 
+    /** Han muc cong no. Gia tri 0 nghia la chua cau hinh han muc. */
+    @Column(nullable = false, precision = 14, scale = 2)
+    private BigDecimal creditLimit = BigDecimal.ZERO;
+
     /** Lifetime Value = tổng doanh thu từ khách hàng này */
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal lifetimeValue = BigDecimal.ZERO;
@@ -131,6 +135,8 @@ public class Customer {
     public void setLastCareDate(LocalDate v) { this.lastCareDate = v; }
     public BigDecimal getTotalDebt() { return totalDebt; }
     public void setTotalDebt(BigDecimal v) { this.totalDebt = v == null ? BigDecimal.ZERO : v; }
+    public BigDecimal getCreditLimit() { return creditLimit; }
+    public void setCreditLimit(BigDecimal v) { this.creditLimit = v == null ? BigDecimal.ZERO : v; }
     public BigDecimal getLifetimeValue() { return lifetimeValue; }
     public void setLifetimeValue(BigDecimal v) { this.lifetimeValue = v == null ? BigDecimal.ZERO : v; }
     public String getNote() { return note; }

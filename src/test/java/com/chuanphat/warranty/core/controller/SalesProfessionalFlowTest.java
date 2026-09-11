@@ -10,7 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chuanphat.warranty.core.entity.Customer;
 import com.chuanphat.warranty.core.enums.SerialStatus;
+import com.chuanphat.warranty.core.repository.CustomerRepository;
 import com.chuanphat.warranty.core.repository.ProductSerialRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -38,6 +40,9 @@ class SalesProfessionalFlowTest {
 
     @Autowired
     private ProductSerialRepository serialRepository;
+
+    @Autowired
+    private CustomerRepository customerRepository;
 
     @Test
     void quotationPaymentInvoiceAndReturnFlow() throws Exception {
@@ -335,6 +340,82 @@ class SalesProfessionalFlowTest {
                 .andExpect(jsonPath("$.discountApprovalStatus").value("APPROVED"));
     }
 
+    @Test
+    void creditLimitExceededWaitsForApproval() throws Exception {
+        createSalesOrderWaitingCreditApproval();
+    }
+
+    @Test
+    void waitingCreditApprovalBlocksConfirmPaymentDeliverAndInvoiceDirectApis() throws Exception {
+        long orderId = createSalesOrderWaitingCreditApproval();
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/confirm", orderId)
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reservationUntil", OffsetDateTime.now().plusHours(2).toString(),
+                                "reason", "Direct confirm should be blocked"
+                        ))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/sales/orders/{id}/payments", orderId)
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "paymentMethod", "CASH",
+                                "amount", new BigDecimal("100.00"),
+                                "paymentDate", LocalDate.now().toString()
+                        ))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/deliver", orderId)
+                        .with(salesUser()))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/sales/orders/{id}/invoice", orderId)
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("status", "ISSUED"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void directConfirmOfDraftCreditLimitExceededMovesToWaitingCreditApproval() throws Exception {
+        long orderId = createDraftSalesOrderForCreditLimitedCustomer();
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/confirm", orderId)
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reservationUntil", OffsetDateTime.now().plusHours(2).toString(),
+                                "reason", "Confirm should require credit approval"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WAITING_CREDIT_APPROVAL"))
+                .andExpect(jsonPath("$.creditApprovalStatus").value("PENDING"))
+                .andExpect(jsonPath("$.accountingRecorded").value(false))
+                .andExpect(jsonPath("$.stockIssued").value(false));
+    }
+
+    @Test
+    void orderCreatorCannotApproveOwnCreditException() throws Exception {
+        long orderId = createSalesOrderWaitingCreditApproval();
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/approve-credit", orderId)
+                        .with(salesSelfCreditApprover())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("note", "Self credit approval should be blocked"))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/approve-credit", orderId)
+                        .with(creditApprover())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("note", "Approved credit exception for test"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.creditApprovalStatus").value("APPROVED"));
+    }
+
     private long createSalesOrderWaitingDiscountApproval() throws Exception {
         MvcResult orderResult = mockMvc.perform(post("/api/sales/orders")
                         .with(salesUser())
@@ -361,6 +442,76 @@ class SalesProfessionalFlowTest {
 
         JsonNode order = objectMapper.readTree(orderResult.getResponse().getContentAsString());
         return order.get("id").asLong();
+    }
+
+    private long createDraftSalesOrderForCreditLimitedCustomer() throws Exception {
+        Customer customer = createCreditLimitedCustomer();
+        MvcResult orderResult = mockMvc.perform(post("/api/sales/orders")
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "branchId", 1,
+                                "customerId", customer.getId(),
+                                "employeeId", 102,
+                                "orderDate", LocalDate.now().toString(),
+                                "discountAmount", BigDecimal.ZERO,
+                                "confirm", false,
+                                "issueInvoice", false,
+                                "items", List.of(Map.of(
+                                        "productId", 31,
+                                        "quantity", 1
+                                ))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.creditApprovalStatus").value("NONE"))
+                .andExpect(jsonPath("$.accountingRecorded").value(false))
+                .andReturn();
+
+        JsonNode order = objectMapper.readTree(orderResult.getResponse().getContentAsString());
+        return order.get("id").asLong();
+    }
+
+    private long createSalesOrderWaitingCreditApproval() throws Exception {
+        Customer customer = createCreditLimitedCustomer();
+        MvcResult orderResult = mockMvc.perform(post("/api/sales/orders")
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "branchId", 1,
+                                "customerId", customer.getId(),
+                                "employeeId", 102,
+                                "orderDate", LocalDate.now().toString(),
+                                "discountAmount", BigDecimal.ZERO,
+                                "confirm", true,
+                                "issueInvoice", true,
+                                "items", List.of(Map.of(
+                                        "productId", 31,
+                                        "quantity", 1
+                                ))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WAITING_CREDIT_APPROVAL"))
+                .andExpect(jsonPath("$.creditApprovalStatus").value("PENDING"))
+                .andExpect(jsonPath("$.paidAmount").value(0))
+                .andExpect(jsonPath("$.accountingRecorded").value(false))
+                .andExpect(jsonPath("$.stockIssued").value(false))
+                .andExpect(jsonPath("$.taxInvoiceId").doesNotExist())
+                .andReturn();
+
+        JsonNode order = objectMapper.readTree(orderResult.getResponse().getContentAsString());
+        return order.get("id").asLong();
+    }
+
+    private Customer createCreditLimitedCustomer() {
+        Customer customer = new Customer();
+        String suffix = String.valueOf(System.nanoTime());
+        customer.setPhone("098" + suffix.substring(Math.max(0, suffix.length() - 8)));
+        customer.setFullName("Credit Limit Test Customer " + suffix);
+        customer.setBranchId(1L);
+        customer.setTotalDebt(new BigDecimal("900.00"));
+        customer.setCreditLimit(new BigDecimal("1000.00"));
+        return customerRepository.save(customer);
     }
 
     private void assertSerialStatus(long serialId, SerialStatus expected) {
@@ -404,6 +555,32 @@ class SalesProfessionalFlowTest {
                         new SimpleGrantedAuthority("SALES_VIEW"),
                         new SimpleGrantedAuthority("SALES_UPDATE"),
                         new SimpleGrantedAuthority("SALES_DISCOUNT_APPROVE"),
+                        new SimpleGrantedAuthority("PRODUCT_VIEW"),
+                        new SimpleGrantedAuthority("CUSTOMER_VIEW")
+                )
+        );
+    }
+
+    private RequestPostProcessor salesSelfCreditApprover() {
+        return user("sales1").authorities(
+                List.of(
+                        new SimpleGrantedAuthority("ROLE_USER"),
+                        new SimpleGrantedAuthority("SALES_VIEW"),
+                        new SimpleGrantedAuthority("SALES_UPDATE"),
+                        new SimpleGrantedAuthority("SALES_CREDIT_APPROVE"),
+                        new SimpleGrantedAuthority("PRODUCT_VIEW"),
+                        new SimpleGrantedAuthority("CUSTOMER_VIEW")
+                )
+        );
+    }
+
+    private RequestPostProcessor creditApprover() {
+        return user("manager1").authorities(
+                List.of(
+                        new SimpleGrantedAuthority("ROLE_USER"),
+                        new SimpleGrantedAuthority("SALES_VIEW"),
+                        new SimpleGrantedAuthority("SALES_UPDATE"),
+                        new SimpleGrantedAuthority("SALES_CREDIT_APPROVE"),
                         new SimpleGrantedAuthority("PRODUCT_VIEW"),
                         new SimpleGrantedAuthority("CUSTOMER_VIEW")
                 )

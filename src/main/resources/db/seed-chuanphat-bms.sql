@@ -188,7 +188,7 @@ SELECT X,
        CURRENT_TIMESTAMP
 FROM SYSTEM_RANGE(1, 100);
 
-MERGE INTO customers (id, phone, full_name, email, address, source, branch_id, tier, rank, score, status, total_purchase_amount, total_purchase_count, total_debt, lifetime_value, created_at) KEY(id)
+MERGE INTO customers (id, phone, full_name, email, address, source, branch_id, tier, rank, score, status, total_purchase_amount, total_purchase_count, total_debt, credit_limit, lifetime_value, created_at) KEY(id)
 SELECT X,
        '09' || LPAD(CAST(20000000 + X AS VARCHAR), 8, '0'),
        CASE MOD(X, 10) WHEN 1 THEN 'Nguyen Van Minh' WHEN 2 THEN 'Tran Thi Huong' WHEN 3 THEN 'Le Quoc Bao' WHEN 4 THEN 'Pham Ngoc Anh' WHEN 5 THEN 'Hoang Thanh Tung' WHEN 6 THEN 'Vo Thi Mai' WHEN 7 THEN 'Dang Gia Khang' WHEN 8 THEN 'Bui Minh Thu' WHEN 9 THEN 'Do Van Phuc' ELSE 'Phan Thanh Lam' END || ' ' || X,
@@ -200,6 +200,7 @@ SELECT X,
        'NEW',
        0,
        'ACTIVE',
+       0,
        0,
        0,
        0,
@@ -225,7 +226,7 @@ MERGE INTO sales_orders (
     id, order_no, branch_id, customer_id, employee_id, order_date, status,
     subtotal, discount_amount, voucher_code, total_amount, vat_rate, vat_amount,
     paid_amount, payment_status, accounting_recorded, stock_issued, warranty_created,
-    voucher_consumed, max_discount_pct, discount_approval_status, created_at
+    voucher_consumed, max_discount_pct, discount_approval_status, credit_approval_status, created_at
 ) KEY(id)
 SELECT X,
        'SO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
@@ -248,6 +249,7 @@ SELECT X,
        FALSE,
        5.00,
        CASE WHEN MOD(X, 7) = 0 THEN 'APPROVED' ELSE 'NONE' END,
+       'NONE',
        DATEADD('DAY', -MOD(X, 365), TIMESTAMP '2026-06-06 10:00:00')
 FROM SYSTEM_RANGE(1, 200);
 

@@ -9,6 +9,7 @@ import com.chuanphat.warranty.audit.enums.AuditAction;
 import com.chuanphat.warranty.audit.enums.AuditModule;
 import com.chuanphat.warranty.audit.service.AuditLogService;
 import com.chuanphat.warranty.auth.entity.AppUser;
+import com.chuanphat.warranty.accounting.repository.ReceivableRepository;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.dto.ConvertQuotationRequest;
@@ -53,6 +54,7 @@ import com.chuanphat.warranty.core.enums.ProductCategory;
 import com.chuanphat.warranty.core.enums.QuotationStatus;
 import com.chuanphat.warranty.core.enums.ReturnSerialDisposition;
 import com.chuanphat.warranty.core.enums.SalesOrderStatus;
+import com.chuanphat.warranty.core.enums.CreditApprovalStatus;
 import com.chuanphat.warranty.core.enums.DiscountApprovalStatus;
 import com.chuanphat.warranty.core.enums.SalesReturnStatus;
 import com.chuanphat.warranty.core.enums.SerialStatus;
@@ -120,6 +122,7 @@ public class SalesService {
     private final SettingService settingService;
     private final ExportDocumentService exportDocumentService;
     private final NotificationService notificationService;
+    private final ReceivableRepository receivableRepository;
 
     public SalesService(
             SalesOrderRepository salesOrderRepository,
@@ -142,7 +145,8 @@ public class SalesService {
             BranchSecurity branchSecurity,
             SettingService settingService,
             ExportDocumentService exportDocumentService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            ReceivableRepository receivableRepository
     ) {
         this.salesOrderRepository = salesOrderRepository;
         this.quotationRepository = quotationRepository;
@@ -165,6 +169,7 @@ public class SalesService {
         this.settingService = settingService;
         this.exportDocumentService = exportDocumentService;
         this.notificationService = notificationService;
+        this.receivableRepository = receivableRepository;
     }
 
     @Transactional(readOnly = true)
@@ -205,13 +210,14 @@ public class SalesService {
         applyTotals(order, subtotal, discount);
         checkAndMarkDiscountApproval(order, nullToZero(request.discountAmount()));
         validatePayments(order.getTotalAmount(), normalizedPayments(request));
+        boolean shouldConfirm = request.confirm() == null || Boolean.TRUE.equals(request.confirm());
+        checkAndMarkCreditApproval(order, customer, normalizedPayments(request), shouldConfirm);
 
         SalesOrder saved = salesOrderRepository.save(order);
         audit(AuditAction.CREATE_ORDER, AuditModule.SALES, "SalesOrder", saved.getId(), null, saved.getOrderNo());
         notificationService.notifyAllOnce("NEW_ORDER", NotificationSeverity.SUCCESS, "SALES", saved.getId(), "Don hang moi", "Don " + saved.getOrderNo() + " vua duoc tao");
 
-        boolean shouldConfirm = request.confirm() == null || Boolean.TRUE.equals(request.confirm());
-        if (shouldConfirm && saved.getStatus() != SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+        if (shouldConfirm && !isWaitingApproval(saved)) {
             confirmOrder(saved, new SalesOrderStatusRequest(saved.getReservationUntil(), null), false);
             consumeVoucher(saved);
             for (PaymentEntryRequest payment : normalizedPayments(request)) {
@@ -220,7 +226,7 @@ public class SalesService {
         }
 
         boolean shouldIssueInvoice = request.issueInvoice() == null ? shouldConfirm : Boolean.TRUE.equals(request.issueInvoice());
-        if (shouldIssueInvoice && saved.getStatus() != SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+        if (shouldIssueInvoice && !isWaitingApproval(saved)) {
             createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
         }
 
@@ -260,6 +266,9 @@ public class SalesService {
         if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
             throw new BusinessException("Order is waiting for discount approval");
         }
+        if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is waiting for credit approval");
+        }
         issueStockIfNeeded(order);
         order.setStatus(SalesOrderStatus.DELIVERED);
         order.setDeliveredAt(OffsetDateTime.now());
@@ -293,6 +302,54 @@ public class SalesService {
         audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesOrder", order.getId(), "Approved discount: " + note, order.getOrderNo());
         notificationService.notifyAllOnce("DISCOUNT_APPROVED", NotificationSeverity.SUCCESS, "SALES", order.getId(),
                 "Giam gia da duoc duyet", "Don " + order.getOrderNo() + " da duoc " + approver + " duyet giam gia");
+        return SalesOrderResponse.from(order);
+    }
+
+    /** Quan ly duyet ban chiu vuot han muc cong no. */
+    @Transactional
+    public SalesOrderResponse approveCredit(Long id, String note) {
+        if (!hasAuthority("SALES_CREDIT_APPROVE")) {
+            throw new AccessDeniedException("Required SALES_CREDIT_APPROVE permission to approve credit");
+        }
+        SalesOrder order = getOrderEntity(id);
+        branchSecurity.requireBranchAccess(order.getBranchId());
+        if (order.getStatus() != SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is not waiting for credit approval");
+        }
+        AppUser approverUser = branchSecurity.currentUser();
+        if (approverUser.getId().equals(order.getEmployeeId())) {
+            throw new BusinessException("Order creator cannot approve their own credit exception");
+        }
+        order.setCreditApprovalStatus(CreditApprovalStatus.APPROVED);
+        order.setCreditApprovedBy(approverUser.getUsername());
+        order.setCreditApprovedAt(OffsetDateTime.now());
+        order.setCreditApprovalNote(note);
+        order.setStatus(SalesOrderStatus.DRAFT);
+        confirmOrder(order, new SalesOrderStatusRequest(order.getReservationUntil(), null), false);
+        audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesOrder", order.getId(), "Approved credit: " + note, order.getOrderNo());
+        notificationService.notifyAllOnce("CREDIT_APPROVED", NotificationSeverity.SUCCESS, "SALES", order.getId(),
+                "Ban chiu da duoc duyet", "Don " + order.getOrderNo() + " da duoc " + approverUser.getUsername() + " duyet han muc cong no");
+        return SalesOrderResponse.from(order);
+    }
+
+    @Transactional
+    public SalesOrderResponse rejectCredit(Long id, String note) {
+        if (!hasAuthority("SALES_CREDIT_APPROVE")) {
+            throw new AccessDeniedException("Required SALES_CREDIT_APPROVE permission to reject credit");
+        }
+        SalesOrder order = getOrderEntity(id);
+        branchSecurity.requireBranchAccess(order.getBranchId());
+        if (order.getStatus() != SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is not waiting for credit approval");
+        }
+        AppUser reviewer = branchSecurity.currentUser();
+        order.setCreditApprovalStatus(CreditApprovalStatus.REJECTED);
+        order.setCreditApprovedBy(reviewer.getUsername());
+        order.setCreditApprovedAt(OffsetDateTime.now());
+        order.setCreditApprovalNote(note);
+        order.setStatus(SalesOrderStatus.CANCELLED);
+        order.setCancelledAt(OffsetDateTime.now());
+        audit(AuditAction.CANCEL_ORDER, AuditModule.SALES, "SalesOrder", order.getId(), "Rejected credit: " + note, order.getOrderNo());
         return SalesOrderResponse.from(order);
     }
 
@@ -433,21 +490,24 @@ public class SalesService {
         }
         applyTotals(order, quotation.getSubtotal(), quotation.getDiscountAmount());
         validatePayments(order.getTotalAmount(), request.payments() == null ? List.of() : request.payments());
+        Customer customer = customerService.get(order.getCustomerId());
+        checkAndMarkCreditApproval(order, customer, request.payments() == null ? List.of() : request.payments(), true);
 
         SalesOrder saved = salesOrderRepository.save(order);
         quotation.setStatus(QuotationStatus.ACCEPTED);
         audit(AuditAction.CREATE_ORDER, AuditModule.SALES, "SalesOrder", saved.getId(), quotation.getQuotationNo(), saved.getOrderNo());
         notificationService.notifyAllOnce("NEW_ORDER", NotificationSeverity.SUCCESS, "SALES", saved.getId(), "Don hang moi", "Don " + saved.getOrderNo() + " vua duoc tao tu bao gia");
 
-        confirmOrder(saved, new SalesOrderStatusRequest(saved.getReservationUntil(), null), false);
-        consumeVoucher(saved);
-        Customer customer = customerService.get(saved.getCustomerId());
-        if (request.payments() != null) {
+        if (!isWaitingApproval(saved)) {
+            confirmOrder(saved, new SalesOrderStatusRequest(saved.getReservationUntil(), null), false);
+            consumeVoucher(saved);
+        }
+        if (request.payments() != null && !isWaitingApproval(saved)) {
             for (PaymentEntryRequest payment : request.payments()) {
                 addPaymentInternal(saved, customer, payment, false);
             }
         }
-        if (Boolean.TRUE.equals(request.issueInvoice())) {
+        if (Boolean.TRUE.equals(request.issueInvoice()) && !isWaitingApproval(saved)) {
             createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
         }
         return SalesOrderResponse.from(saved);
@@ -756,7 +816,15 @@ public class SalesService {
         if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
             throw new BusinessException("Order is waiting for discount approval");
         }
+        if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is waiting for credit approval");
+        }
         if (order.getStatus() == SalesOrderStatus.DRAFT) {
+            Customer customer = customerService.get(order.getCustomerId());
+            checkAndMarkCreditApproval(order, customer, List.of(), true);
+            if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+                return;
+            }
             order.setConfirmedAt(OffsetDateTime.now());
         }
         if (request != null && request.reservationUntil() != null) {
@@ -783,6 +851,9 @@ public class SalesService {
         }
         if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
             throw new BusinessException("Order is waiting for discount approval");
+        }
+        if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is waiting for credit approval");
         }
         recordOrderAccounting(order);
         BigDecimal amount = request.amount();
@@ -832,6 +903,9 @@ public class SalesService {
     private Invoice createInvoiceEntity(SalesOrder order, CreateInvoiceRequest request) {
         if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
             throw new BusinessException("Order is waiting for discount approval");
+        }
+        if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is waiting for credit approval");
         }
         Invoice existing = invoiceRepository.findByOrder_Id(order.getId()).orElse(null);
         if (existing != null) {
@@ -1232,6 +1306,38 @@ public class SalesService {
         }
         int value = minutes == null || minutes <= 0 ? DEFAULT_RESERVATION_MINUTES : minutes;
         return OffsetDateTime.now().plusMinutes(value);
+    }
+
+    private boolean isWaitingApproval(SalesOrder order) {
+        return order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL
+                || order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL;
+    }
+
+    private void checkAndMarkCreditApproval(SalesOrder order, Customer customer, List<PaymentEntryRequest> payments, boolean shouldConfirm) {
+        if (!shouldConfirm || order.getStatus() != SalesOrderStatus.DRAFT) {
+            return;
+        }
+        if (order.getCreditApprovalStatus() == CreditApprovalStatus.APPROVED || hasAuthority("SALES_CREDIT_APPROVE")) {
+            return;
+        }
+        BigDecimal creditLimit = nullToZero(customer.getCreditLimit());
+        if (creditLimit.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal expectedPaid = payments == null ? BigDecimal.ZERO : payments.stream()
+                .map(PaymentEntryRequest::amount)
+                .map(this::nullToZero)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal newDebt = order.getTotalAmount().subtract(expectedPaid);
+        if (newDebt.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal currentDebt = nullToZero(customer.getTotalDebt()).max(nullToZero(receivableRepository.balanceByCustomerId(customer.getId())));
+        BigDecimal projectedDebt = currentDebt.add(newDebt);
+        if (projectedDebt.compareTo(creditLimit) > 0) {
+            order.setCreditApprovalStatus(CreditApprovalStatus.PENDING);
+            order.setStatus(SalesOrderStatus.WAITING_CREDIT_APPROVAL);
+        }
     }
 
     /**

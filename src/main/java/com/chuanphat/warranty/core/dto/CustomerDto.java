@@ -5,6 +5,7 @@ import com.chuanphat.warranty.core.enums.RecordStatus;
 import com.chuanphat.warranty.crm.enums.CustomerTier;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 
 public record CustomerDto(
         Long id,
@@ -16,6 +17,7 @@ public record CustomerDto(
         @NotNull Long branchId,
         Long assignedTo,
         String birthday,
+        BigDecimal creditLimit,
         CustomerTier tier,
         RecordStatus status
 ) {
@@ -30,6 +32,7 @@ public record CustomerDto(
                 customer.getBranchId(),
                 customer.getAssignedTo(),
                 customer.getBirthday(),
+                customer.getCreditLimit(),
                 customer.getTier(),
                 customer.getStatus()
         );

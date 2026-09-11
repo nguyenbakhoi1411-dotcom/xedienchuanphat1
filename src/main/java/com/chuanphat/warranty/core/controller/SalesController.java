@@ -250,5 +250,22 @@ public class SalesController {
         return service.rejectDiscount(id, request == null ? null : request.note());
     }
 
+    @PatchMapping("/orders/{id}/approve-credit")
+    @PreAuthorize("hasAuthority('SALES_CREDIT_APPROVE')")
+    @Audited(action = AuditAction.UPDATE_ORDER, module = AuditModule.SALES, entityType = "SalesOrder", entityIdParam = "id")
+    public SalesOrderResponse approveCredit(@PathVariable Long id,
+            @RequestBody(required = false) CreditApprovalRequest request) {
+        return service.approveCredit(id, request == null ? null : request.note());
+    }
+
+    @PatchMapping("/orders/{id}/reject-credit")
+    @PreAuthorize("hasAuthority('SALES_CREDIT_APPROVE')")
+    @Audited(action = AuditAction.UPDATE_ORDER, module = AuditModule.SALES, entityType = "SalesOrder", entityIdParam = "id")
+    public SalesOrderResponse rejectCredit(@PathVariable Long id,
+            @RequestBody(required = false) CreditApprovalRequest request) {
+        return service.rejectCredit(id, request == null ? null : request.note());
+    }
+
     record DiscountApprovalRequest(String note) {}
+    record CreditApprovalRequest(String note) {}
 }

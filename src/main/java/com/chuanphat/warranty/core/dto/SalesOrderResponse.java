@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.dto;
 
 import com.chuanphat.warranty.core.entity.SalesOrder;
+import com.chuanphat.warranty.core.enums.CreditApprovalStatus;
 import com.chuanphat.warranty.core.enums.DiscountApprovalStatus;
 import com.chuanphat.warranty.core.enums.PaymentStatus;
 import com.chuanphat.warranty.core.enums.SalesOrderStatus;
@@ -37,6 +38,10 @@ public record SalesOrderResponse(
         String approvedBy,
         OffsetDateTime approvedAt,
         String approvalNote,
+        CreditApprovalStatus creditApprovalStatus,
+        String creditApprovedBy,
+        OffsetDateTime creditApprovedAt,
+        String creditApprovalNote,
         // Flags
         boolean accountingRecorded,
         boolean stockIssued,
@@ -70,6 +75,10 @@ public record SalesOrderResponse(
                 order.getApprovedBy(),
                 order.getApprovedAt(),
                 order.getApprovalNote(),
+                order.getCreditApprovalStatus(),
+                order.getCreditApprovedBy(),
+                order.getCreditApprovedAt(),
+                order.getCreditApprovalNote(),
                 order.isAccountingRecorded(),
                 order.isStockIssued(),
                 order.isWarrantyCreated(),
