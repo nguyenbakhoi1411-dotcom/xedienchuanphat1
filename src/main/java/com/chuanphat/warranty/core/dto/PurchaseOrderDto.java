@@ -14,6 +14,7 @@ public record PurchaseOrderDto(
         Long supplierId,
         String supplierName,
         Long branchId,
+        Long warehouseId,
         PurchaseOrderStatus status,
         String statusLabel,
         LocalDate purchaseDate,
@@ -38,7 +39,8 @@ public record PurchaseOrderDto(
             String productCode,
             int quantity,
             BigDecimal unitCost,
-            BigDecimal lineTotal
+            BigDecimal lineTotal,
+            int receivedQuantity
     ) {
         public static PurchaseOrderItemDto from(PurchaseOrderItem item) {
             return new PurchaseOrderItemDto(
@@ -48,7 +50,8 @@ public record PurchaseOrderDto(
                     item.getProduct().getProductCode(),
                     item.getQuantity(),
                     item.getUnitCost(),
-                    item.getLineTotal()
+                    item.getLineTotal(),
+                    item.getReceivedQuantity()
             );
         }
     }
@@ -57,7 +60,7 @@ public record PurchaseOrderDto(
         return new PurchaseOrderDto(
                 po.getId(), po.getPurchaseOrderNo(),
                 po.getSupplier().getId(), po.getSupplier().getName(),
-                po.getBranchId(), po.getStatus(), statusLabel(po.getStatus()),
+                po.getBranchId(), po.getWarehouseId(), po.getStatus(), statusLabel(po.getStatus()),
                 po.getPurchaseDate(), po.getExpectedDelivery(),
                 po.getTotalAmount(), po.getPaidAmount(),
                 po.getNote(), po.getCreatedBy(), po.getCreatedAt(),

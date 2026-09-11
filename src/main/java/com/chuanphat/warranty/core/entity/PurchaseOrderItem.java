@@ -35,6 +35,9 @@ public class PurchaseOrderItem {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal lineTotal;
 
+    @Column(nullable = false)
+    private int receivedQuantity = 0;
+
     public Long getId() { return id; }
     public PurchaseOrder getPurchaseOrder() { return purchaseOrder; }
     public void setPurchaseOrder(PurchaseOrder purchaseOrder) { this.purchaseOrder = purchaseOrder; }
@@ -44,6 +47,11 @@ public class PurchaseOrderItem {
     public void setQuantity(int quantity) { this.quantity = quantity; }
     public BigDecimal getUnitCost() { return unitCost; }
     public void setUnitCost(BigDecimal unitCost) { this.unitCost = unitCost; }
+    // Backward-compatible alias for the purchase PR1 spec name; canonical column remains unit_cost.
+    public BigDecimal getUnitPrice() { return unitCost; }
+    public void setUnitPrice(BigDecimal unitPrice) { this.unitCost = unitPrice; }
     public BigDecimal getLineTotal() { return lineTotal; }
     public void setLineTotal(BigDecimal lineTotal) { this.lineTotal = lineTotal; }
+    public int getReceivedQuantity() { return receivedQuantity; }
+    public void setReceivedQuantity(int receivedQuantity) { this.receivedQuantity = receivedQuantity; }
 }
