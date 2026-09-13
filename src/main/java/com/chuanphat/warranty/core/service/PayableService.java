@@ -10,6 +10,7 @@ import com.chuanphat.warranty.core.entity.Supplier;
 import com.chuanphat.warranty.core.enums.PayableStatus;
 import com.chuanphat.warranty.core.repository.PayablePaymentRepository;
 import com.chuanphat.warranty.core.repository.PayableRepository;
+import com.chuanphat.warranty.core.repository.PurchaseReceiptRepository;
 import com.chuanphat.warranty.core.repository.SupplierRepository;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
@@ -40,19 +41,25 @@ public class PayableService {
     private final PayableRepository payableRepo;
     private final PayablePaymentRepository paymentRepo;
     private final SupplierRepository supplierRepo;
+    private final PurchaseReceiptRepository receiptRepository;
     private final SupplierService supplierService;
     private final BranchSecurity branchSecurity;
+    private final ThreeWayMatchService threeWayMatchService;
 
     public PayableService(PayableRepository payableRepo,
                           PayablePaymentRepository paymentRepo,
                           SupplierRepository supplierRepo,
+                          PurchaseReceiptRepository receiptRepository,
                           SupplierService supplierService,
-                          BranchSecurity branchSecurity) {
+                          BranchSecurity branchSecurity,
+                          ThreeWayMatchService threeWayMatchService) {
         this.payableRepo    = payableRepo;
         this.paymentRepo    = paymentRepo;
         this.supplierRepo   = supplierRepo;
+        this.receiptRepository = receiptRepository;
         this.supplierService = supplierService;
         this.branchSecurity = branchSecurity;
+        this.threeWayMatchService = threeWayMatchService;
     }
 
     // ── QUERY ──────────────────────────────────────────────────────
@@ -161,6 +168,7 @@ public class PayableService {
         if (req.amount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("Số tiền thanh toán phải > 0");
         }
+        requireMatchedSupplierInvoiceIfPurchaseReceiptPayable(payable);
 
         BigDecimal applied = payable.applyPayment(req.amount());
 
@@ -255,6 +263,15 @@ public class PayableService {
     private Payable findById(Long id) {
         return payableRepo.findById(id)
                 .orElseThrow(() -> new BusinessException("Không tìm thấy công nợ: " + id));
+    }
+
+    private void requireMatchedSupplierInvoiceIfPurchaseReceiptPayable(Payable payable) {
+        if (!"PURCHASE_RECEIPT".equals(payable.getSourceType()) || payable.getSourceId() == null) {
+            return;
+        }
+        var receipt = receiptRepository.findById(payable.getSourceId())
+                .orElseThrow(() -> new BusinessException("Không tìm thấy phiếu nhập gốc của công nợ: " + payable.getSourceId()));
+        threeWayMatchService.requireInvoicePayable(receipt.getPurchaseOrderId());
     }
 
     private String generatePayableCode() {
