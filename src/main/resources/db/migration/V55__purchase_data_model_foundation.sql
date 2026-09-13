@@ -1,0 +1,11 @@
+ALTER TABLE suppliers
+    ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS category VARCHAR(30) NOT NULL DEFAULT 'OTHER',
+    ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(80),
+    ADD COLUMN IF NOT EXISTS bank_name VARCHAR(120);
+
+ALTER TABLE purchase_orders
+    ADD COLUMN IF NOT EXISTS warehouse_id BIGINT REFERENCES warehouses(id);
+
+ALTER TABLE purchase_order_items
+    ADD COLUMN IF NOT EXISTS received_quantity INT NOT NULL DEFAULT 0;

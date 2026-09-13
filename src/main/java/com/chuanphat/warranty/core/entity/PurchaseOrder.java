@@ -32,6 +32,10 @@ public class PurchaseOrder {
     @Column(nullable = false)
     private Long branchId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id")
+    private Warehouse warehouse;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private PurchaseOrderStatus status = PurchaseOrderStatus.DRAFT;
@@ -106,16 +110,27 @@ public class PurchaseOrder {
     public Long getId() { return id; }
     public String getPurchaseOrderNo() { return purchaseOrderNo; }
     public void setPurchaseOrderNo(String purchaseOrderNo) { this.purchaseOrderNo = purchaseOrderNo; }
+    // Backward-compatible aliases for the purchase PR1 spec names; canonical columns keep existing names.
+    public String getPoCode() { return purchaseOrderNo; }
+    public void setPoCode(String poCode) { this.purchaseOrderNo = poCode; }
     public Supplier getSupplier() { return supplier; }
     public void setSupplier(Supplier supplier) { this.supplier = supplier; }
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+    public Warehouse getWarehouse() { return warehouse; }
+    public void setWarehouse(Warehouse warehouse) { this.warehouse = warehouse; }
+    public Long getWarehouseId() { return warehouse != null ? warehouse.getId() : null; }
     public PurchaseOrderStatus getStatus() { return status; }
     public void setStatus(PurchaseOrderStatus status) { this.status = status; }
     public LocalDate getPurchaseDate() { return purchaseDate; }
     public void setPurchaseDate(LocalDate purchaseDate) { this.purchaseDate = purchaseDate; }
+    // Backward-compatible aliases for the purchase PR1 spec names; canonical columns keep existing names.
+    public LocalDate getOrderDate() { return purchaseDate; }
+    public void setOrderDate(LocalDate orderDate) { this.purchaseDate = orderDate; }
     public LocalDate getExpectedDelivery() { return expectedDelivery; }
     public void setExpectedDelivery(LocalDate expectedDelivery) { this.expectedDelivery = expectedDelivery; }
+    public LocalDate getExpectedDeliveryDate() { return expectedDelivery; }
+    public void setExpectedDeliveryDate(LocalDate expectedDeliveryDate) { this.expectedDelivery = expectedDeliveryDate; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public BigDecimal getPaidAmount() { return paidAmount; }

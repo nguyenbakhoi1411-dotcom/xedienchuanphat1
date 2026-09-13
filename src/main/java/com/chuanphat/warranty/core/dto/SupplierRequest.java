@@ -1,7 +1,7 @@
 package com.chuanphat.warranty.core.dto;
 
+import com.chuanphat.warranty.core.enums.SupplierCategory;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record SupplierRequest(
@@ -14,6 +14,10 @@ public record SupplierRequest(
         String website,
         String address,
         String contactPerson,
+        String contactPhone,
+        SupplierCategory category,
+        String bankAccountNumber,
+        String bankName,
         BigDecimal creditLimit,
         int paymentTermsDays,
         Short rating,
