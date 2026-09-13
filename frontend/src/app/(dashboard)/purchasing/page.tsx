@@ -261,7 +261,7 @@ function PurchaseOrdersTab() {
                     <Td className="text-slate-500">{fmtD(po.purchaseDate)}</Td>
                     <Td className="text-slate-500">
                       {po.expectedDelivery ? (
-                        <span className={new Date(po.expectedDelivery) < new Date() && po.status !== "RECEIVED" ? "text-red-600 font-medium" : ""}>
+                        <span className={new Date(po.expectedDelivery) < new Date() && !["RECEIVED", "FULLY_RECEIVED"].includes(po.status) ? "text-red-600 font-medium" : ""}>
                           {fmtD(po.expectedDelivery)}
                         </span>
                       ) : "—"}

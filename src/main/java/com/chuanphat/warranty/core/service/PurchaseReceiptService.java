@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.service;
 
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.core.config.PurchaseReceiptProperties;
 import com.chuanphat.warranty.core.dto.PurchaseReceiptDto;
 import com.chuanphat.warranty.core.dto.PurchaseReceiptItemRequest;
 import com.chuanphat.warranty.core.dto.PurchaseReceiptRequest;
@@ -10,11 +11,12 @@ import com.chuanphat.warranty.core.enums.ProductCategory;
 import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.enums.ReceiptStatus;
 import com.chuanphat.warranty.core.enums.SerialStatus;
-import com.chuanphat.warranty.core.enums.InventoryTransactionType;
+import com.chuanphat.warranty.core.enums.SupplierCategory;
 import com.chuanphat.warranty.core.repository.*;
 import com.chuanphat.warranty.exception.BusinessException;
 import com.chuanphat.warranty.exception.ConflictException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
@@ -48,8 +50,8 @@ public class PurchaseReceiptService {
     private final ProductSerialRepository serialRepo;
     private final InventoryService inventoryService;
     private final PayableService payableService;
-    private final PurchaseOrderService purchaseOrderService;
     private final BranchSecurity branchSecurity;
+    private final PurchaseReceiptProperties receiptProperties;
 
     public PurchaseReceiptService(
             PurchaseReceiptRepository receiptRepo,
@@ -60,8 +62,8 @@ public class PurchaseReceiptService {
             ProductSerialRepository serialRepo,
             InventoryService inventoryService,
             PayableService payableService,
-            PurchaseOrderService purchaseOrderService,
-            BranchSecurity branchSecurity
+            BranchSecurity branchSecurity,
+            PurchaseReceiptProperties receiptProperties
     ) {
         this.receiptRepo = receiptRepo;
         this.productRepo = productRepo;
@@ -71,8 +73,8 @@ public class PurchaseReceiptService {
         this.serialRepo = serialRepo;
         this.inventoryService = inventoryService;
         this.payableService = payableService;
-        this.purchaseOrderService = purchaseOrderService;
         this.branchSecurity = branchSecurity;
+        this.receiptProperties = receiptProperties;
     }
 
     // ──────────────────────────────────────────────
@@ -103,9 +105,8 @@ public class PurchaseReceiptService {
     public PurchaseReceiptDto create(PurchaseReceiptRequest req) {
         branchSecurity.requireBranchAccess(req.branchId());
         PurchaseOrder purchaseOrder = requireReceivablePurchaseOrder(req.purchaseOrderId(), req.supplierId(), req.branchId());
-        Map<Long, Integer> orderedQuantities = orderedQuantitiesByProduct(purchaseOrder);
         Map<Long, Integer> requestedQuantities = requestedQuantitiesByProduct(req.items());
-        validateRequestedQuantities(purchaseOrder.getId(), orderedQuantities, requestedQuantities);
+        validateRequestedQuantities(purchaseOrder, requestedQuantities);
 
         Supplier supplier = supplierRepo.findById(req.supplierId())
                 .orElseThrow(() -> new BusinessException("Khong tim thay nha cung cap: " + req.supplierId()));
@@ -161,6 +162,10 @@ public class PurchaseReceiptService {
             throw new BusinessException("Chi co the xac nhan phieu o trang thai DRAFT");
         }
 
+        if (receipt.getPurchaseOrderId() != null) {
+            recordPurchaseOrderReceivedQuantities(receipt);
+        }
+
         // Lay warehouse hieu qua
         Warehouse effectiveWarehouse = resolveEffectiveWarehouse(receipt);
 
@@ -191,15 +196,6 @@ public class PurchaseReceiptService {
                 saved.getTotalAmount(),
                 paymentTermsDays
         );
-
-        // Cap nhat PO neu co. Du lieu cu co the co phieu nhap khong gan PO.
-        if (receipt.getPurchaseOrderId() != null) {
-            if (isPurchaseOrderFullyReceived(receipt.getPurchaseOrderId())) {
-                purchaseOrderService.markFullyReceived(receipt.getPurchaseOrderId());
-            } else {
-                purchaseOrderService.markPartiallyReceived(receipt.getPurchaseOrderId());
-            }
-        }
 
         return PurchaseReceiptDto.from(saved);
     }
@@ -296,14 +292,6 @@ public class PurchaseReceiptService {
         return purchaseOrder;
     }
 
-    private Map<Long, Integer> orderedQuantitiesByProduct(PurchaseOrder purchaseOrder) {
-        Map<Long, Integer> quantities = new HashMap<>();
-        for (PurchaseOrderItem item : purchaseOrder.getItems()) {
-            quantities.merge(item.getProduct().getId(), item.getQuantity(), Integer::sum);
-        }
-        return quantities;
-    }
-
     private Map<Long, Integer> requestedQuantitiesByProduct(List<PurchaseReceiptItemRequest> items) {
         Map<Long, Integer> quantities = new HashMap<>();
         for (PurchaseReceiptItemRequest item : items) {
@@ -312,33 +300,74 @@ public class PurchaseReceiptService {
         return quantities;
     }
 
-    private void validateRequestedQuantities(Long purchaseOrderId,
-                                             Map<Long, Integer> orderedQuantities,
-                                             Map<Long, Integer> requestedQuantities) {
+    private void validateRequestedQuantities(PurchaseOrder purchaseOrder, Map<Long, Integer> requestedQuantities) {
+        Map<Long, PurchaseOrderItem> orderItems = orderItemsByProduct(purchaseOrder);
         for (var entry : requestedQuantities.entrySet()) {
             Long productId = entry.getKey();
-            int orderedQuantity = orderedQuantities.getOrDefault(productId, 0);
-            if (orderedQuantity == 0) {
+            PurchaseOrderItem orderItem = orderItems.get(productId);
+            if (orderItem == null) {
                 throw new BusinessException("San pham khong nam trong don mua hang: " + productId);
             }
-            long alreadyPlannedOrReceived = receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(
-                    purchaseOrderId, productId, List.of(ReceiptStatus.DRAFT, ReceiptStatus.CONFIRMED));
-            if (alreadyPlannedOrReceived + entry.getValue() > orderedQuantity) {
+            if (!isQuantityWithinAllowedTolerance(purchaseOrder, orderItem, entry.getValue())) {
                 throw new BusinessException("So luong nhap vuot qua so luong con lai cua don mua hang");
             }
         }
     }
 
-    private boolean isPurchaseOrderFullyReceived(Long purchaseOrderId) {
-        PurchaseOrder purchaseOrder = purchaseOrderService.findById(purchaseOrderId);
+    private Map<Long, PurchaseOrderItem> orderItemsByProduct(PurchaseOrder purchaseOrder) {
+        Map<Long, PurchaseOrderItem> itemsByProduct = new HashMap<>();
         for (PurchaseOrderItem item : purchaseOrder.getItems()) {
-            long receivedQuantity = receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(
-                    purchaseOrderId, item.getProduct().getId(), List.of(ReceiptStatus.CONFIRMED));
-            if (receivedQuantity < item.getQuantity()) {
-                return false;
+            itemsByProduct.put(item.getProduct().getId(), item);
+        }
+        return itemsByProduct;
+    }
+
+    private boolean isQuantityWithinAllowedTolerance(PurchaseOrder purchaseOrder, PurchaseOrderItem orderItem, int newQuantity) {
+        int targetQuantity = orderItem.getReceivedQuantity() + newQuantity;
+        BigDecimal allowedQuantity = allowedQuantity(purchaseOrder, orderItem);
+        return BigDecimal.valueOf(targetQuantity).compareTo(allowedQuantity) <= 0;
+    }
+
+    private BigDecimal allowedQuantity(PurchaseOrder purchaseOrder, PurchaseOrderItem orderItem) {
+        BigDecimal orderedQuantity = BigDecimal.valueOf(orderItem.getQuantity());
+        if (orderItem.getProduct().getCategory() == ProductCategory.ELECTRIC_MOTORBIKE) {
+            return orderedQuantity;
+        }
+        if (purchaseOrder.getSupplier().getCategory() != SupplierCategory.FOOD_SUPPLIER) {
+            return orderedQuantity;
+        }
+        BigDecimal toleranceMultiplier = BigDecimal.ONE.add(
+                receiptProperties.getFoodOverReceiptTolerancePercent()
+                        .max(BigDecimal.ZERO)
+                        .divide(new BigDecimal("100"), 6, RoundingMode.HALF_UP));
+        return orderedQuantity.multiply(toleranceMultiplier);
+    }
+
+    private void recordPurchaseOrderReceivedQuantities(PurchaseReceipt receipt) {
+        PurchaseOrder purchaseOrder = poRepo.findById(receipt.getPurchaseOrderId())
+                .orElseThrow(() -> new BusinessException("Khong tim thay don mua hang: " + receipt.getPurchaseOrderId()));
+        Map<Long, Integer> receiptQuantities = new HashMap<>();
+        for (PurchaseReceiptItem item : receipt.getItems()) {
+            receiptQuantities.merge(item.getProduct().getId(), item.getQuantity(), Integer::sum);
+        }
+        validateRequestedQuantities(purchaseOrder, receiptQuantities);
+
+        Map<Long, PurchaseOrderItem> orderItems = orderItemsByProduct(purchaseOrder);
+        for (var entry : receiptQuantities.entrySet()) {
+            PurchaseOrderItem orderItem = orderItems.get(entry.getKey());
+            orderItem.setReceivedQuantity(orderItem.getReceivedQuantity() + entry.getValue());
+        }
+
+        boolean fullyReceived = true;
+        for (PurchaseOrderItem item : purchaseOrder.getItems()) {
+            if (item.getReceivedQuantity() < item.getQuantity()) {
+                fullyReceived = false;
+                break;
             }
         }
-        return true;
+        purchaseOrder.setStatus(fullyReceived ? PurchaseOrderStatus.FULLY_RECEIVED : PurchaseOrderStatus.PARTIALLY_RECEIVED);
+        purchaseOrder.setStockReceived(fullyReceived);
+        poRepo.save(purchaseOrder);
     }
 
     private String generateReceiptNo() {

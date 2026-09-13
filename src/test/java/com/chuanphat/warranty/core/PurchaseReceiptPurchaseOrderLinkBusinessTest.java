@@ -1,17 +1,18 @@
 package com.chuanphat.warranty.core;
 
 import static com.chuanphat.warranty.BusinessCriticalTestSupport.withId;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.core.config.PurchaseReceiptProperties;
 import com.chuanphat.warranty.core.dto.PurchaseReceiptItemRequest;
 import com.chuanphat.warranty.core.dto.PurchaseReceiptRequest;
 import com.chuanphat.warranty.core.entity.Product;
@@ -24,6 +25,7 @@ import com.chuanphat.warranty.core.entity.Warehouse;
 import com.chuanphat.warranty.core.enums.ProductCategory;
 import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.enums.ReceiptStatus;
+import com.chuanphat.warranty.core.enums.SupplierCategory;
 import com.chuanphat.warranty.core.repository.ProductRepository;
 import com.chuanphat.warranty.core.repository.ProductSerialRepository;
 import com.chuanphat.warranty.core.repository.PurchaseOrderRepository;
@@ -32,7 +34,6 @@ import com.chuanphat.warranty.core.repository.SupplierRepository;
 import com.chuanphat.warranty.core.repository.WarehouseRepository;
 import com.chuanphat.warranty.core.service.InventoryService;
 import com.chuanphat.warranty.core.service.PayableService;
-import com.chuanphat.warranty.core.service.PurchaseOrderService;
 import com.chuanphat.warranty.core.service.PurchaseReceiptService;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class PurchaseReceiptPurchaseOrderLinkBusinessTest {
@@ -56,13 +58,14 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
     @Mock ProductSerialRepository serialRepo;
     @Mock InventoryService inventoryService;
     @Mock PayableService payableService;
-    @Mock PurchaseOrderService purchaseOrderService;
     @Mock BranchSecurity branchSecurity;
 
+    PurchaseReceiptProperties properties;
     PurchaseReceiptService service;
 
     @BeforeEach
     void setUp() {
+        properties = new PurchaseReceiptProperties();
         service = new PurchaseReceiptService(
                 receiptRepo,
                 productRepo,
@@ -72,53 +75,15 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
                 serialRepo,
                 inventoryService,
                 payableService,
-                purchaseOrderService,
-                branchSecurity);
+                branchSecurity,
+                properties);
         lenient().when(receiptRepo.findMaxReceiptSeq()).thenReturn(0);
         lenient().when(receiptRepo.save(any(PurchaseReceipt.class))).thenAnswer(invocation -> withId(invocation.getArgument(0), 300L));
-        lenient().when(receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(anyLong(), anyLong(), any()))
-                .thenReturn(0L);
+        lenient().when(purchaseOrderRepository.save(any(PurchaseOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
-    void purchaseReceiptCanBeCreatedForApprovedPurchaseOrderWithinRemainingQuantity() {
-        Product product = product(100L);
-        Supplier supplier = supplier(10L);
-        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, supplier, 1L, orderItem(product, 3));
-        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
-        when(supplierRepo.findById(10L)).thenReturn(Optional.of(supplier));
-        when(productRepo.findById(100L)).thenReturn(Optional.of(product));
-        when(receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(eq(200L), eq(100L), any()))
-                .thenReturn(1L);
-
-        var receipt = service.create(request(200L, 10L, 1L, item(100L, 2)));
-
-        assertThat(receipt.purchaseOrderId()).isEqualTo(200L);
-        assertThat(receipt.status()).isEqualTo(ReceiptStatus.DRAFT);
-        assertThat(receipt.items()).hasSize(1);
-        verify(receiptRepo).save(any(PurchaseReceipt.class));
-    }
-
-    @Test
-    void purchaseReceiptCanBeCreatedForPartiallyReceivedPurchaseOrderWithinRemainingQuantity() {
-        Product product = product(100L);
-        Supplier supplier = supplier(10L);
-        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.PARTIALLY_RECEIVED, supplier, 1L, orderItem(product, 3));
-        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
-        when(supplierRepo.findById(10L)).thenReturn(Optional.of(supplier));
-        when(productRepo.findById(100L)).thenReturn(Optional.of(product));
-        when(receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(eq(200L), eq(100L), any()))
-                .thenReturn(2L);
-
-        var receipt = service.create(request(200L, 10L, 1L, item(100L, 1)));
-
-        assertThat(receipt.purchaseOrderId()).isEqualTo(200L);
-        assertThat(receipt.totalAmount()).isEqualByComparingTo("1000000");
-        verify(receiptRepo).save(any(PurchaseReceipt.class));
-    }
-
-    @Test
-    void purchaseReceiptRequiresPurchaseOrderReference() {
+    void cannotCreateGoodsReceiptWithoutApprovedPurchaseOrderWhenTypeIsFromPurchase() {
         PurchaseReceiptRequest request = request(null, 10L, 1L, item(100L, 1));
 
         assertThatThrownBy(() -> service.create(request))
@@ -129,8 +94,9 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
     }
 
     @Test
-    void purchaseReceiptCannotBeCreatedForUnapprovedPurchaseOrder() {
-        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.SUBMITTED, 10L, 1L, orderItem(100L, 2));
+    void cannotLinkGoodsReceiptToPurchaseOrderThatIsNotApproved() {
+        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.SUBMITTED, supplier(10L, SupplierCategory.OTHER), 1L,
+                orderItem(product(100L, ProductCategory.SPARE_PART), 2, 0));
         when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.create(request(200L, 10L, 1L, item(100L, 1))))
@@ -141,39 +107,11 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
     }
 
     @Test
-    void purchaseReceiptSupplierAndBranchMustMatchPurchaseOrder() {
-        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, 10L, 1L, orderItem(100L, 2));
+    void cannotReceiveQuantityExceedingRemainingPoQuantity() {
+        Product product = product(100L, ProductCategory.SPARE_PART);
+        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, supplier(10L, SupplierCategory.OTHER), 1L,
+                orderItem(product, 3, 2));
         when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
-
-        assertThatThrownBy(() -> service.create(request(200L, 11L, 1L, item(100L, 1))))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Nha cung cap phieu nhap khong khop");
-
-        assertThatThrownBy(() -> service.create(request(200L, 10L, 2L, item(100L, 1))))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Chi nhanh phieu nhap khong khop");
-
-        verify(receiptRepo, never()).save(any());
-    }
-
-    @Test
-    void purchaseReceiptCannotReceiveProductNotInPurchaseOrder() {
-        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, 10L, 1L, orderItem(100L, 2));
-        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
-
-        assertThatThrownBy(() -> service.create(request(200L, 10L, 1L, item(101L, 1))))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("khong nam trong don mua hang");
-
-        verify(receiptRepo, never()).save(any());
-    }
-
-    @Test
-    void purchaseReceiptCannotReceiveMoreThanRemainingPurchaseOrderQuantity() {
-        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, 10L, 1L, orderItem(100L, 3));
-        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
-        when(receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(eq(200L), eq(100L), any()))
-                .thenReturn(2L);
 
         assertThatThrownBy(() -> service.create(request(200L, 10L, 1L, item(100L, 2))))
                 .isInstanceOf(BusinessException.class)
@@ -183,42 +121,118 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
     }
 
     @Test
-    void confirmedReceiptMarksPurchaseOrderPartiallyReceivedWhenQuantityRemains() {
-        Product product = product(100L);
-        Supplier supplier = supplier(10L);
+    void receivingPartialQuantityKeepsOrderInPartiallyReceivedStatus() {
+        Product product = product(100L, ProductCategory.SPARE_PART);
+        Supplier supplier = supplier(10L, SupplierCategory.OTHER);
         Warehouse warehouse = warehouse(20L);
         PurchaseReceipt receipt = receipt(300L, 200L, supplier, warehouse, receiptItem(product, 2));
-        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, 10L, 1L, orderItem(product, 5));
+        PurchaseOrderItem orderItem = orderItem(product, 5, 0);
+        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, supplier, 1L, orderItem);
         when(receiptRepo.findById(300L)).thenReturn(Optional.of(receipt));
-        when(purchaseOrderService.findById(200L)).thenReturn(order);
-        when(receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(eq(200L), eq(100L), any()))
-                .thenReturn(2L);
+        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
 
         service.confirm(300L);
 
+        assertThat(orderItem.getReceivedQuantity()).isEqualTo(2);
+        assertThat(order.getStatus()).isEqualTo(PurchaseOrderStatus.PARTIALLY_RECEIVED);
+        assertThat(order.isStockReceived()).isFalse();
         verify(inventoryService).increase(eq(1L), eq(warehouse), eq(product), eq(2), eq(new BigDecimal("1000000")));
-        verify(payableService).createFromReceipt(eq(10L), eq(1L), eq(300L), eq("GNK00001"), eq(new BigDecimal("2000000")), eq(30));
-        verify(purchaseOrderService).markPartiallyReceived(200L);
-        verify(purchaseOrderService, never()).markFullyReceived(200L);
     }
 
     @Test
-    void confirmedReceiptMarksPurchaseOrderFullyReceivedWhenAllQuantitiesReceived() {
-        Product product = product(100L);
-        Supplier supplier = supplier(10L);
+    void receivingFullQuantityMovesOrderToFullyReceivedStatus() {
+        Product product = product(100L, ProductCategory.SPARE_PART);
+        Supplier supplier = supplier(10L, SupplierCategory.OTHER);
         Warehouse warehouse = warehouse(20L);
         PurchaseReceipt receipt = receipt(300L, 200L, supplier, warehouse, receiptItem(product, 2));
-        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, 10L, 1L, orderItem(product, 2));
+        PurchaseOrderItem orderItem = orderItem(product, 2, 0);
+        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, supplier, 1L, orderItem);
         when(receiptRepo.findById(300L)).thenReturn(Optional.of(receipt));
-        when(purchaseOrderService.findById(200L)).thenReturn(order);
-        when(receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(eq(200L), eq(100L), any()))
-                .thenReturn(2L);
+        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
 
         service.confirm(300L);
 
+        assertThat(orderItem.getReceivedQuantity()).isEqualTo(2);
+        assertThat(order.getStatus()).isEqualTo(PurchaseOrderStatus.FULLY_RECEIVED);
+        assertThat(order.isStockReceived()).isTrue();
         verify(inventoryService).increase(eq(1L), eq(warehouse), eq(product), eq(2), eq(new BigDecimal("1000000")));
-        verify(purchaseOrderService).markFullyReceived(200L);
-        verify(purchaseOrderService, never()).markPartiallyReceived(200L);
+    }
+
+    @Test
+    void toleranceConfigAllowsSmallOverReceiptForFoodCategoryWithinConfiguredPercent() {
+        properties.setFoodOverReceiptTolerancePercent(new BigDecimal("2"));
+        Product product = product(100L, ProductCategory.SPARE_PART);
+        Supplier supplier = supplier(10L, SupplierCategory.FOOD_SUPPLIER);
+        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, supplier, 1L,
+                orderItem(product, 100, 100));
+        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
+        when(supplierRepo.findById(10L)).thenReturn(Optional.of(supplier));
+        when(productRepo.findById(100L)).thenReturn(Optional.of(product));
+
+        var receipt = service.create(request(200L, 10L, 1L, item(100L, 2)));
+
+        assertThat(receipt.purchaseOrderId()).isEqualTo(200L);
+        assertThat(receipt.totalAmount()).isEqualByComparingTo("2000000");
+        verify(receiptRepo).save(any(PurchaseReceipt.class));
+    }
+
+    @Test
+    void electricVehicleReceiptDoesNotAllowAnyToleranceOverage() {
+        properties.setFoodOverReceiptTolerancePercent(new BigDecimal("100"));
+        Product product = product(100L, ProductCategory.ELECTRIC_MOTORBIKE);
+        Supplier supplier = supplier(10L, SupplierCategory.FOOD_SUPPLIER);
+        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, supplier, 1L,
+                orderItem(product, 1, 1));
+        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.create(request(200L, 10L, 1L, item(100L, 1))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("vuot qua so luong con lai");
+
+        verify(receiptRepo, never()).save(any());
+    }
+
+    @Test
+    void confirmReceiptAndPurchaseOrderStatusUpdateAreAtomic() {
+        Product product = product(100L, ProductCategory.SPARE_PART);
+        Supplier supplier = supplier(10L, SupplierCategory.OTHER);
+        Warehouse warehouse = warehouse(20L);
+        PurchaseReceipt receipt = receipt(300L, 200L, supplier, warehouse, receiptItem(product, 2));
+        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, supplier, 1L,
+                orderItem(product, 2, 0));
+        when(receiptRepo.findById(300L)).thenReturn(Optional.of(receipt));
+        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
+        when(purchaseOrderRepository.save(any(PurchaseOrder.class)))
+                .thenThrow(new DataIntegrityViolationException("po update failed"));
+
+        assertThatThrownBy(() -> service.confirm(300L))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("po update failed");
+
+        verify(inventoryService, never()).increase(any(), any(), any(), eq(2), any());
+        verify(receiptRepo, never()).save(any(PurchaseReceipt.class));
+    }
+
+    @Test
+    void confirmReceiptRollbackCoversPurchaseOrderUpdateWhenInventoryFails() {
+        Product product = product(100L, ProductCategory.SPARE_PART);
+        Supplier supplier = supplier(10L, SupplierCategory.OTHER);
+        Warehouse warehouse = warehouse(20L);
+        PurchaseReceipt receipt = receipt(300L, 200L, supplier, warehouse, receiptItem(product, 2));
+        PurchaseOrder order = purchaseOrder(PurchaseOrderStatus.APPROVED, supplier, 1L,
+                orderItem(product, 2, 0));
+        when(receiptRepo.findById(300L)).thenReturn(Optional.of(receipt));
+        when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
+        doThrow(new DataIntegrityViolationException("inventory update failed"))
+                .when(inventoryService).increase(eq(1L), eq(warehouse), eq(product), eq(2), eq(new BigDecimal("1000000")));
+
+        assertThatThrownBy(() -> service.confirm(300L))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("inventory update failed");
+
+        verify(purchaseOrderRepository).save(order);
+        verify(receiptRepo, never()).save(any(PurchaseReceipt.class));
+        verify(payableService, never()).createFromReceipt(any(), any(), any(), any(), any(), any(Integer.class));
     }
 
     private PurchaseReceiptRequest request(Long purchaseOrderId, Long supplierId, Long branchId, PurchaseReceiptItemRequest item) {
@@ -236,10 +250,6 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
         return new PurchaseReceiptItemRequest(productId, quantity, new BigDecimal("1000000"), null, null, null, null);
     }
 
-    private PurchaseOrder purchaseOrder(PurchaseOrderStatus status, Long supplierId, Long branchId, PurchaseOrderItem item) {
-        return purchaseOrder(status, supplier(supplierId), branchId, item);
-    }
-
     private PurchaseOrder purchaseOrder(PurchaseOrderStatus status, Supplier supplier, Long branchId, PurchaseOrderItem item) {
         PurchaseOrder order = withId(new PurchaseOrder(), 200L);
         order.setStatus(status);
@@ -249,14 +259,11 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
         return order;
     }
 
-    private PurchaseOrderItem orderItem(Long productId, int quantity) {
-        return orderItem(product(productId), quantity);
-    }
-
-    private PurchaseOrderItem orderItem(Product product, int quantity) {
+    private PurchaseOrderItem orderItem(Product product, int quantity, int receivedQuantity) {
         PurchaseOrderItem item = new PurchaseOrderItem();
         item.setProduct(product);
         item.setQuantity(quantity);
+        item.setReceivedQuantity(receivedQuantity);
         item.setUnitCost(new BigDecimal("1000000"));
         item.setLineTotal(new BigDecimal("1000000").multiply(BigDecimal.valueOf(quantity)));
         return item;
@@ -286,11 +293,11 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
         return item;
     }
 
-    private Product product(Long id) {
+    private Product product(Long id, ProductCategory category) {
         Product product = withId(new Product(), id);
         product.setProductCode("P-" + id);
         product.setProductName("San pham " + id);
-        product.setCategory(ProductCategory.SPARE_PART);
+        product.setCategory(category);
         product.setBrand("Chuan Phat");
         product.setImportPrice(new BigDecimal("1000000"));
         product.setSalePrice(new BigDecimal("1200000"));
@@ -298,10 +305,11 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
         return product;
     }
 
-    private Supplier supplier(Long id) {
+    private Supplier supplier(Long id, SupplierCategory category) {
         Supplier supplier = withId(new Supplier(), id);
         supplier.setCode("NCC-" + id);
         supplier.setName("Nha cung cap " + id);
+        supplier.setCategory(category);
         supplier.setPaymentTermsDays(30);
         return supplier;
     }

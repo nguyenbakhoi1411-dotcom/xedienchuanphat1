@@ -91,6 +91,7 @@ public record PurchaseOrderDto(
             case PENDING_APPROVAL -> "Chờ duyệt";
             case APPROVED -> "Đã duyệt";
             case PARTIALLY_RECEIVED -> "Nhập một phần";
+            case FULLY_RECEIVED -> "Đã nhập đủ";
             case RECEIVED -> "Đã nhập đủ";
             case CANCELLED -> "Đã hủy";
             case REJECTED -> "Bị từ chối";

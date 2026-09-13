@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * Sau khi APPROVED:
  *   PurchaseReceiptService.create(purchaseOrderId=...) -> nhap kho
- *   Receipt.confirm() -> cap nhat PARTIALLY_RECEIVED / RECEIVED
+ *   Receipt.confirm() -> cap nhat PARTIALLY_RECEIVED / FULLY_RECEIVED
  */
 @Service
 @Transactional
@@ -166,7 +166,9 @@ public class PurchaseOrderService {
     public PurchaseOrderDto cancel(Long id, String reason) {
         PurchaseOrder po = findById(id);
         branchSecurity.requireBranchAccess(po.getBranchId());
-        if (po.getStatus() == PurchaseOrderStatus.RECEIVED || po.getStatus() == PurchaseOrderStatus.PARTIALLY_RECEIVED) {
+        if (po.getStatus() == PurchaseOrderStatus.FULLY_RECEIVED
+                || po.getStatus() == PurchaseOrderStatus.RECEIVED
+                || po.getStatus() == PurchaseOrderStatus.PARTIALLY_RECEIVED) {
             throw new BusinessException("Không thể hủy đơn đã nhập kho. Tạo phiếu trả hàng thay.");
         }
         if (po.getStatus() == PurchaseOrderStatus.CANCELLED) {
@@ -192,7 +194,7 @@ public class PurchaseOrderService {
 
     public void markFullyReceived(Long poId) {
         PurchaseOrder po = findById(poId);
-        po.setStatus(PurchaseOrderStatus.RECEIVED);
+        po.setStatus(PurchaseOrderStatus.FULLY_RECEIVED);
         po.setStockReceived(true);
         poRepo.save(po);
     }

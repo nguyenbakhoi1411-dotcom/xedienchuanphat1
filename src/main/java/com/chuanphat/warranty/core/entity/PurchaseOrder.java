@@ -13,7 +13,7 @@ import java.util.List;
  * V20: status machine day du, approval workflow, expected delivery.
  *
  * Luong: DRAFT -> submit() -> SUBMITTED -> approve() -> APPROVED -> createReceipt()
- *        APPROVED -> PurchaseReceipt.confirm() -> PARTIALLY_RECEIVED -> RECEIVED
+ *        APPROVED -> PurchaseReceipt.confirm() -> PARTIALLY_RECEIVED -> FULLY_RECEIVED
  */
 @Entity
 @Table(name = "purchase_orders")

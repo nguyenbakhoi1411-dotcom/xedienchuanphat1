@@ -15,6 +15,7 @@ import com.chuanphat.warranty.core.entity.Supplier;
 import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.repository.ProductRepository;
 import com.chuanphat.warranty.core.repository.PurchaseOrderRepository;
+import com.chuanphat.warranty.core.repository.WarehouseRepository;
 import com.chuanphat.warranty.core.service.PurchaseOrderService;
 import com.chuanphat.warranty.core.service.SupplierService;
 import com.chuanphat.warranty.exception.BusinessException;
@@ -33,6 +34,7 @@ class PurchaseOrderApprovalServiceBusinessTest {
 
     @Mock PurchaseOrderRepository purchaseOrderRepository;
     @Mock ProductRepository productRepository;
+    @Mock WarehouseRepository warehouseRepository;
     @Mock SupplierService supplierService;
     @Mock BranchSecurity branchSecurity;
 
@@ -40,7 +42,7 @@ class PurchaseOrderApprovalServiceBusinessTest {
 
     @BeforeEach
     void setUp() {
-        service = new PurchaseOrderService(purchaseOrderRepository, productRepository, supplierService, branchSecurity);
+        service = new PurchaseOrderService(purchaseOrderRepository, productRepository, warehouseRepository, supplierService, branchSecurity);
         lenient().when(purchaseOrderRepository.save(any(PurchaseOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
