@@ -9,7 +9,7 @@ import java.util.List;
 
 /** Request tao phieu nhap kho (Purchase Receipt). */
 public record PurchaseReceiptRequest(
-        Long purchaseOrderId,         // null = nhap truc tiep khong qua PO
+        @NotNull Long purchaseOrderId,
         @NotNull Long supplierId,
         @NotNull Long branchId,
         Long warehouseId,

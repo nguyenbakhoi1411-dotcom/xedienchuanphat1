@@ -7,6 +7,7 @@ import com.chuanphat.warranty.core.dto.PurchaseReceiptItemRequest;
 import com.chuanphat.warranty.core.dto.PurchaseReceiptRequest;
 import com.chuanphat.warranty.core.entity.*;
 import com.chuanphat.warranty.core.enums.ProductCategory;
+import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.enums.ReceiptStatus;
 import com.chuanphat.warranty.core.enums.SerialStatus;
 import com.chuanphat.warranty.core.enums.InventoryTransactionType;
@@ -16,7 +17,9 @@ import com.chuanphat.warranty.exception.ConflictException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -27,10 +30,11 @@ import org.springframework.transaction.annotation.Transactional;
  * PurchaseReceiptService — Quan ly phieu nhap kho.
  *
  * Luong: DRAFT → confirm() → CONFIRMED
+ *   - Phieu moi bat buoc tham chieu PurchaseOrder da duoc duyet
  *   - Xe dien: tao ProductSerial tu frameNumber/engineNumber/batterySerial
  *   - Phu tung: tang InventoryStock + updateAverageCost
  *   - Ghi InventoryTransaction(PURCHASE_RECEIPT) cho tung dong
- *   - Cap nhat PurchaseOrder.stockReceived = true neu co PO
+ *   - Cap nhat PurchaseOrder theo so luong thuc nhap
  */
 @Service
 @Transactional
@@ -98,6 +102,10 @@ public class PurchaseReceiptService {
 
     public PurchaseReceiptDto create(PurchaseReceiptRequest req) {
         branchSecurity.requireBranchAccess(req.branchId());
+        PurchaseOrder purchaseOrder = requireReceivablePurchaseOrder(req.purchaseOrderId(), req.supplierId(), req.branchId());
+        Map<Long, Integer> orderedQuantities = orderedQuantitiesByProduct(purchaseOrder);
+        Map<Long, Integer> requestedQuantities = requestedQuantitiesByProduct(req.items());
+        validateRequestedQuantities(purchaseOrder.getId(), orderedQuantities, requestedQuantities);
 
         Supplier supplier = supplierRepo.findById(req.supplierId())
                 .orElseThrow(() -> new BusinessException("Khong tim thay nha cung cap: " + req.supplierId()));
@@ -116,7 +124,7 @@ public class PurchaseReceiptService {
         receipt.setSupplier(supplier);
         receipt.setBranchId(req.branchId());
         receipt.setWarehouse(warehouse);
-        receipt.setPurchaseOrderId(req.purchaseOrderId());
+        receipt.setPurchaseOrderId(purchaseOrder.getId());
         receipt.setReceiptDate(req.receiptDate() != null ? req.receiptDate() : LocalDate.now());
         receipt.setNote(req.note());
         receipt.setCreatedBy(currentUsername());
@@ -184,12 +192,9 @@ public class PurchaseReceiptService {
                 paymentTermsDays
         );
 
-        // Cap nhat PO neu co
+        // Cap nhat PO neu co. Du lieu cu co the co phieu nhap khong gan PO.
         if (receipt.getPurchaseOrderId() != null) {
-            // Kiem tra con phieu nhap DRAFT khac cua PO khong
-            long remainingDraft = receiptRepo.countByPurchaseOrderIdAndStatus(
-                    receipt.getPurchaseOrderId(), ReceiptStatus.DRAFT);
-            if (remainingDraft == 0) {
+            if (isPurchaseOrderFullyReceived(receipt.getPurchaseOrderId())) {
                 purchaseOrderService.markFullyReceived(receipt.getPurchaseOrderId());
             } else {
                 purchaseOrderService.markPartiallyReceived(receipt.getPurchaseOrderId());
@@ -269,6 +274,71 @@ public class PurchaseReceiptService {
     private PurchaseReceipt findById(Long id) {
         return receiptRepo.findById(id)
                 .orElseThrow(() -> new BusinessException("Khong tim thay phieu nhap: " + id));
+    }
+
+    private PurchaseOrder requireReceivablePurchaseOrder(Long purchaseOrderId, Long supplierId, Long branchId) {
+        if (purchaseOrderId == null) {
+            throw new BusinessException("Phieu nhap kho phai tham chieu don mua hang da duyet");
+        }
+        PurchaseOrder purchaseOrder = poRepo.findById(purchaseOrderId)
+                .orElseThrow(() -> new BusinessException("Khong tim thay don mua hang: " + purchaseOrderId));
+        branchSecurity.requireBranchAccess(purchaseOrder.getBranchId());
+        if (!purchaseOrder.getBranchId().equals(branchId)) {
+            throw new BusinessException("Chi nhanh phieu nhap khong khop voi don mua hang");
+        }
+        if (!purchaseOrder.getSupplier().getId().equals(supplierId)) {
+            throw new BusinessException("Nha cung cap phieu nhap khong khop voi don mua hang");
+        }
+        if (purchaseOrder.getStatus() != PurchaseOrderStatus.APPROVED
+                && purchaseOrder.getStatus() != PurchaseOrderStatus.PARTIALLY_RECEIVED) {
+            throw new BusinessException("Chi duoc tao phieu nhap cho don mua hang da duyet hoac dang nhap mot phan");
+        }
+        return purchaseOrder;
+    }
+
+    private Map<Long, Integer> orderedQuantitiesByProduct(PurchaseOrder purchaseOrder) {
+        Map<Long, Integer> quantities = new HashMap<>();
+        for (PurchaseOrderItem item : purchaseOrder.getItems()) {
+            quantities.merge(item.getProduct().getId(), item.getQuantity(), Integer::sum);
+        }
+        return quantities;
+    }
+
+    private Map<Long, Integer> requestedQuantitiesByProduct(List<PurchaseReceiptItemRequest> items) {
+        Map<Long, Integer> quantities = new HashMap<>();
+        for (PurchaseReceiptItemRequest item : items) {
+            quantities.merge(item.productId(), item.quantity(), Integer::sum);
+        }
+        return quantities;
+    }
+
+    private void validateRequestedQuantities(Long purchaseOrderId,
+                                             Map<Long, Integer> orderedQuantities,
+                                             Map<Long, Integer> requestedQuantities) {
+        for (var entry : requestedQuantities.entrySet()) {
+            Long productId = entry.getKey();
+            int orderedQuantity = orderedQuantities.getOrDefault(productId, 0);
+            if (orderedQuantity == 0) {
+                throw new BusinessException("San pham khong nam trong don mua hang: " + productId);
+            }
+            long alreadyPlannedOrReceived = receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(
+                    purchaseOrderId, productId, List.of(ReceiptStatus.DRAFT, ReceiptStatus.CONFIRMED));
+            if (alreadyPlannedOrReceived + entry.getValue() > orderedQuantity) {
+                throw new BusinessException("So luong nhap vuot qua so luong con lai cua don mua hang");
+            }
+        }
+    }
+
+    private boolean isPurchaseOrderFullyReceived(Long purchaseOrderId) {
+        PurchaseOrder purchaseOrder = purchaseOrderService.findById(purchaseOrderId);
+        for (PurchaseOrderItem item : purchaseOrder.getItems()) {
+            long receivedQuantity = receiptRepo.sumQuantityByPurchaseOrderIdAndProductIdAndStatusIn(
+                    purchaseOrderId, item.getProduct().getId(), List.of(ReceiptStatus.CONFIRMED));
+            if (receivedQuantity < item.getQuantity()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String generateReceiptNo() {
