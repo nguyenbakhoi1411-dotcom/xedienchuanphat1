@@ -276,7 +276,7 @@ function PurchaseOrdersTab() {
                             <FileText className="h-3 w-3" /> Gửi duyệt
                           </button>
                         )}
-                        {po.status === "PENDING_APPROVAL" && (
+                        {(po.status === "SUBMITTED" || po.status === "PENDING_APPROVAL") && (
                           <>
                             <button onClick={() => void doAction(po.id, () => purchaseOrderApi.approve(po.id))} disabled={acting === po.id}
                               className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
@@ -288,7 +288,7 @@ function PurchaseOrdersTab() {
                             </button>
                           </>
                         )}
-                        {(po.status === "DRAFT" || po.status === "PENDING_APPROVAL") && (
+                        {(po.status === "DRAFT" || po.status === "SUBMITTED" || po.status === "PENDING_APPROVAL") && (
                           <button onClick={() => { const r = prompt("Lý do hủy?") ?? ""; void doAction(po.id, () => purchaseOrderApi.cancel(po.id, r)); }} disabled={acting === po.id}
                             className="flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-50">
                             <XCircle className="h-3 w-3" /> Hủy

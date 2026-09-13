@@ -7,6 +7,7 @@ import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,6 +21,7 @@ public class PurchaseOrderController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PURCHASE_VIEW')")
     public PageResponse<PurchaseOrderDto> list(
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) PurchaseOrderStatus status,
@@ -31,30 +33,35 @@ public class PurchaseOrderController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('PURCHASE_VIEW')")
     public PurchaseOrderDto get(@PathVariable Long id) {
         return poService.get(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PURCHASE_CREATE')")
     public PurchaseOrderDto create(@Valid @RequestBody PurchaseOrderRequest req) {
         return poService.create(req);
     }
 
-    /** Gui duyet (DRAFT -> PENDING_APPROVAL / APPROVED) */
-    @PostMapping("/{id}/submit")
+    /** Gui duyet (DRAFT -> SUBMITTED) */
+    @PatchMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('PURCHASE_UPDATE')")
     public PurchaseOrderDto submit(@PathVariable Long id) {
         return poService.submit(id);
     }
 
-    /** Duyet (PENDING_APPROVAL -> APPROVED) */
-    @PostMapping("/{id}/approve")
+    /** Duyet (SUBMITTED -> APPROVED) */
+    @PatchMapping("/{id}/approve")
+    @PreAuthorize("hasAuthority('PURCHASE_APPROVE')")
     public PurchaseOrderDto approve(@PathVariable Long id) {
         return poService.approve(id);
     }
 
-    /** Tu choi (PENDING_APPROVAL -> REJECTED) */
-    @PostMapping("/{id}/reject")
+    /** Tu choi (SUBMITTED -> REJECTED) */
+    @PatchMapping("/{id}/reject")
+    @PreAuthorize("hasAuthority('PURCHASE_APPROVE')")
     public PurchaseOrderDto reject(@PathVariable Long id,
                                    @RequestParam(defaultValue = "") String reason) {
         return poService.reject(id, reason);
@@ -62,6 +69,7 @@ public class PurchaseOrderController {
 
     /** Huy don (DRAFT / PENDING_APPROVAL -> CANCELLED) */
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('PURCHASE_CANCEL')")
     public PurchaseOrderDto cancel(@PathVariable Long id,
                                     @RequestParam(defaultValue = "") String reason) {
         return poService.cancel(id, reason);

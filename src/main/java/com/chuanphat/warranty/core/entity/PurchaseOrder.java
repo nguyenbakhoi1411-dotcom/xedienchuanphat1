@@ -12,7 +12,7 @@ import java.util.List;
  * Don mua hang.
  * V20: status machine day du, approval workflow, expected delivery.
  *
- * Luong: DRAFT -> submit() -> PENDING_APPROVAL/APPROVED -> createReceipt()
+ * Luong: DRAFT -> submit() -> SUBMITTED -> approve() -> APPROVED -> createReceipt()
  *        APPROVED -> PurchaseReceipt.confirm() -> PARTIALLY_RECEIVED -> RECEIVED
  */
 @Entity
@@ -47,7 +47,7 @@ public class PurchaseOrder {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
-    /** Han muc tu dong duyet (vuot muc nay can PENDING_APPROVAL) */
+    /** Nguong phan quyen duyet; tat ca PO sau submit deu can maker-checker. */
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal approvalThreshold = new BigDecimal("50000000");
 

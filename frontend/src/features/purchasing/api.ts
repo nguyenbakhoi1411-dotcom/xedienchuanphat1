@@ -67,13 +67,13 @@ export const purchaseOrderApi = {
     api.post<PurchaseOrder>("/purchase-orders", req).then(d),
 
   submit: (id: number): Promise<PurchaseOrder> =>
-    api.post<PurchaseOrder>(`/purchase-orders/${id}/submit`).then(d),
+    api.patch<PurchaseOrder>(`/purchase-orders/${id}/submit`).then(d),
 
   approve: (id: number): Promise<PurchaseOrder> =>
-    api.post<PurchaseOrder>(`/purchase-orders/${id}/approve`).then(d),
+    api.patch<PurchaseOrder>(`/purchase-orders/${id}/approve`).then(d),
 
   reject: (id: number, reason: string): Promise<PurchaseOrder> =>
-    api.post<PurchaseOrder>(`/purchase-orders/${id}/reject`, null, { params: { reason } }).then(d),
+    api.patch<PurchaseOrder>(`/purchase-orders/${id}/reject`, null, { params: { reason } }).then(d),
 
   cancel: (id: number, reason: string): Promise<PurchaseOrder> =>
     api.post<PurchaseOrder>(`/purchase-orders/${id}/cancel`, null, { params: { reason } }).then(d),
