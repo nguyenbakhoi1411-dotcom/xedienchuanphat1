@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 
 public record CreateSalesReturnItemRequest(
         @NotNull Long orderItemId,
+        Long batchId,
+        Long serialId,
         @Min(1) int quantity,
         ReturnSerialDisposition serialDisposition
 ) {

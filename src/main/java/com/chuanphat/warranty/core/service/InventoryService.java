@@ -224,6 +224,19 @@ public class InventoryService {
     }
 
     @Transactional
+    public void processSalesReturn(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        BigDecimal averageCost = increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));
+        record(InventoryTransactionType.RETURN, product, null, branchId, null, warehouse.getId(), quantity, averageCost, LocalDate.now(), "Sales return " + returnNo);
+    }
+
+    @Transactional
+    public void recordWriteOff(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        record(InventoryTransactionType.WRITE_OFF, product, branchId, null, warehouse.getId(), null, quantity, averageCost(branchId, warehouse.getId(), product.getId()), LocalDate.now(), "Sales return write-off " + returnNo);
+    }
+
+    @Transactional
     public void increaseForReturn(Long branchId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
         BigDecimal averageCost = increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));

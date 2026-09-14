@@ -5,6 +5,7 @@ import com.chuanphat.warranty.audit.enums.AuditAction;
 import com.chuanphat.warranty.audit.enums.AuditModule;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.core.dto.ConvertQuotationRequest;
+import com.chuanphat.warranty.core.dto.ApproveSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.CreateInstallmentRequest;
 import com.chuanphat.warranty.core.dto.CreateInvoiceRequest;
 import com.chuanphat.warranty.core.dto.CreateQuotationRequest;
@@ -16,6 +17,7 @@ import com.chuanphat.warranty.core.dto.PaymentEntryRequest;
 import com.chuanphat.warranty.core.dto.QuotationListResponse;
 import com.chuanphat.warranty.core.dto.QuotationResponse;
 import com.chuanphat.warranty.core.dto.QuotationStatusRequest;
+import com.chuanphat.warranty.core.dto.RejectSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.SalesOrderResponse;
 import com.chuanphat.warranty.core.dto.SalesOrderListResponse;
 import com.chuanphat.warranty.core.dto.SalesOrderStatusRequest;
@@ -217,6 +219,20 @@ public class SalesController {
     @Audited(action = AuditAction.CREATE_RETURN, module = AuditModule.SALES, entityType = "SalesReturn")
     public SalesReturnResponse createReturn(@Valid @RequestBody CreateSalesReturnRequest request) {
         return service.createReturn(request);
+    }
+
+    @PatchMapping("/returns/{id}/approve")
+    @PreAuthorize("hasAuthority('SALES_RETURN_APPROVE')")
+    @Audited(action = AuditAction.UPDATE_ORDER, module = AuditModule.SALES, entityType = "SalesReturn", entityIdParam = "id")
+    public SalesReturnResponse approveReturn(@PathVariable Long id, @Valid @RequestBody ApproveSalesReturnRequest request) {
+        return service.approveReturn(id, request);
+    }
+
+    @PatchMapping("/returns/{id}/reject")
+    @PreAuthorize("hasAuthority('SALES_RETURN_APPROVE')")
+    @Audited(action = AuditAction.UPDATE_ORDER, module = AuditModule.SALES, entityType = "SalesReturn", entityIdParam = "id")
+    public SalesReturnResponse rejectReturn(@PathVariable Long id, @RequestBody(required = false) RejectSalesReturnRequest request) {
+        return service.rejectReturn(id, request);
     }
 
     @PostMapping("/vouchers/preview")

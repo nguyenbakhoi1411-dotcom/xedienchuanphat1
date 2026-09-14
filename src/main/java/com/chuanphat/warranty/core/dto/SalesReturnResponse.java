@@ -1,6 +1,8 @@
 package com.chuanphat.warranty.core.dto;
 
 import com.chuanphat.warranty.core.entity.SalesReturn;
+import com.chuanphat.warranty.core.enums.SalesReturnDisposition;
+import com.chuanphat.warranty.core.enums.SalesReturnReasonCode;
 import com.chuanphat.warranty.core.enums.SalesReturnStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,7 +20,9 @@ public record SalesReturnResponse(
         BigDecimal returnAmount,
         BigDecimal refundAmount,
         SalesReturnStatus status,
-        String reason,
+        SalesReturnReasonCode reasonCode,
+        String reasonNote,
+        SalesReturnDisposition disposition,
         OffsetDateTime createdAt,
         List<SalesReturnItemResponse> items
 ) {
@@ -34,7 +38,9 @@ public record SalesReturnResponse(
                 salesReturn.getReturnAmount(),
                 salesReturn.getRefundAmount(),
                 salesReturn.getStatus(),
-                salesReturn.getReason(),
+                salesReturn.getReasonCode(),
+                salesReturn.getReasonNote(),
+                salesReturn.getDisposition(),
                 salesReturn.getCreatedAt(),
                 salesReturn.getItems().stream().map(SalesReturnItemResponse::from).toList()
         );

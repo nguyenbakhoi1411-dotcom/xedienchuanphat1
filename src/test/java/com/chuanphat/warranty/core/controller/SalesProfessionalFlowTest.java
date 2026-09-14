@@ -85,6 +85,7 @@ class SalesProfessionalFlowTest {
         JsonNode order = objectMapper.readTree(orderResult.getResponse().getContentAsString());
         long orderId = order.get("id").asLong();
         long orderItemId = order.get("items").get(0).get("id").asLong();
+        long soldSerialId = order.get("items").get(0).get("serialId").asLong();
         BigDecimal totalAmount = order.get("totalAmount").decimalValue();
 
         mockMvc.perform(post("/api/sales/orders/{id}/payments", orderId)
@@ -119,18 +120,19 @@ class SalesProfessionalFlowTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "orderId", orderId,
-                                "refundAmount", new BigDecimal("100.00"),
+                                "refundAmount", BigDecimal.ZERO,
                                 "refundMethod", "CASH",
-                                "reason", "Customer return test",
+                                "reasonCode", "CUSTOMER_CHANGED_MIND",
+                                "reasonNote", "Customer return test",
                                 "items", List.of(Map.of(
                                         "orderItemId", orderItemId,
+                                        "serialId", soldSerialId,
                                         "quantity", 1,
                                         "serialDisposition", "RETURNED"
                                 ))
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.refundAmount").value(100.00));
+                .andExpect(jsonPath("$.status").value("REQUESTED"));
     }
 
     @Test
@@ -586,4 +588,5 @@ class SalesProfessionalFlowTest {
                 )
         );
     }
+
 }
