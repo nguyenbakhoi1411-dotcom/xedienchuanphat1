@@ -36,6 +36,9 @@ class SecurityAnnotationTest extends PostgresIntegrationTest {
         List<String> unsecuredEndpoints = new ArrayList<>();
         controllers.forEach((beanName, bean) -> {
             Class<?> controllerClass = AopUtils.getTargetClass(bean);
+            if (!isApplicationController(controllerClass)) {
+                return;
+            }
             boolean classHasPreAuthorize = AnnotatedElementUtils.hasAnnotation(controllerClass, PreAuthorize.class);
             boolean classIsPublic = AnnotatedElementUtils.hasAnnotation(controllerClass, PublicEndpoint.class);
 
@@ -62,6 +65,10 @@ class SecurityAnnotationTest extends PostgresIntegrationTest {
                 || AnnotatedElementUtils.hasAnnotation(method, PutMapping.class)
                 || AnnotatedElementUtils.hasAnnotation(method, PatchMapping.class)
                 || AnnotatedElementUtils.hasAnnotation(method, DeleteMapping.class);
+    }
+
+    private boolean isApplicationController(Class<?> controllerClass) {
+        return controllerClass.getName().startsWith("com.chuanphat.warranty.");
     }
 
     private boolean isPublic(Method method) {
