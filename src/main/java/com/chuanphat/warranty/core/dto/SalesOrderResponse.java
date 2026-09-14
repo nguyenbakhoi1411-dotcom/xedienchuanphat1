@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 public record SalesOrderResponse(
         Long id,
@@ -42,6 +43,7 @@ public record SalesOrderResponse(
         String creditApprovedBy,
         OffsetDateTime creditApprovedAt,
         String creditApprovalNote,
+        UUID exchangeGroupId,
         // Flags
         boolean accountingRecorded,
         boolean stockIssued,
@@ -79,6 +81,7 @@ public record SalesOrderResponse(
                 order.getCreditApprovedBy(),
                 order.getCreditApprovedAt(),
                 order.getCreditApprovalNote(),
+                order.getExchangeGroupId(),
                 order.isAccountingRecorded(),
                 order.isStockIssued(),
                 order.isWarrantyCreated(),

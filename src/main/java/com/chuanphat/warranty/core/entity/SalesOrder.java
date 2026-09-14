@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "sales_orders")
@@ -143,6 +144,9 @@ public class SalesOrder {
     @Column(length = 500)
     private String creditApprovalNote;
 
+    @Column(name = "exchange_group_id")
+    private UUID exchangeGroupId;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SalesOrderItem> items = new ArrayList<>();
 
@@ -220,6 +224,8 @@ public class SalesOrder {
     public void setCreditApprovedAt(OffsetDateTime creditApprovedAt) { this.creditApprovedAt = creditApprovedAt; }
     public String getCreditApprovalNote() { return creditApprovalNote; }
     public void setCreditApprovalNote(String creditApprovalNote) { this.creditApprovalNote = creditApprovalNote; }
+    public UUID getExchangeGroupId() { return exchangeGroupId; }
+    public void setExchangeGroupId(UUID exchangeGroupId) { this.exchangeGroupId = exchangeGroupId; }
     public List<SalesOrderItem> getItems() { return items; }
     public void addItem(SalesOrderItem item) { items.add(item); item.setOrder(this); }
 }
