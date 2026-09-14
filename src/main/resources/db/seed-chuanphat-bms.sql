@@ -380,11 +380,12 @@ SELECT X,
        TRUE
 FROM SYSTEM_RANGE(1, 30);
 
-MERGE INTO purchase_order_items (id, purchase_order_id, product_id, quantity, unit_cost, line_total) KEY(id)
+MERGE INTO purchase_order_items (id, purchase_order_id, product_id, quantity, received_quantity, unit_cost, line_total) KEY(id)
 SELECT X,
        MOD(X - 1, 30) + 1,
        MOD(X - 1, 50) + 1,
        MOD(X, 5) + 1,
+       0,
        CASE WHEN MOD(X - 1, 50) + 1 <= 30 THEN 10800000 + MOD(X, 8) * 350000 ELSE 1200000 + MOD(X, 10) * 250000 END,
        (MOD(X, 5) + 1) * CASE WHEN MOD(X - 1, 50) + 1 <= 30 THEN 10800000 + MOD(X, 8) * 350000 ELSE 1200000 + MOD(X, 10) * 250000 END
 FROM SYSTEM_RANGE(1, 60);
