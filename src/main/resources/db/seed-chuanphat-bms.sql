@@ -323,7 +323,7 @@ FROM SYSTEM_RANGE(1, 50);
 
 MERGE INTO suppliers (
     id, code, name, tax_code, phone, email, website, address, contact_person,
-    current_debt, credit_limit, payment_terms_days, rating, notes, status, created_at
+    current_debt, credit_limit, payment_terms_days, rating, notes, status, category, created_at
 ) KEY(id)
 SELECT X,
        'NCC-' || LPAD(CAST(X AS VARCHAR), 3, '0'),
@@ -351,6 +351,7 @@ SELECT X,
        CAST(3 + MOD(X, 3) AS SMALLINT),
        'Seed supplier ' || X,
        'ACTIVE',
+       CASE WHEN MOD(X, 5) IN (1, 2, 3, 4) THEN 'EV_SUPPLIER' ELSE 'OTHER' END,
        TIMESTAMP '2026-01-10 08:00:00'
 FROM SYSTEM_RANGE(1, 20);
 
