@@ -8,6 +8,7 @@ import com.chuanphat.warranty.core.dto.PurchasePaymentResultDto;
 import com.chuanphat.warranty.core.dto.SupplierPayableAgingDto;
 import com.chuanphat.warranty.core.entity.PurchasePayment;
 import com.chuanphat.warranty.core.entity.SupplierInvoice;
+import com.chuanphat.warranty.core.enums.PurchasePaymentEntryType;
 import com.chuanphat.warranty.core.enums.SupplierInvoicePaymentStatus;
 import com.chuanphat.warranty.core.enums.SupplierInvoiceStatus;
 import com.chuanphat.warranty.core.repository.PurchasePaymentRepository;
@@ -59,6 +60,7 @@ public class PurchasePaymentService {
         PurchasePayment payment = new PurchasePayment();
         payment.setSupplierInvoice(invoice);
         payment.setAmount(request.amount());
+        payment.setEntryType(PurchasePaymentEntryType.PAYMENT);
         payment.setPaymentDate(request.paymentDate() != null ? request.paymentDate() : LocalDate.now());
         payment.setPaymentMethod(request.paymentMethod());
         payment.setReferenceNo(request.referenceNo());
@@ -70,6 +72,36 @@ public class PurchasePaymentService {
         invoice.setPaymentStatus(paymentStatus(invoice.getTotalAmount(), newPaidAmount));
         SupplierInvoice savedInvoice = invoiceRepository.save(invoice);
         return result(saved, savedInvoice);
+    }
+
+    public PurchasePayment applyReturnCredit(SupplierInvoice invoice, BigDecimal amount, String returnCode) {
+        if (invoice.getStatus() != SupplierInvoiceStatus.MATCHED && invoice.getStatus() != SupplierInvoiceStatus.RESOLVED) {
+            throw new BusinessException("Hoa don nha cung cap chua MATCHED/RESOLVED, khong duoc ghi giam tru tra hang");
+        }
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("So tien giam tru phai > 0");
+        }
+        BigDecimal alreadyApplied = paymentRepository.sumBySupplierInvoiceId(invoice.getId());
+        BigDecimal newAppliedAmount = alreadyApplied.add(amount);
+        if (newAppliedAmount.compareTo(invoice.getTotalAmount()) > 0) {
+            throw new BusinessException("Tong giam tru/thanh toan vuot qua gia tri hoa don nha cung cap");
+        }
+
+        PurchasePayment credit = new PurchasePayment();
+        credit.setSupplierInvoice(invoice);
+        credit.setAmount(amount);
+        credit.setEntryType(PurchasePaymentEntryType.RETURN_CREDIT);
+        credit.setPaymentDate(LocalDate.now());
+        credit.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
+        credit.setReferenceNo(returnCode);
+        credit.setNote("Giam tru cong no do tra hang NCC " + returnCode);
+        credit.setCreatedBy(safeUsername());
+        PurchasePayment saved = paymentRepository.save(credit);
+
+        invoice.setPaidAmount(newAppliedAmount);
+        invoice.setPaymentStatus(paymentStatus(invoice.getTotalAmount(), newAppliedAmount));
+        invoiceRepository.save(invoice);
+        return saved;
     }
 
     @Transactional(readOnly = true)

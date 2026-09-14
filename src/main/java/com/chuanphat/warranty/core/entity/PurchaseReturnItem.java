@@ -22,6 +22,11 @@ public class PurchaseReturnItem {
     @JoinColumn(name = "serial_id")
     private ProductSerial serial;
 
+    @Column(name = "purchase_receipt_item_id")
+    private Long purchaseReceiptItemId;
+
+    private Long batchId;
+
     @Column(nullable = false)
     private Integer quantity = 1;
 
@@ -42,6 +47,10 @@ public class PurchaseReturnItem {
     public void setProduct(Product product) { this.product = product; }
     public ProductSerial getSerial() { return serial; }
     public void setSerial(ProductSerial serial) { this.serial = serial; }
+    public Long getPurchaseReceiptItemId() { return purchaseReceiptItemId; }
+    public void setPurchaseReceiptItemId(Long purchaseReceiptItemId) { this.purchaseReceiptItemId = purchaseReceiptItemId; }
+    public Long getBatchId() { return batchId; }
+    public void setBatchId(Long batchId) { this.batchId = batchId; }
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
     public BigDecimal getUnitPrice() { return unitPrice; }
