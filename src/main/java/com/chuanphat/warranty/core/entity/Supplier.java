@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.entity;
 
 import com.chuanphat.warranty.core.enums.RecordStatus;
+import com.chuanphat.warranty.core.enums.SupplierCategory;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -44,6 +45,19 @@ public class Supplier {
 
     @Column(length = 120)
     private String contactPerson;
+
+    @Column(length = 30)
+    private String contactPhone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private SupplierCategory category = SupplierCategory.OTHER;
+
+    @Column(length = 80)
+    private String bankAccountNumber;
+
+    @Column(length = 120)
+    private String bankName;
 
     /** Cong no hien tai (tu dong cap nhat khi nhap/tra hang/thanh toan) */
     @Column(nullable = false, precision = 14, scale = 2)
@@ -90,12 +104,23 @@ public class Supplier {
     public void setAddress(String address) { this.address = address; }
     public String getContactPerson() { return contactPerson; }
     public void setContactPerson(String contactPerson) { this.contactPerson = contactPerson; }
+    public String getContactPhone() { return contactPhone; }
+    public void setContactPhone(String contactPhone) { this.contactPhone = contactPhone; }
+    public SupplierCategory getCategory() { return category; }
+    public void setCategory(SupplierCategory category) { this.category = category; }
+    public String getBankAccountNumber() { return bankAccountNumber; }
+    public void setBankAccountNumber(String bankAccountNumber) { this.bankAccountNumber = bankAccountNumber; }
+    public String getBankName() { return bankName; }
+    public void setBankName(String bankName) { this.bankName = bankName; }
     public BigDecimal getCurrentDebt() { return currentDebt; }
     public void setCurrentDebt(BigDecimal currentDebt) { this.currentDebt = currentDebt; }
     public BigDecimal getCreditLimit() { return creditLimit; }
     public void setCreditLimit(BigDecimal creditLimit) { this.creditLimit = creditLimit; }
     public int getPaymentTermsDays() { return paymentTermsDays; }
     public void setPaymentTermsDays(int paymentTermsDays) { this.paymentTermsDays = paymentTermsDays; }
+    // Backward-compatible alias for the purchase PR1 spec name; canonical column remains payment_terms_days.
+    public int getDefaultPaymentTermDays() { return paymentTermsDays; }
+    public void setDefaultPaymentTermDays(int defaultPaymentTermDays) { this.paymentTermsDays = defaultPaymentTermDays; }
     public Short getRating() { return rating; }
     public void setRating(Short rating) { this.rating = rating; }
     public String getNotes() { return notes; }
