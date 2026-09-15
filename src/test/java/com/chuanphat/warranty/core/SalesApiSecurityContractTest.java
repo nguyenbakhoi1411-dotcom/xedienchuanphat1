@@ -31,7 +31,16 @@ class SalesApiSecurityContractTest {
 
     @Test
     void sensitiveSalesEndpointsRequirePermissions() {
-        for (String methodName : List.of("createOrder", "approveDiscount", "createReturn", "createInvoice", "salesOrderPdf")) {
+        for (String methodName : List.of(
+                "createOrder",
+                "approveDiscount",
+                "rejectDiscount",
+                "approveCredit",
+                "rejectCredit",
+                "createReturn",
+                "createInvoice",
+                "salesOrderPdf"
+        )) {
             Method method = findMethod(SalesController.class, methodName);
             PreAuthorize preAuthorize = method.getAnnotation(PreAuthorize.class);
             assertThat(preAuthorize).as(methodName).isNotNull();

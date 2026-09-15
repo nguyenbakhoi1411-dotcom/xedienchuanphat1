@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.entity;
 
 import com.chuanphat.warranty.core.enums.PaymentStatus;
+import com.chuanphat.warranty.core.enums.CreditApprovalStatus;
 import com.chuanphat.warranty.core.enums.DiscountApprovalStatus;
 import com.chuanphat.warranty.core.enums.SalesOrderStatus;
 import jakarta.persistence.CascadeType;
@@ -49,7 +50,7 @@ public class SalesOrder {
     private LocalDate orderDate = LocalDate.now();
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 40)
     private SalesOrderStatus status = SalesOrderStatus.DRAFT;
 
     @Column(nullable = false, precision = 14, scale = 2)
@@ -129,6 +130,19 @@ public class SalesOrder {
     @Column(length = 500)
     private String approvalNote;
 
+    // ── Credit Approval ──
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private CreditApprovalStatus creditApprovalStatus = CreditApprovalStatus.NONE;
+
+    @Column(length = 120)
+    private String creditApprovedBy;
+
+    private OffsetDateTime creditApprovedAt;
+
+    @Column(length = 500)
+    private String creditApprovalNote;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SalesOrderItem> items = new ArrayList<>();
 
@@ -198,6 +212,14 @@ public class SalesOrder {
     public void setApprovedAt(OffsetDateTime approvedAt) { this.approvedAt = approvedAt; }
     public String getApprovalNote() { return approvalNote; }
     public void setApprovalNote(String approvalNote) { this.approvalNote = approvalNote; }
+    public CreditApprovalStatus getCreditApprovalStatus() { return creditApprovalStatus; }
+    public void setCreditApprovalStatus(CreditApprovalStatus creditApprovalStatus) { this.creditApprovalStatus = creditApprovalStatus; }
+    public String getCreditApprovedBy() { return creditApprovedBy; }
+    public void setCreditApprovedBy(String creditApprovedBy) { this.creditApprovedBy = creditApprovedBy; }
+    public OffsetDateTime getCreditApprovedAt() { return creditApprovedAt; }
+    public void setCreditApprovedAt(OffsetDateTime creditApprovedAt) { this.creditApprovedAt = creditApprovedAt; }
+    public String getCreditApprovalNote() { return creditApprovalNote; }
+    public void setCreditApprovalNote(String creditApprovalNote) { this.creditApprovalNote = creditApprovalNote; }
     public List<SalesOrderItem> getItems() { return items; }
     public void addItem(SalesOrderItem item) { items.add(item); item.setOrder(this); }
 }

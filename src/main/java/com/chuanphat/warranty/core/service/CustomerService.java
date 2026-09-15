@@ -131,6 +131,7 @@ public class CustomerService {
         customer.setBranchId(request.branchId());
         customer.setAssignedTo(request.assignedTo());
         customer.setBirthday(request.birthday());
+        customer.setCreditLimit(request.creditLimit());
         customer.setTier(request.tier() == null ? CustomerTier.NEW : request.tier());
         customer.setStatus(request.status() == null ? RecordStatus.ACTIVE : request.status());
     }
