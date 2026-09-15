@@ -12,6 +12,7 @@ import com.chuanphat.warranty.auth.entity.AppUser;
 import com.chuanphat.warranty.accounting.repository.ReceivableRepository;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.core.dto.ApproveSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.ConvertQuotationRequest;
 import com.chuanphat.warranty.core.dto.CreateInstallmentRequest;
 import com.chuanphat.warranty.core.dto.CreateInvoiceRequest;
@@ -27,6 +28,7 @@ import com.chuanphat.warranty.core.dto.PaymentEntryRequest;
 import com.chuanphat.warranty.core.dto.QuotationListResponse;
 import com.chuanphat.warranty.core.dto.QuotationResponse;
 import com.chuanphat.warranty.core.dto.QuotationStatusRequest;
+import com.chuanphat.warranty.core.dto.RejectSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.SalesOrderResponse;
 import com.chuanphat.warranty.core.dto.SalesOrderListResponse;
 import com.chuanphat.warranty.core.dto.SalesOrderStatusRequest;
@@ -53,6 +55,8 @@ import com.chuanphat.warranty.core.enums.PaymentStatus;
 import com.chuanphat.warranty.core.enums.ProductCategory;
 import com.chuanphat.warranty.core.enums.QuotationStatus;
 import com.chuanphat.warranty.core.enums.ReturnSerialDisposition;
+import com.chuanphat.warranty.core.enums.SalesPaymentEntryType;
+import com.chuanphat.warranty.core.enums.SalesReturnDisposition;
 import com.chuanphat.warranty.core.enums.SalesOrderStatus;
 import com.chuanphat.warranty.core.enums.CreditApprovalStatus;
 import com.chuanphat.warranty.core.enums.DiscountApprovalStatus;
@@ -64,6 +68,7 @@ import com.chuanphat.warranty.core.repository.ProductSerialRepository;
 import com.chuanphat.warranty.core.repository.QuotationRepository;
 import com.chuanphat.warranty.core.repository.SalesOrderRepository;
 import com.chuanphat.warranty.core.repository.SalesPaymentRepository;
+import com.chuanphat.warranty.core.repository.SalesReturnItemRepository;
 import com.chuanphat.warranty.core.repository.SalesReturnRepository;
 import com.chuanphat.warranty.dto.CreateWarrantyRequest;
 import com.chuanphat.warranty.entity.WarrantyPolicy;
@@ -106,6 +111,7 @@ public class SalesService {
     private final SalesPaymentRepository paymentRepository;
     private final InstallmentApplicationRepository installmentRepository;
     private final SalesReturnRepository returnRepository;
+    private final SalesReturnItemRepository returnItemRepository;
     private final ProductSerialRepository serialRepository;
     private final InvoiceRepository invoiceRepository;
     private final VoucherRepository voucherRepository;
@@ -130,6 +136,7 @@ public class SalesService {
             SalesPaymentRepository paymentRepository,
             InstallmentApplicationRepository installmentRepository,
             SalesReturnRepository returnRepository,
+            SalesReturnItemRepository returnItemRepository,
             ProductSerialRepository serialRepository,
             InvoiceRepository invoiceRepository,
             VoucherRepository voucherRepository,
@@ -153,6 +160,7 @@ public class SalesService {
         this.paymentRepository = paymentRepository;
         this.installmentRepository = installmentRepository;
         this.returnRepository = returnRepository;
+        this.returnItemRepository = returnItemRepository;
         this.serialRepository = serialRepository;
         this.invoiceRepository = invoiceRepository;
         this.voucherRepository = voucherRepository;
@@ -670,6 +678,9 @@ public class SalesService {
 
     @Transactional
     public SalesReturnResponse createReturn(CreateSalesReturnRequest request) {
+        if (request.reasonCode() == null) {
+            throw new BusinessException("Return reason code is required");
+        }
         SalesOrder order = getOrderEntity(request.orderId());
         branchSecurity.requireBranchAccess(order.getBranchId());
         if (order.getStatus() == SalesOrderStatus.CANCELLED) {
@@ -685,7 +696,9 @@ public class SalesService {
         salesReturn.setBranchId(order.getBranchId());
         salesReturn.setCustomerId(order.getCustomerId());
         salesReturn.setReturnDate(request.returnDate() == null ? LocalDate.now() : request.returnDate());
-        salesReturn.setReason(request.reason());
+        salesReturn.setReasonCode(request.reasonCode());
+        salesReturn.setReasonNote(request.reasonNote());
+        salesReturn.setCreatedBy(currentUsername());
 
         BigDecimal returnAmount = BigDecimal.ZERO;
         for (CreateSalesReturnItemRequest itemRequest : request.items()) {
@@ -693,7 +706,9 @@ public class SalesService {
                     .filter(item -> item.getId().equals(itemRequest.orderItemId()))
                     .findFirst()
                     .orElseThrow(() -> new BusinessException("Order item not found in order: " + itemRequest.orderItemId()));
-            int availableToReturn = orderItem.getQuantity() - orderItem.getReturnedQuantity();
+            validateReturnedSerial(orderItem, itemRequest.serialId());
+            int alreadyAccepted = returnItemRepository.sumQuantityByOrderItemIdAndStatuses(orderItem.getId(), acceptedReturnStatuses());
+            int availableToReturn = orderItem.getQuantity() - alreadyAccepted;
             if (itemRequest.quantity() > availableToReturn) {
                 throw new BusinessException("Return quantity exceeds sold quantity");
             }
@@ -702,21 +717,12 @@ public class SalesService {
             returnItem.setOrderItem(orderItem);
             returnItem.setProduct(orderItem.getProduct());
             returnItem.setSerial(orderItem.getSerial());
+            returnItem.setBatchId(itemRequest.batchId());
             returnItem.setQuantity(itemRequest.quantity());
             returnItem.setUnitPrice(orderItem.getUnitPrice());
             returnItem.setLineAmount(orderItem.getUnitPrice().multiply(BigDecimal.valueOf(itemRequest.quantity())));
             returnItem.setSerialDisposition(itemRequest.serialDisposition() == null ? ReturnSerialDisposition.RETURNED : itemRequest.serialDisposition());
             salesReturn.addItem(returnItem);
-
-            orderItem.setReturnedQuantity(orderItem.getReturnedQuantity() + itemRequest.quantity());
-            if (orderItem.getSerial() != null) {
-                orderItem.getSerial().setStatus(returnItem.getSerialDisposition() == ReturnSerialDisposition.DAMAGED ? SerialStatus.DAMAGED : SerialStatus.RETURNED);
-                orderItem.getSerial().setReservedOrderNo(null);
-                orderItem.getSerial().setReservationUntil(null);
-            }
-            if (returnItem.getSerialDisposition() == ReturnSerialDisposition.RETURNED) {
-                inventoryService.returnStock(order.getBranchId(), orderItem.getProduct(), itemRequest.quantity(), salesReturn.getReturnNo());
-            }
             returnAmount = returnAmount.add(returnItem.getLineAmount());
         }
 
@@ -729,52 +735,143 @@ public class SalesService {
         }
         salesReturn.setReturnAmount(returnAmount);
         salesReturn.setRefundAmount(refundAmount);
-        salesReturn.setStatus(SalesReturnStatus.COMPLETED);
+        salesReturn.setStatus(SalesReturnStatus.REQUESTED);
         SalesReturn saved = returnRepository.save(salesReturn);
+        audit(AuditAction.CREATE_RETURN, AuditModule.SALES, "SalesReturn", saved.getId(), null, saved.getReturnNo());
+        return SalesReturnResponse.from(saved);
+    }
 
-        Customer customer = customerService.get(order.getCustomerId());
-        if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
-            accountingService.recordSalesRefund(
-                    saved.getReturnNo(),
-                    saved.getReturnDate(),
-                    customer.getId(),
-                    customer.getFullName(),
-                    refundAmount,
-                    request.refundMethod() == null ? PaymentMethod.CASH : request.refundMethod(),
-                    request.bankAccountId(),
-                    "Refund sales return " + saved.getReturnNo()
-            );
-            order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));
-            order.setPaymentStatus(paymentStatus(order.getTotalAmount(), order.getPaidAmount()));
-            audit(AuditAction.REFUND, AuditModule.SALES, "SalesReturn", saved.getId(), null, saved.getReturnNo());
+    @Transactional
+    public SalesReturnResponse approveReturn(Long id, ApproveSalesReturnRequest request) {
+        SalesReturn salesReturn = returnRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Sales return not found: " + id));
+        branchSecurity.requireBranchAccess(salesReturn.getBranchId());
+        if (salesReturn.getStatus() != SalesReturnStatus.REQUESTED) {
+            throw new BusinessException("Only requested returns can be approved");
+        }
+        AppUser approver = branchSecurity.currentUser();
+        if (approver.getUsername().equalsIgnoreCase(salesReturn.getCreatedBy())) {
+            throw new BusinessException("Return creator cannot approve their own return request");
+        }
+        SalesReturnDisposition disposition = request == null ? null : request.disposition();
+        if (disposition == null) {
+            throw new BusinessException("Return disposition is required");
         }
 
+        salesReturn.setDisposition(disposition);
+        salesReturn.setApprovedBy(approver.getUsername());
+        salesReturn.setApprovedAt(OffsetDateTime.now());
+        salesReturn.setStatus(SalesReturnStatus.APPROVED);
+
+        SalesOrder order = salesReturn.getOrder();
+        Customer customer = customerService.get(order.getCustomerId());
+        for (SalesReturnItem item : salesReturn.getItems()) {
+            SalesOrderItem orderItem = item.getOrderItem();
+            orderItem.setReturnedQuantity(orderItem.getReturnedQuantity() + item.getQuantity());
+            ProductSerial serial = orderItem.getSerial();
+            if (serial != null) {
+                serial.setStatus(item.getSerialDisposition() == ReturnSerialDisposition.DAMAGED ? SerialStatus.DAMAGED : SerialStatus.RETURNED);
+                serial.setReservedOrderNo(null);
+                serial.setReservationUntil(null);
+            }
+            if (disposition == SalesReturnDisposition.REFUND_TO_INVENTORY) {
+                inventoryService.processSalesReturn(order.getBranchId(), orderItem.getWarehouse() == null ? null : orderItem.getWarehouse().getId(), orderItem.getProduct(), item.getQuantity(), salesReturn.getReturnNo());
+            } else {
+                inventoryService.recordWriteOff(order.getBranchId(), orderItem.getWarehouse() == null ? null : orderItem.getWarehouse().getId(), orderItem.getProduct(), item.getQuantity(), salesReturn.getReturnNo());
+            }
+        }
+        salesReturn.setReceivedAt(OffsetDateTime.now());
+        salesReturn.setStatus(SalesReturnStatus.RECEIVED);
+
+        applyReturnFinancialLedger(salesReturn, order, customer);
         boolean allReturned = order.getItems().stream().allMatch(item -> item.getReturnedQuantity() >= item.getQuantity());
         if (allReturned) {
             order.setStatus(SalesOrderStatus.RETURNED);
             order.setReturnedAt(OffsetDateTime.now());
         }
-
-        // Đảo bút toán doanh thu + giá vốn (chống ghi trùng bằng flag accountingReversed)
-        if (!saved.isAccountingReversed()) {
-            BigDecimal returnCostAmount = saved.getItems().stream()
+        if (salesReturn.getStatus() == SalesReturnStatus.CREDITED && !salesReturn.isAccountingReversed()) {
+            BigDecimal returnCostAmount = salesReturn.getItems().stream()
                     .map(item -> item.getProduct().getImportPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             accountingService.recordSalesReturnReversal(
-                    saved.getReturnNo(),
-                    saved.getReturnDate(),
+                    salesReturn.getReturnNo(),
+                    salesReturn.getReturnDate(),
                     customer.getId(),
                     customer.getFullName(),
-                    saved.getReturnAmount(),
+                    salesReturn.getReturnAmount(),
                     returnCostAmount,
-                    "Sales return reversal " + saved.getReturnNo()
+                    "Sales return reversal " + salesReturn.getReturnNo()
             );
-            saved.setAccountingReversed(true);
-            saved.setReversalEntryNo(saved.getReturnNo() + "-REV");
+            salesReturn.setAccountingReversed(true);
+            salesReturn.setReversalEntryNo(salesReturn.getReturnNo() + "-REV");
         }
 
-        audit(AuditAction.CREATE_RETURN, AuditModule.SALES, "SalesReturn", saved.getId(), null, saved.getReturnNo());
-        return SalesReturnResponse.from(saved);
+        audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesReturn", salesReturn.getId(), request == null ? null : request.note(), salesReturn.getReturnNo());
+        return SalesReturnResponse.from(salesReturn);
+    }
+
+    private void applyReturnFinancialLedger(SalesReturn salesReturn, SalesOrder order, Customer customer) {
+        BigDecimal paidByLedger = paymentRepository.sumAmountByOrderId(order.getId());
+        BigDecimal returnAmount = salesReturn.getReturnAmount();
+        if (paidByLedger.compareTo(order.getTotalAmount()) >= 0) {
+            SalesPayment refund = new SalesPayment();
+            refund.setOrder(order);
+            refund.setPaymentMethod(PaymentMethod.CASH);
+            refund.setAmount(returnAmount.negate());
+            refund.setPaymentDate(salesReturn.getReturnDate());
+            refund.setReferenceNo(salesReturn.getReturnNo() + "-REFUND");
+            refund.setNote("Refund sales return " + salesReturn.getReturnNo());
+            refund.setEntryType(SalesPaymentEntryType.REFUND);
+            paymentRepository.save(refund);
+            order.setPaidAmount(order.getPaidAmount().subtract(returnAmount).max(BigDecimal.ZERO));
+            order.setPaymentStatus(paymentStatus(order.getTotalAmount(), order.getPaidAmount()));
+            salesReturn.setRefundAmount(returnAmount);
+            salesReturn.setStatus(SalesReturnStatus.REFUNDED);
+            audit(AuditAction.REFUND, AuditModule.SALES, "SalesReturn", salesReturn.getId(), null, salesReturn.getReturnNo());
+            return;
+        }
+
+        salesReturn.setRefundAmount(BigDecimal.ZERO);
+        salesReturn.setStatus(SalesReturnStatus.CREDITED);
+    }
+
+    private void validateReturnedSerial(SalesOrderItem orderItem, Long requestedSerialId) {
+        ProductSerial soldSerial = orderItem.getSerial();
+        if (soldSerial == null && requestedSerialId != null) {
+            throw new BusinessException("Order item was not sold with a serial");
+        }
+        if (soldSerial != null && (requestedSerialId == null || !soldSerial.getId().equals(requestedSerialId))) {
+            throw new BusinessException("Return serial must match the serial originally sold on the order");
+        }
+    }
+
+    private List<SalesReturnStatus> acceptedReturnStatuses() {
+        return List.of(
+                SalesReturnStatus.APPROVED,
+                SalesReturnStatus.RECEIVED,
+                SalesReturnStatus.REFUNDED,
+                SalesReturnStatus.CREDITED,
+                SalesReturnStatus.COMPLETED
+        );
+    }
+
+    @Transactional
+    public SalesReturnResponse rejectReturn(Long id, RejectSalesReturnRequest request) {
+        SalesReturn salesReturn = returnRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Sales return not found: " + id));
+        branchSecurity.requireBranchAccess(salesReturn.getBranchId());
+        if (salesReturn.getStatus() != SalesReturnStatus.REQUESTED) {
+            throw new BusinessException("Only requested returns can be rejected");
+        }
+        AppUser reviewer = branchSecurity.currentUser();
+        if (reviewer.getUsername().equalsIgnoreCase(salesReturn.getCreatedBy())) {
+            throw new BusinessException("Return creator cannot reject their own return request");
+        }
+        salesReturn.setRejectedBy(reviewer.getUsername());
+        salesReturn.setRejectedAt(OffsetDateTime.now());
+        salesReturn.setStatus(SalesReturnStatus.REJECTED);
+        audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesReturn", salesReturn.getId(), request == null ? null : request.note(), salesReturn.getReturnNo());
+        return SalesReturnResponse.from(salesReturn);
     }
 
     @Transactional(readOnly = true)
@@ -1369,6 +1466,15 @@ public class SalesService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(item -> authority.equals(item.getAuthority()));
+    }
+
+    private String currentUsername() {
+        try {
+            return branchSecurity.currentUser().getUsername();
+        } catch (RuntimeException ex) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            return authentication == null ? "system" : authentication.getName();
+        }
     }
 
     private boolean matchesCsv(String csv, Long value) {

@@ -38,6 +38,8 @@ class SalesApiSecurityContractTest {
                 "approveCredit",
                 "rejectCredit",
                 "createReturn",
+                "approveReturn",
+                "rejectReturn",
                 "createInvoice",
                 "salesOrderPdf"
         )) {

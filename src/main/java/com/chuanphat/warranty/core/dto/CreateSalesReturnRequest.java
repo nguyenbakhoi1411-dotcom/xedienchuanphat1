@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.dto;
 
 import com.chuanphat.warranty.accounting.enums.PaymentMethod;
+import com.chuanphat.warranty.core.enums.SalesReturnReasonCode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
@@ -15,7 +16,8 @@ public record CreateSalesReturnRequest(
         @NotNull @DecimalMin("0.00") BigDecimal refundAmount,
         PaymentMethod refundMethod,
         Long bankAccountId,
-        String reason,
+        @NotNull SalesReturnReasonCode reasonCode,
+        String reasonNote,
         @Valid @NotEmpty List<CreateSalesReturnItemRequest> items
 ) {
 }
