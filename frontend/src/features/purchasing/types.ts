@@ -54,6 +54,7 @@ export type PurchaseOrderStatus =
   | "PENDING_APPROVAL"
   | "APPROVED"
   | "PARTIALLY_RECEIVED"
+  | "FULLY_RECEIVED"
   | "RECEIVED"
   | "CANCELLED"
   | "REJECTED";
@@ -64,6 +65,7 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
   PENDING_APPROVAL: "Chờ duyệt",
   APPROVED: "Đã duyệt",
   PARTIALLY_RECEIVED: "Nhập một phần",
+  FULLY_RECEIVED: "Đã nhập đủ",
   RECEIVED: "Đã nhập đủ",
   CANCELLED: "Đã hủy",
   REJECTED: "Bị từ chối",
@@ -75,6 +77,7 @@ export const PO_STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
   PENDING_APPROVAL: "bg-amber-100 text-amber-700",
   APPROVED: "bg-blue-100 text-blue-700",
   PARTIALLY_RECEIVED: "bg-violet-100 text-violet-700",
+  FULLY_RECEIVED: "bg-emerald-100 text-emerald-700",
   RECEIVED: "bg-emerald-100 text-emerald-700",
   CANCELLED: "bg-red-100 text-red-700",
   REJECTED: "bg-red-100 text-red-800",
@@ -88,6 +91,7 @@ export interface PurchaseOrderItem {
   quantity: number;
   unitCost: number;
   lineTotal: number;
+  receivedQuantity: number;
 }
 
 export interface PurchaseOrder {
