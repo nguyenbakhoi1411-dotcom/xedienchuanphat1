@@ -2,11 +2,11 @@ package com.chuanphat.warranty.core.repository;
 
 import com.chuanphat.warranty.core.entity.PurchaseReceipt;
 import com.chuanphat.warranty.core.enums.ReceiptStatus;
-import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PurchaseReceiptRepository extends JpaRepository<PurchaseReceipt, Long> {
 
@@ -16,8 +16,22 @@ public interface PurchaseReceiptRepository extends JpaRepository<PurchaseReceipt
 
     Page<PurchaseReceipt> findByStatus(ReceiptStatus status, Pageable pageable);
 
-    /** Dem so phieu nhap cua 1 PO theo trang thai (de biet PARTIALLY_RECEIVED hay RECEIVED) */
+    /** Dem so phieu nhap cua 1 PO theo trang thai (legacy helper, giu de tuong thich code cu) */
     long countByPurchaseOrderIdAndStatus(Long purchaseOrderId, ReceiptStatus status);
+
+    @Query("""
+            select coalesce(sum(item.quantity), 0)
+            from PurchaseReceipt receipt
+            join receipt.items item
+            where receipt.purchaseOrderId = :purchaseOrderId
+              and item.product.id = :productId
+              and receipt.status = com.chuanphat.warranty.core.enums.ReceiptStatus.CONFIRMED
+            """)
+    long sumConfirmedQuantityByPurchaseOrderIdAndProductId(
+            @Param("purchaseOrderId") Long purchaseOrderId,
+            @Param("productId") Long productId);
+
+    boolean existsByPurchaseOrderIdAndStatus(Long purchaseOrderId, ReceiptStatus status);
 
     @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(r.receiptNo, 4) AS int)), 0) FROM PurchaseReceipt r WHERE r.receiptNo LIKE 'GNK%'")
     int findMaxReceiptSeq();
