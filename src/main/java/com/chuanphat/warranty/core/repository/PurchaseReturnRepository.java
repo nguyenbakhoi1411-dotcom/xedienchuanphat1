@@ -9,4 +9,6 @@ public interface PurchaseReturnRepository extends JpaRepository<PurchaseReturn, 
     Page<PurchaseReturn> findByBranchId(Long branchId, Pageable pageable);
     Page<PurchaseReturn> findBySupplierId(Long supplierId, Pageable pageable);
     long countBySupplierId(Long supplierId);
+
+    java.util.List<PurchaseReturn> findByPurchaseReceiptId(Long purchaseReceiptId);
 }

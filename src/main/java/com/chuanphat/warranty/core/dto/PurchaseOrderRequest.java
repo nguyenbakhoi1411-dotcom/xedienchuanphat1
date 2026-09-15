@@ -11,6 +11,7 @@ import java.util.List;
 public record PurchaseOrderRequest(
         @NotNull Long supplierId,
         @NotNull Long branchId,
+        Long warehouseId,
         LocalDate purchaseDate,
         LocalDate expectedDelivery,
         String note,
