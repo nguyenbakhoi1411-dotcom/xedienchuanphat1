@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -56,6 +57,8 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
     Optional<SalesOrder> findWithItemsById(Long id);
 
     List<SalesOrder> findByCustomerIdOrderByOrderDateDesc(Long customerId);
+
+    List<SalesOrder> findByExchangeGroupId(UUID exchangeGroupId);
 
     long countByEmployeeIdAndOrderDateBetween(Long employeeId, LocalDate from, LocalDate to);
 

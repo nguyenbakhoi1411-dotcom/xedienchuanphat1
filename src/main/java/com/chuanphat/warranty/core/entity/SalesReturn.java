@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "sales_returns")
@@ -94,6 +95,9 @@ public class SalesReturn {
     @Column(length = 80)
     private String reversalEntryNo;
 
+    @Column(name = "exchange_group_id")
+    private UUID exchangeGroupId;
+
     @OneToMany(mappedBy = "salesReturn", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SalesReturnItem> items = new ArrayList<>();
 
@@ -139,6 +143,8 @@ public class SalesReturn {
     public void setAccountingReversed(boolean accountingReversed) { this.accountingReversed = accountingReversed; }
     public String getReversalEntryNo() { return reversalEntryNo; }
     public void setReversalEntryNo(String reversalEntryNo) { this.reversalEntryNo = reversalEntryNo; }
+    public UUID getExchangeGroupId() { return exchangeGroupId; }
+    public void setExchangeGroupId(UUID exchangeGroupId) { this.exchangeGroupId = exchangeGroupId; }
     public List<SalesReturnItem> getItems() { return items; }
     public void addItem(SalesReturnItem item) { items.add(item); item.setSalesReturn(this); }
 }

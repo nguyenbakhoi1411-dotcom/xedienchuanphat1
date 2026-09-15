@@ -813,19 +813,23 @@ public class SalesService {
     private void applyReturnFinancialLedger(SalesReturn salesReturn, SalesOrder order, Customer customer) {
         BigDecimal paidByLedger = paymentRepository.sumAmountByOrderId(order.getId());
         BigDecimal returnAmount = salesReturn.getReturnAmount();
+        BigDecimal requestedRefundAmount = salesReturn.getRefundAmount() != null
+                && salesReturn.getRefundAmount().compareTo(BigDecimal.ZERO) > 0
+                ? salesReturn.getRefundAmount()
+                : returnAmount;
         if (paidByLedger.compareTo(order.getTotalAmount()) >= 0) {
             SalesPayment refund = new SalesPayment();
             refund.setOrder(order);
             refund.setPaymentMethod(PaymentMethod.CASH);
-            refund.setAmount(returnAmount.negate());
+            refund.setAmount(requestedRefundAmount.negate());
             refund.setPaymentDate(salesReturn.getReturnDate());
             refund.setReferenceNo(salesReturn.getReturnNo() + "-REFUND");
             refund.setNote("Refund sales return " + salesReturn.getReturnNo());
             refund.setEntryType(SalesPaymentEntryType.REFUND);
             paymentRepository.save(refund);
-            order.setPaidAmount(order.getPaidAmount().subtract(returnAmount).max(BigDecimal.ZERO));
+            order.setPaidAmount(order.getPaidAmount().subtract(requestedRefundAmount).max(BigDecimal.ZERO));
             order.setPaymentStatus(paymentStatus(order.getTotalAmount(), order.getPaidAmount()));
-            salesReturn.setRefundAmount(returnAmount);
+            salesReturn.setRefundAmount(requestedRefundAmount);
             salesReturn.setStatus(SalesReturnStatus.REFUNDED);
             audit(AuditAction.REFUND, AuditModule.SALES, "SalesReturn", salesReturn.getId(), null, salesReturn.getReturnNo());
             return;

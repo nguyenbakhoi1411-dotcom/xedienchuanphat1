@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 public record SalesReturnResponse(
         Long id,
@@ -23,6 +24,7 @@ public record SalesReturnResponse(
         SalesReturnReasonCode reasonCode,
         String reasonNote,
         SalesReturnDisposition disposition,
+        UUID exchangeGroupId,
         OffsetDateTime createdAt,
         List<SalesReturnItemResponse> items
 ) {
@@ -41,6 +43,7 @@ public record SalesReturnResponse(
                 salesReturn.getReasonCode(),
                 salesReturn.getReasonNote(),
                 salesReturn.getDisposition(),
+                salesReturn.getExchangeGroupId(),
                 salesReturn.getCreatedAt(),
                 salesReturn.getItems().stream().map(SalesReturnItemResponse::from).toList()
         );
