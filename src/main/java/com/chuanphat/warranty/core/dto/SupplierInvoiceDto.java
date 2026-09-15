@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.dto;
 
 import com.chuanphat.warranty.core.entity.SupplierInvoice;
 import com.chuanphat.warranty.core.entity.SupplierInvoiceItem;
+import com.chuanphat.warranty.core.enums.SupplierInvoicePaymentStatus;
 import com.chuanphat.warranty.core.enums.SupplierInvoiceStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,7 +17,10 @@ public record SupplierInvoiceDto(
         Long supplierId,
         Long branchId,
         SupplierInvoiceStatus status,
+        SupplierInvoicePaymentStatus paymentStatus,
         BigDecimal totalAmount,
+        BigDecimal paidAmount,
+        BigDecimal remainingAmount,
         String matchDetails,
         String resolvedBy,
         OffsetDateTime resolvedAt,
@@ -45,7 +49,10 @@ public record SupplierInvoiceDto(
                 invoice.getSupplier().getId(),
                 invoice.getBranchId(),
                 invoice.getStatus(),
+                invoice.getPaymentStatus(),
                 invoice.getTotalAmount(),
+                invoice.getPaidAmount(),
+                invoice.getRemainingAmount(),
                 invoice.getMatchDetails(),
                 invoice.getResolvedBy(),
                 invoice.getResolvedAt(),

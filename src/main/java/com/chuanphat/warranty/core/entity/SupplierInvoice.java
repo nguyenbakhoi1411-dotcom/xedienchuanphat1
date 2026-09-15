@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.entity;
 
 import com.chuanphat.warranty.core.enums.SupplierInvoiceStatus;
+import com.chuanphat.warranty.core.enums.SupplierInvoicePaymentStatus;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -55,6 +56,13 @@ public class SupplierInvoice {
     @Column(nullable = false, length = 30)
     private SupplierInvoiceStatus status = SupplierInvoiceStatus.PENDING_MATCH;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private SupplierInvoicePaymentStatus paymentStatus = SupplierInvoicePaymentStatus.UNPAID;
+
+    @Column(nullable = false, precision = 14, scale = 2)
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+
     @Column(length = 2000)
     private String matchDetails;
 
@@ -77,6 +85,9 @@ public class SupplierInvoice {
 
     @OneToMany(mappedBy = "supplierInvoice", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SupplierInvoiceItem> items = new ArrayList<>();
+
+    @OneToMany(mappedBy = "supplierInvoice", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PurchasePayment> payments = new ArrayList<>();
 
     public void addItem(SupplierInvoiceItem item) {
         items.add(item);
@@ -110,6 +121,11 @@ public class SupplierInvoice {
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public SupplierInvoiceStatus getStatus() { return status; }
     public void setStatus(SupplierInvoiceStatus status) { this.status = status; }
+    public SupplierInvoicePaymentStatus getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(SupplierInvoicePaymentStatus paymentStatus) { this.paymentStatus = paymentStatus; }
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+    public BigDecimal getRemainingAmount() { return totalAmount.subtract(paidAmount); }
     public String getMatchDetails() { return matchDetails; }
     public void setMatchDetails(String matchDetails) { this.matchDetails = matchDetails; }
     public String getResolvedBy() { return resolvedBy; }
@@ -124,4 +140,5 @@ public class SupplierInvoice {
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public List<SupplierInvoiceItem> getItems() { return items; }
+    public List<PurchasePayment> getPayments() { return payments; }
 }
