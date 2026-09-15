@@ -10,6 +10,7 @@ import com.chuanphat.warranty.core.entity.Supplier;
 import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.repository.PurchaseOrderRepository;
 import com.chuanphat.warranty.core.repository.ProductRepository;
+import com.chuanphat.warranty.core.repository.WarehouseRepository;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -38,15 +39,18 @@ public class PurchaseOrderService {
 
     private final PurchaseOrderRepository poRepo;
     private final ProductRepository productRepo;
+    private final WarehouseRepository warehouseRepo;
     private final SupplierService supplierService;
     private final BranchSecurity branchSecurity;
 
     public PurchaseOrderService(PurchaseOrderRepository poRepo,
                                 ProductRepository productRepo,
+                                WarehouseRepository warehouseRepo,
                                 SupplierService supplierService,
                                 BranchSecurity branchSecurity) {
         this.poRepo = poRepo;
         this.productRepo = productRepo;
+        this.warehouseRepo = warehouseRepo;
         this.supplierService = supplierService;
         this.branchSecurity = branchSecurity;
     }
@@ -84,6 +88,14 @@ public class PurchaseOrderService {
         po.setPurchaseOrderNo(generatePoNo());
         po.setSupplier(supplier);
         po.setBranchId(req.branchId());
+        if (req.warehouseId() != null) {
+            var warehouse = warehouseRepo.findById(req.warehouseId())
+                    .orElseThrow(() -> new BusinessException("Không tìm thấy kho: " + req.warehouseId()));
+            if (!warehouse.getBranchId().equals(req.branchId())) {
+                throw new BusinessException("Kho nhận hàng không thuộc chi nhánh của đơn mua hàng");
+            }
+            po.setWarehouse(warehouse);
+        }
         po.setStatus(PurchaseOrderStatus.DRAFT);
         po.setPurchaseDate(req.purchaseDate() != null ? req.purchaseDate() : LocalDate.now());
         po.setExpectedDelivery(req.expectedDelivery());

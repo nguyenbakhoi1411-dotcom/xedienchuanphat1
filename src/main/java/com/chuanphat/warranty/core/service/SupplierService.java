@@ -7,6 +7,7 @@ import com.chuanphat.warranty.core.dto.SupplierRequest;
 import com.chuanphat.warranty.core.entity.Supplier;
 import com.chuanphat.warranty.core.entity.SupplierGroup;
 import com.chuanphat.warranty.core.enums.RecordStatus;
+import com.chuanphat.warranty.core.enums.SupplierCategory;
 import com.chuanphat.warranty.core.repository.SupplierGroupRepository;
 import com.chuanphat.warranty.core.repository.SupplierRepository;
 import com.chuanphat.warranty.exception.BusinessException;
@@ -105,6 +106,10 @@ public class SupplierService {
         s.setWebsite(req.website());
         s.setAddress(req.address());
         s.setContactPerson(req.contactPerson());
+        s.setContactPhone(req.contactPhone());
+        s.setCategory(req.category() != null ? req.category() : SupplierCategory.OTHER);
+        s.setBankAccountNumber(req.bankAccountNumber());
+        s.setBankName(req.bankName());
         s.setCreditLimit(req.creditLimit() != null ? req.creditLimit() : BigDecimal.ZERO);
         s.setPaymentTermsDays(req.paymentTermsDays() > 0 ? req.paymentTermsDays() : 30);
         s.setRating(req.rating());

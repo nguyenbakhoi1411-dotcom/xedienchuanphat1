@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.dto;
 
 import com.chuanphat.warranty.core.entity.Supplier;
 import com.chuanphat.warranty.core.enums.RecordStatus;
+import com.chuanphat.warranty.core.enums.SupplierCategory;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
@@ -17,6 +18,10 @@ public record SupplierDto(
         String website,
         String address,
         String contactPerson,
+        String contactPhone,
+        SupplierCategory category,
+        String bankAccountNumber,
+        String bankName,
         BigDecimal currentDebt,
         BigDecimal creditLimit,
         int paymentTermsDays,
@@ -31,7 +36,8 @@ public record SupplierDto(
                 s.getGroup() != null ? s.getGroup().getId() : null,
                 s.getGroup() != null ? s.getGroup().getName() : null,
                 s.getTaxCode(), s.getPhone(), s.getEmail(), s.getWebsite(),
-                s.getAddress(), s.getContactPerson(),
+                s.getAddress(), s.getContactPerson(), s.getContactPhone(),
+                s.getCategory(), s.getBankAccountNumber(), s.getBankName(),
                 s.getCurrentDebt(), s.getCreditLimit(),
                 s.getPaymentTermsDays(), s.getRating(),
                 s.getNotes(), s.getStatus(), s.getCreatedAt()
