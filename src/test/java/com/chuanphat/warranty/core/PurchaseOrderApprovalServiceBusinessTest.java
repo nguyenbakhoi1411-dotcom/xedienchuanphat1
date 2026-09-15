@@ -42,7 +42,8 @@ class PurchaseOrderApprovalServiceBusinessTest {
 
     @BeforeEach
     void setUp() {
-        service = new PurchaseOrderService(purchaseOrderRepository, productRepository, warehouseRepository, supplierService, branchSecurity);
+        service = new PurchaseOrderService(
+                purchaseOrderRepository, productRepository, warehouseRepository, supplierService, branchSecurity);
         lenient().when(purchaseOrderRepository.save(any(PurchaseOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
