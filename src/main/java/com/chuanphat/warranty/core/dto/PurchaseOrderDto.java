@@ -14,6 +14,7 @@ public record PurchaseOrderDto(
         Long supplierId,
         String supplierName,
         Long branchId,
+        Long warehouseId,
         PurchaseOrderStatus status,
         String statusLabel,
         LocalDate purchaseDate,
@@ -21,12 +22,22 @@ public record PurchaseOrderDto(
         BigDecimal totalAmount,
         BigDecimal paidAmount,
         String note,
+        // Maker audit
         String createdBy,
         OffsetDateTime createdAt,
+        String submittedBy,
+        OffsetDateTime submittedAt,
+        // Checker audit
         String approvedBy,
         OffsetDateTime approvedAt,
         String rejectedBy,
+        OffsetDateTime rejectedAt,
         String rejectReason,
+        // Cancel audit
+        String cancelledBy,
+        OffsetDateTime cancelledAt,
+        String cancelReason,
+        // Workflow flags
         boolean stockReceived,
         boolean accountingRecorded,
         List<PurchaseOrderItemDto> items
@@ -38,7 +49,8 @@ public record PurchaseOrderDto(
             String productCode,
             int quantity,
             BigDecimal unitCost,
-            BigDecimal lineTotal
+            BigDecimal lineTotal,
+            int receivedQuantity
     ) {
         public static PurchaseOrderItemDto from(PurchaseOrderItem item) {
             return new PurchaseOrderItemDto(
@@ -48,7 +60,8 @@ public record PurchaseOrderDto(
                     item.getProduct().getProductCode(),
                     item.getQuantity(),
                     item.getUnitCost(),
-                    item.getLineTotal()
+                    item.getLineTotal(),
+                    item.getReceivedQuantity()
             );
         }
     }
@@ -57,12 +70,15 @@ public record PurchaseOrderDto(
         return new PurchaseOrderDto(
                 po.getId(), po.getPurchaseOrderNo(),
                 po.getSupplier().getId(), po.getSupplier().getName(),
-                po.getBranchId(), po.getStatus(), statusLabel(po.getStatus()),
+                po.getBranchId(), po.getWarehouseId(), po.getStatus(), statusLabel(po.getStatus()),
                 po.getPurchaseDate(), po.getExpectedDelivery(),
                 po.getTotalAmount(), po.getPaidAmount(),
-                po.getNote(), po.getCreatedBy(), po.getCreatedAt(),
+                po.getNote(),
+                po.getCreatedBy(), po.getCreatedAt(),
+                po.getSubmittedBy(), po.getSubmittedAt(),
                 po.getApprovedBy(), po.getApprovedAt(),
-                po.getRejectedBy(), po.getRejectReason(),
+                po.getRejectedBy(), po.getRejectedAt(), po.getRejectReason(),
+                po.getCancelledBy(), po.getCancelledAt(), po.getCancelReason(),
                 po.isStockReceived(), po.isAccountingRecorded(),
                 po.getItems().stream().map(PurchaseOrderItemDto::from).toList()
         );
@@ -71,9 +87,11 @@ public record PurchaseOrderDto(
     private static String statusLabel(PurchaseOrderStatus s) {
         return switch (s) {
             case DRAFT -> "Nháp";
+            case SUBMITTED -> "Đã gửi duyệt";
             case PENDING_APPROVAL -> "Chờ duyệt";
             case APPROVED -> "Đã duyệt";
             case PARTIALLY_RECEIVED -> "Nhập một phần";
+            case FULLY_RECEIVED -> "Đã nhập đủ";
             case RECEIVED -> "Đã nhập đủ";
             case CANCELLED -> "Đã hủy";
             case REJECTED -> "Bị từ chối";

@@ -10,6 +10,7 @@ import com.chuanphat.warranty.core.entity.Supplier;
 import com.chuanphat.warranty.core.enums.PurchaseOrderStatus;
 import com.chuanphat.warranty.core.repository.PurchaseOrderRepository;
 import com.chuanphat.warranty.core.repository.ProductRepository;
+import com.chuanphat.warranty.core.repository.WarehouseRepository;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -24,13 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * Luong:
  *   create() -> DRAFT
- *   submit() -> PENDING_APPROVAL (neu vuot nguong) hoac APPROVED (tu dong duyet)
+ *   submit() -> SUBMITTED
  *   approve() / reject() -> APPROVED / REJECTED
- *   cancel() -> CANCELLED (chi DRAFT / PENDING_APPROVAL)
+ *   cancel() -> CANCELLED
  *
  * Sau khi APPROVED:
  *   PurchaseReceiptService.create(purchaseOrderId=...) -> nhap kho
- *   Receipt.confirm() -> cap nhat PARTIALLY_RECEIVED / RECEIVED
+ *   Receipt.confirm() -> cap nhat PARTIALLY_RECEIVED / FULLY_RECEIVED
  */
 @Service
 @Transactional
@@ -38,15 +39,18 @@ public class PurchaseOrderService {
 
     private final PurchaseOrderRepository poRepo;
     private final ProductRepository productRepo;
+    private final WarehouseRepository warehouseRepo;
     private final SupplierService supplierService;
     private final BranchSecurity branchSecurity;
 
     public PurchaseOrderService(PurchaseOrderRepository poRepo,
                                 ProductRepository productRepo,
+                                WarehouseRepository warehouseRepo,
                                 SupplierService supplierService,
                                 BranchSecurity branchSecurity) {
         this.poRepo = poRepo;
         this.productRepo = productRepo;
+        this.warehouseRepo = warehouseRepo;
         this.supplierService = supplierService;
         this.branchSecurity = branchSecurity;
     }
@@ -84,6 +88,14 @@ public class PurchaseOrderService {
         po.setPurchaseOrderNo(generatePoNo());
         po.setSupplier(supplier);
         po.setBranchId(req.branchId());
+        if (req.warehouseId() != null) {
+            var warehouse = warehouseRepo.findById(req.warehouseId())
+                    .orElseThrow(() -> new BusinessException("Không tìm thấy kho: " + req.warehouseId()));
+            if (!warehouse.getBranchId().equals(req.branchId())) {
+                throw new BusinessException("Kho nhận hàng không thuộc chi nhánh của đơn mua hàng");
+            }
+            po.setWarehouse(warehouse);
+        }
         po.setStatus(PurchaseOrderStatus.DRAFT);
         po.setPurchaseDate(req.purchaseDate() != null ? req.purchaseDate() : LocalDate.now());
         po.setExpectedDelivery(req.expectedDelivery());
@@ -115,15 +127,7 @@ public class PurchaseOrderService {
 
         po.setSubmittedAt(OffsetDateTime.now());
         po.setSubmittedBy(currentUsername());
-
-        if (po.requiresApproval()) {
-            po.setStatus(PurchaseOrderStatus.PENDING_APPROVAL);
-        } else {
-            // Tu dong duyet neu nho hon nguong
-            po.setStatus(PurchaseOrderStatus.APPROVED);
-            po.setApprovedAt(OffsetDateTime.now());
-            po.setApprovedBy("AUTO");
-        }
+        po.setStatus(PurchaseOrderStatus.SUBMITTED);
         return PurchaseOrderDto.from(poRepo.save(po));
     }
 
@@ -131,10 +135,16 @@ public class PurchaseOrderService {
 
     public PurchaseOrderDto approve(Long id) {
         PurchaseOrder po = findById(id);
-        requireStatus(po, PurchaseOrderStatus.PENDING_APPROVAL);
+        branchSecurity.requireBranchAccess(po.getBranchId());
+        requireSubmitted(po);
+        var approver = branchSecurity.currentUser();
+        if (approver.getUsername().equalsIgnoreCase(po.getCreatedBy())) {
+            throw new BusinessException("Người tạo đơn mua hàng không được tự duyệt đơn của chính mình");
+        }
+        requireApprovalLevel(approver, po.getTotalAmount());
         po.setStatus(PurchaseOrderStatus.APPROVED);
         po.setApprovedAt(OffsetDateTime.now());
-        po.setApprovedBy(currentUsername());
+        po.setApprovedBy(approver.getUsername());
         return PurchaseOrderDto.from(poRepo.save(po));
     }
 
@@ -142,7 +152,8 @@ public class PurchaseOrderService {
 
     public PurchaseOrderDto reject(Long id, String reason) {
         PurchaseOrder po = findById(id);
-        requireStatus(po, PurchaseOrderStatus.PENDING_APPROVAL);
+        branchSecurity.requireBranchAccess(po.getBranchId());
+        requireSubmitted(po);
         po.setStatus(PurchaseOrderStatus.REJECTED);
         po.setRejectedAt(OffsetDateTime.now());
         po.setRejectedBy(currentUsername());
@@ -155,7 +166,9 @@ public class PurchaseOrderService {
     public PurchaseOrderDto cancel(Long id, String reason) {
         PurchaseOrder po = findById(id);
         branchSecurity.requireBranchAccess(po.getBranchId());
-        if (po.getStatus() == PurchaseOrderStatus.RECEIVED || po.getStatus() == PurchaseOrderStatus.PARTIALLY_RECEIVED) {
+        if (po.getStatus() == PurchaseOrderStatus.FULLY_RECEIVED
+                || po.getStatus() == PurchaseOrderStatus.RECEIVED
+                || po.getStatus() == PurchaseOrderStatus.PARTIALLY_RECEIVED) {
             throw new BusinessException("Không thể hủy đơn đã nhập kho. Tạo phiếu trả hàng thay.");
         }
         if (po.getStatus() == PurchaseOrderStatus.CANCELLED) {
@@ -181,7 +194,7 @@ public class PurchaseOrderService {
 
     public void markFullyReceived(Long poId) {
         PurchaseOrder po = findById(poId);
-        po.setStatus(PurchaseOrderStatus.RECEIVED);
+        po.setStatus(PurchaseOrderStatus.FULLY_RECEIVED);
         po.setStockReceived(true);
         poRepo.save(po);
     }
@@ -197,6 +210,33 @@ public class PurchaseOrderService {
         if (po.getStatus() != required) {
             throw new BusinessException("Đơn mua hàng phải ở trạng thái " + required.name()
                     + ", hiện tại: " + po.getStatus().name());
+        }
+    }
+
+    private void requireSubmitted(PurchaseOrder po) {
+        if (po.getStatus() != PurchaseOrderStatus.SUBMITTED && po.getStatus() != PurchaseOrderStatus.PENDING_APPROVAL) {
+            throw new BusinessException("Đơn mua hàng phải ở trạng thái SUBMITTED, hiện tại: " + po.getStatus().name());
+        }
+    }
+
+    private void requireApprovalLevel(com.chuanphat.warranty.auth.entity.AppUser approver, BigDecimal totalAmount) {
+        BigDecimal amount = totalAmount == null ? BigDecimal.ZERO : totalAmount;
+        if (amount.compareTo(new BigDecimal("20000000")) < 0) {
+            requireAnyRole(approver, "PURCHASE_MANAGER", "CHIEF_ACCOUNTANT", "ADMIN", "SUPER_ADMIN");
+            return;
+        }
+        if (amount.compareTo(new BigDecimal("100000000")) <= 0) {
+            requireAnyRole(approver, "CHIEF_ACCOUNTANT", "ADMIN", "SUPER_ADMIN");
+            return;
+        }
+        requireAnyRole(approver, "ADMIN", "SUPER_ADMIN");
+    }
+
+    private void requireAnyRole(com.chuanphat.warranty.auth.entity.AppUser user, String... roleCodes) {
+        var allowedRoles = java.util.Set.of(roleCodes);
+        boolean allowed = user.getRoles().stream().anyMatch(role -> allowedRoles.contains(role.getCode()));
+        if (!allowed) {
+            throw new org.springframework.security.access.AccessDeniedException("Không đủ thẩm quyền duyệt đơn mua hàng theo giá trị đơn");
         }
     }
 
