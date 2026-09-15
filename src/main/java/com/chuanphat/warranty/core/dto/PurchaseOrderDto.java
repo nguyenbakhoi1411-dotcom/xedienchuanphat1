@@ -22,12 +22,22 @@ public record PurchaseOrderDto(
         BigDecimal totalAmount,
         BigDecimal paidAmount,
         String note,
+        // Maker audit
         String createdBy,
         OffsetDateTime createdAt,
+        String submittedBy,
+        OffsetDateTime submittedAt,
+        // Checker audit
         String approvedBy,
         OffsetDateTime approvedAt,
         String rejectedBy,
+        OffsetDateTime rejectedAt,
         String rejectReason,
+        // Cancel audit
+        String cancelledBy,
+        OffsetDateTime cancelledAt,
+        String cancelReason,
+        // Workflow flags
         boolean stockReceived,
         boolean accountingRecorded,
         List<PurchaseOrderItemDto> items
@@ -63,9 +73,12 @@ public record PurchaseOrderDto(
                 po.getBranchId(), po.getWarehouseId(), po.getStatus(), statusLabel(po.getStatus()),
                 po.getPurchaseDate(), po.getExpectedDelivery(),
                 po.getTotalAmount(), po.getPaidAmount(),
-                po.getNote(), po.getCreatedBy(), po.getCreatedAt(),
+                po.getNote(),
+                po.getCreatedBy(), po.getCreatedAt(),
+                po.getSubmittedBy(), po.getSubmittedAt(),
                 po.getApprovedBy(), po.getApprovedAt(),
-                po.getRejectedBy(), po.getRejectReason(),
+                po.getRejectedBy(), po.getRejectedAt(), po.getRejectReason(),
+                po.getCancelledBy(), po.getCancelledAt(), po.getCancelReason(),
                 po.isStockReceived(), po.isAccountingRecorded(),
                 po.getItems().stream().map(PurchaseOrderItemDto::from).toList()
         );
@@ -74,6 +87,7 @@ public record PurchaseOrderDto(
     private static String statusLabel(PurchaseOrderStatus s) {
         return switch (s) {
             case DRAFT -> "Nháp";
+            case SUBMITTED -> "Đã gửi duyệt";
             case PENDING_APPROVAL -> "Chờ duyệt";
             case APPROVED -> "Đã duyệt";
             case PARTIALLY_RECEIVED -> "Nhập một phần";

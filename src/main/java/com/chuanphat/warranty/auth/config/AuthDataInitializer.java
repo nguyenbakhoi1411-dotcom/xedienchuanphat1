@@ -54,7 +54,8 @@ public class AuthDataInitializer {
                     "INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "INVENTORY_TRANSFER", "INVENTORY_APPROVE", "INVENTORY_TRANSFER_APPROVE", "INVENTORY_STOCKTAKE",
                     "SALES_VIEW", "SALES_CREATE", "SALES_UPDATE", "SALES_CANCEL", "SALES_DISCOUNT_APPROVE", "SALES_RETURN", "INVOICE_ISSUE", "INVOICE_EXPORT",
                     "CUSTOMER_VIEW", "CUSTOMER_CREATE", "CUSTOMER_UPDATE",
-                    "SUPPLIER_VIEW", "SUPPLIER_CREATE", "SUPPLIER_UPDATE", "PURCHASE_CREATE",
+                    "SUPPLIER_VIEW", "SUPPLIER_CREATE", "SUPPLIER_UPDATE",
+                    "PURCHASE_VIEW", "PURCHASE_CREATE", "PURCHASE_UPDATE", "PURCHASE_APPROVE", "PURCHASE_CANCEL",
                     "WARRANTY_VIEW", "WARRANTY_MANAGE",
                     "ACCOUNTING_VIEW", "ACCOUNTING_CREATE", "ACCOUNTING_POST", "ACCOUNTING_CANCEL", "ACCOUNTING_REPORT", "ACCOUNTING_EXPORT", "RECEIPT_CREATE", "PAYMENT_CREATE",
                     "REPORT_VIEW", "REPORT_EXPORT", "AUDIT_VIEW", "SETTING_MANAGE",
@@ -95,7 +96,8 @@ public class AuthDataInitializer {
                     "INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "INVENTORY_TRANSFER", "INVENTORY_APPROVE", "INVENTORY_TRANSFER_APPROVE", "INVENTORY_STOCKTAKE",
                     "SALES_VIEW", "SALES_CREATE", "SALES_UPDATE", "SALES_CANCEL", "SALES_DISCOUNT_APPROVE", "SALES_RETURN", "INVOICE_ISSUE", "INVOICE_EXPORT",
                     "CUSTOMER_VIEW", "CUSTOMER_CREATE", "CUSTOMER_UPDATE",
-                    "SUPPLIER_VIEW", "SUPPLIER_CREATE", "SUPPLIER_UPDATE", "PURCHASE_CREATE",
+                    "SUPPLIER_VIEW", "SUPPLIER_CREATE", "SUPPLIER_UPDATE",
+                    "PURCHASE_VIEW", "PURCHASE_CREATE", "PURCHASE_UPDATE", "PURCHASE_CANCEL",
                     "WARRANTY_VIEW", "WARRANTY_MANAGE", "HR_VIEW", "HR_MANAGE",
                     "VIEW_PRICE_POLICY", "CREATE_PRICE_POLICY", "EDIT_PRICE_POLICY", "APPROVE_PRICE_POLICY", "CANCEL_PRICE_POLICY", "VIEW_PRICE_HISTORY", "VIEW_COST_PRICE", "VIEW_PROFIT",
                     "REPORT_VIEW", "REPORT_EXPORT", "AUDIT_VIEW", "EXPORT_REPORT", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE");
@@ -112,11 +114,20 @@ public class AuthDataInitializer {
                     "DASHBOARD_VIEW", "PRODUCT_VIEW", "INVENTORY_VIEW", "SALES_VIEW", "SALES_CREATE", "SALES_UPDATE", "SALES_RETURN", "INVOICE_ISSUE", "INVOICE_EXPORT",
                     "CUSTOMER_VIEW", "CUSTOMER_CREATE", "CUSTOMER_UPDATE", "VIEW_PRICE_POLICY", "AI_ASSISTANT_USE");
             ensureRole(roleRepository, permissionRepository, "WAREHOUSE_STAFF", "Nhan vien kho",
-                    "PRODUCT_VIEW", "INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "INVENTORY_TRANSFER", "INVENTORY_STOCKTAKE", "SUPPLIER_VIEW", "PURCHASE_CREATE", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE");
+                    "PRODUCT_VIEW", "INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_EXPORT", "INVENTORY_TRANSFER", "INVENTORY_STOCKTAKE",
+                    "SUPPLIER_VIEW", "PURCHASE_VIEW", "PURCHASE_CREATE", "PURCHASE_UPDATE", "PURCHASE_CANCEL",
+                    "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE");
             ensureRole(roleRepository, permissionRepository, "AUDITOR", "Kiem toan noi bo",
                     "DASHBOARD_VIEW", "REPORT_VIEW", "REPORT_EXPORT", "AUDIT_VIEW", "VIEW_AUDIT_LOG", "EXPORT_REPORT", "AI_ASSISTANT_USE");
             ensureRole(roleRepository, permissionRepository, "HR_MANAGER", "Quan ly nhan su",
                     "DASHBOARD_VIEW", "HR_VIEW", "HR_MANAGE", "USER_VIEW", "USER_CREATE", "USER_UPDATE", "ROLE_VIEW", "VIEW_AUDIT_LOG", "IMPORT_DATA", "UPLOAD_FILE", "AI_ASSISTANT_USE");
+            // Maker-checker approver roles (PR2: purchase-order-maker-checker-approval)
+            ensureRole(roleRepository, permissionRepository, "PURCHASE_MANAGER", "Quan ly mua hang",
+                    "DASHBOARD_VIEW", "PURCHASE_VIEW", "PURCHASE_APPROVE", "SUPPLIER_VIEW", "REPORT_VIEW", "AI_ASSISTANT_USE");
+            ensureRole(roleRepository, permissionRepository, "CHIEF_ACCOUNTANT", "Ke toan truong",
+                    "DASHBOARD_VIEW", "PURCHASE_VIEW", "PURCHASE_APPROVE", "ACCOUNTING_VIEW", "ACCOUNTING_REPORT",
+                    "RECEIPT_CREATE", "PAYMENT_CREATE", "SUPPLIER_VIEW", "REPORT_VIEW", "REPORT_EXPORT",
+                    "VIEW_ACCOUNTING", "VIEW_CUSTOMER_DEBT", "LOCK_ACCOUNTING_PERIOD", "AI_ASSISTANT_USE");
 
             if (bootstrapAdminEnabled) {
                 validateBootstrapAdmin();
@@ -183,6 +194,8 @@ public class AuthDataInitializer {
             case "WAREHOUSE_STAFF" -> "Nhap xuat ton va kiem kho";
             case "AUDITOR" -> "Xem bao cao va nhat ky he thong";
             case "HR_MANAGER" -> "Quan ly nhan su, tai khoan va ho so";
+            case "PURCHASE_MANAGER" -> "Duyet don mua hang duoi 20 trieu";
+            case "CHIEF_ACCOUNTANT" -> "Duyet don mua hang tu 20 den 100 trieu";
             default -> "Vai tro he thong";
         };
     }

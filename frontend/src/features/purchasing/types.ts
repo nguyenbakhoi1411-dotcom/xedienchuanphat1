@@ -50,6 +50,7 @@ export interface SupplierRequest {
 // ── Purchase Order ──────────────────────────────────────────────────────────
 export type PurchaseOrderStatus =
   | "DRAFT"
+  | "SUBMITTED"
   | "PENDING_APPROVAL"
   | "APPROVED"
   | "PARTIALLY_RECEIVED"
@@ -59,6 +60,7 @@ export type PurchaseOrderStatus =
 
 export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
   DRAFT: "Nháp",
+  SUBMITTED: "Đã gửi duyệt",
   PENDING_APPROVAL: "Chờ duyệt",
   APPROVED: "Đã duyệt",
   PARTIALLY_RECEIVED: "Nhập một phần",
@@ -69,6 +71,7 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
 
 export const PO_STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
   DRAFT: "bg-slate-100 text-slate-600",
+  SUBMITTED: "bg-amber-100 text-amber-700",
   PENDING_APPROVAL: "bg-amber-100 text-amber-700",
   APPROVED: "bg-blue-100 text-blue-700",
   PARTIALLY_RECEIVED: "bg-violet-100 text-violet-700",
@@ -102,10 +105,16 @@ export interface PurchaseOrder {
   note?: string;
   createdBy?: string;
   createdAt: string;
+  submittedBy?: string;
+  submittedAt?: string;
   approvedBy?: string;
   approvedAt?: string;
   rejectedBy?: string;
+  rejectedAt?: string;
   rejectReason?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancelReason?: string;
   stockReceived: boolean;
   accountingRecorded: boolean;
   items: PurchaseOrderItem[];
