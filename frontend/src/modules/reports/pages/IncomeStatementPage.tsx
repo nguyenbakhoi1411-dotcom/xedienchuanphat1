@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { PeriodSelector, IncomeStatementViewer } from '../../components';
-import { useIncomeStatement } from '../../hooks';
+import { PeriodSelector, IncomeStatementViewer } from '../components';
+import { useIncomeStatement } from '../hooks';
 import { format, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
 
 export function IncomeStatementPage() {

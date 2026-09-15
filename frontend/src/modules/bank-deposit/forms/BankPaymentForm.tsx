@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCreateBankPayment, useBankAccounts } from '../hooks';
-import { CreateBankPaymentRequest, paymentSubTypes } from '../types';
+import { CreateBankPaymentRequest, PartnerType, paymentSubTypes } from '../types';
 
 // Validation schema
 const bankPaymentSchema = z.object({
@@ -18,7 +18,7 @@ const bankPaymentSchema = z.object({
   currency: z.string().length(3, 'Currency code must be 3 characters').optional(),
   exchangeRate: z.number().positive().optional(),
   description: z.string().optional(),
-  partnerType: z.enum(['CUSTOMER', 'SUPPLIER', 'EMPLOYEE']).optional(),
+  partnerType: z.nativeEnum(PartnerType).optional(),
   partnerId: z.string().uuid().optional(),
   debitAccount: z.string().min(2, 'Debit account is required'),
   creditAccount: z.string().min(2, 'Credit account is required'),

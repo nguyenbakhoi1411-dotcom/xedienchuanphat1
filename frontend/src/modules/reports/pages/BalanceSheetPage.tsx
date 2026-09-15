@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { PeriodSelector, BalanceSheetViewer } from '../../components';
-import { useBalanceSheet } from '../../hooks';
+import { PeriodSelector, BalanceSheetViewer } from '../components';
+import { useBalanceSheet } from '../hooks';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 export function BalanceSheetPage() {

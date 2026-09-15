@@ -250,12 +250,13 @@ export function ReportHubPage() {
   };
 
   const recentReportItems = recentReports.map((recent) => {
-    const report = MOCK_REPORTS.find((r) => r.id === recent.id);
+    const recentId = recent.id ?? recent.reportId ?? '';
+    const report = MOCK_REPORTS.find((r) => r.id === recentId);
     return {
-      id: recent.id,
+      id: recentId,
       name: report?.name || 'Unknown',
       icon: report?.icon,
-      viewedAt: recent.viewedAt,
+      viewedAt: new Date(recent.viewedAt).toLocaleDateString('vi-VN'),
     };
   });
 

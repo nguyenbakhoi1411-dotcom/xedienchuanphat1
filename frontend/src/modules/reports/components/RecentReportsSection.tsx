@@ -28,7 +28,7 @@ export function RecentReportItem({ id, name, icon, viewedAt, onView }: RecentRep
 }
 
 interface RecentReportsSectionProps {
-  reports: RecentReportItemProps[];
+  reports: Omit<RecentReportItemProps, 'onView'>[];
   onView: (id: string) => void;
   isLoading?: boolean;
 }

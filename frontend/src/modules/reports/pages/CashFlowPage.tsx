@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { PeriodSelector, CashFlowViewer } from '../../components';
-import { useCashFlow } from '../../hooks';
+import { PeriodSelector, CashFlowViewer } from '../components';
+import { useCashFlow } from '../hooks';
 import { format, startOfYear } from 'date-fns';
 
 export function CashFlowPage() {
