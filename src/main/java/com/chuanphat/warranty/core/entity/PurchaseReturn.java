@@ -1,6 +1,8 @@
 package com.chuanphat.warranty.core.entity;
 
 import jakarta.persistence.*;
+import com.chuanphat.warranty.core.enums.PurchaseReturnReasonCode;
+import com.chuanphat.warranty.core.enums.PurchaseReturnStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -25,20 +27,27 @@ public class PurchaseReturn {
 
     private Long purchaseOrderId;
 
+    private Long purchaseReceiptId;
+
     @Column(nullable = false)
     private LocalDate returnDate = LocalDate.now();
 
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
-    @Column(length = 20)
-    private String status = "DRAFT";
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private PurchaseReturnStatus status = PurchaseReturnStatus.REQUESTED;
 
     @Column(length = 30)
     private String refundMethod;   // DEDUCT_PAYABLE | CASH_REFUND
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private PurchaseReturnReasonCode reasonCode;
+
     @Column(length = 500)
-    private String reason;
+    private String reasonNote;
 
     @Column(length = 500)
     private String note;
@@ -54,6 +63,25 @@ public class PurchaseReturn {
     private boolean accountingRecorded = false;
 
     private Long payableId;
+
+    private Long supplierInvoiceId;
+
+    private Long supplierReceivableId;
+
+    @Column(length = 120)
+    private String approvedBy;
+
+    private OffsetDateTime approvedAt;
+
+    @Column(length = 120)
+    private String shippedBackBy;
+
+    private OffsetDateTime shippedBackAt;
+
+    @Column(length = 120)
+    private String creditedBy;
+
+    private OffsetDateTime creditedAt;
 
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
@@ -74,16 +102,22 @@ public class PurchaseReturn {
     public void setBranchId(Long branchId) { this.branchId = branchId; }
     public Long getPurchaseOrderId() { return purchaseOrderId; }
     public void setPurchaseOrderId(Long purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
+    public Long getPurchaseReceiptId() { return purchaseReceiptId; }
+    public void setPurchaseReceiptId(Long purchaseReceiptId) { this.purchaseReceiptId = purchaseReceiptId; }
     public LocalDate getReturnDate() { return returnDate; }
     public void setReturnDate(LocalDate returnDate) { this.returnDate = returnDate; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public PurchaseReturnStatus getStatus() { return status; }
+    public void setStatus(PurchaseReturnStatus status) { this.status = status; }
     public String getRefundMethod() { return refundMethod; }
     public void setRefundMethod(String refundMethod) { this.refundMethod = refundMethod; }
-    public String getReason() { return reason; }
-    public void setReason(String reason) { this.reason = reason; }
+    public PurchaseReturnReasonCode getReasonCode() { return reasonCode; }
+    public void setReasonCode(PurchaseReturnReasonCode reasonCode) { this.reasonCode = reasonCode; }
+    public String getReasonNote() { return reasonNote; }
+    public void setReasonNote(String reasonNote) { this.reasonNote = reasonNote; }
+    public String getReason() { return reasonNote; }
+    public void setReason(String reason) { this.reasonNote = reason; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
     public boolean isStockReturned() { return stockReturned; }
@@ -94,6 +128,22 @@ public class PurchaseReturn {
     public void setAccountingRecorded(boolean accountingRecorded) { this.accountingRecorded = accountingRecorded; }
     public Long getPayableId() { return payableId; }
     public void setPayableId(Long payableId) { this.payableId = payableId; }
+    public Long getSupplierInvoiceId() { return supplierInvoiceId; }
+    public void setSupplierInvoiceId(Long supplierInvoiceId) { this.supplierInvoiceId = supplierInvoiceId; }
+    public Long getSupplierReceivableId() { return supplierReceivableId; }
+    public void setSupplierReceivableId(Long supplierReceivableId) { this.supplierReceivableId = supplierReceivableId; }
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+    public OffsetDateTime getApprovedAt() { return approvedAt; }
+    public void setApprovedAt(OffsetDateTime approvedAt) { this.approvedAt = approvedAt; }
+    public String getShippedBackBy() { return shippedBackBy; }
+    public void setShippedBackBy(String shippedBackBy) { this.shippedBackBy = shippedBackBy; }
+    public OffsetDateTime getShippedBackAt() { return shippedBackAt; }
+    public void setShippedBackAt(OffsetDateTime shippedBackAt) { this.shippedBackAt = shippedBackAt; }
+    public String getCreditedBy() { return creditedBy; }
+    public void setCreditedBy(String creditedBy) { this.creditedBy = creditedBy; }
+    public OffsetDateTime getCreditedAt() { return creditedAt; }
+    public void setCreditedAt(OffsetDateTime creditedAt) { this.creditedAt = creditedAt; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }

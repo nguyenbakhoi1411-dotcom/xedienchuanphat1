@@ -217,6 +217,15 @@ public class InventoryService {
     }
 
     @Transactional
+    public void recordPurchaseReturn(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        BigDecimal averageCost = averageCost(branchId, warehouse.getId(), product.getId());
+        decrease(branchId, warehouse.getId(), product.getId(), quantity);
+        record(InventoryTransactionType.PURCHASE_RETURN, product, branchId, null, warehouse.getId(), null, quantity,
+                averageCost, LocalDate.now(), "Purchase return " + returnNo);
+    }
+
+    @Transactional
     public void returnStock(Long branchId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
         increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));
