@@ -43,12 +43,32 @@ public class AccountingPeriodController {
         return ResponseEntity.ok(periodService.lockPeriod(id, user.getUsername(), req.note()));
     }
 
+    @PatchMapping("/{year}/{month}/lock")
+    @PreAuthorize("hasAuthority('LOCK_ACCOUNTING_PERIOD')")
+    public ResponseEntity<AccountingPeriodDtos.PeriodResponse> lockByMonth(
+            @PathVariable int year,
+            @PathVariable int month,
+            @RequestBody(required = false) AccountingPeriodDtos.LockUnlockRequest req,
+            @AuthenticationPrincipal UserDetails user) {
+        return ResponseEntity.ok(periodService.lockMonthlyPeriod(year, month, user.getUsername(), req == null ? null : req.note()));
+    }
+
     @PatchMapping("/{id}/unlock")
-    @PreAuthorize("hasAuthority('UNLOCK_ACCOUNTING_PERIOD')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<AccountingPeriodDtos.PeriodResponse> unlock(
             @PathVariable Long id,
             @RequestBody AccountingPeriodDtos.LockUnlockRequest req,
             @AuthenticationPrincipal UserDetails user) {
-        return ResponseEntity.ok(periodService.unlockPeriod(id, user.getUsername(), req.note()));
+        return ResponseEntity.ok(periodService.unlockPeriod(id, user.getUsername(), req.note(), req.reason()));
+    }
+
+    @PatchMapping("/{year}/{month}/unlock")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<AccountingPeriodDtos.PeriodResponse> unlockByMonth(
+            @PathVariable int year,
+            @PathVariable int month,
+            @RequestBody AccountingPeriodDtos.LockUnlockRequest req,
+            @AuthenticationPrincipal UserDetails user) {
+        return ResponseEntity.ok(periodService.unlockMonthlyPeriod(year, month, user.getUsername(), req.note(), req.reason()));
     }
 }

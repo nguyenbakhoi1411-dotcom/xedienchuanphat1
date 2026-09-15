@@ -12,6 +12,17 @@ public record JournalEntryRequest(
         @NotNull JournalReferenceType referenceType,
         String referenceId,
         String description,
+        Integer adjustmentForYear,
+        Integer adjustmentForMonth,
         @Valid @NotEmpty List<JournalEntryLineRequest> lines
 ) {
+    public JournalEntryRequest(
+            LocalDate entryDate,
+            JournalReferenceType referenceType,
+            String referenceId,
+            String description,
+            List<JournalEntryLineRequest> lines
+    ) {
+        this(entryDate, referenceType, referenceId, description, null, null, lines);
+    }
 }

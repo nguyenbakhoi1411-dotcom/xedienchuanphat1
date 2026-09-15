@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.service;
 
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.core.config.PurchaseReceiptProperties;
 import com.chuanphat.warranty.core.dto.PurchaseReceiptDto;
 import com.chuanphat.warranty.core.dto.PurchaseReceiptItemRequest;
@@ -102,6 +103,7 @@ public class PurchaseReceiptService {
     // CREATE
     // ──────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "#req.receiptDate() ?: T(java.time.LocalDate).now()", branchId = "#req.branchId()")
     public PurchaseReceiptDto create(PurchaseReceiptRequest req) {
         branchSecurity.requireBranchAccess(req.branchId());
         PurchaseOrder purchaseOrder = requireReceivablePurchaseOrder(req.purchaseOrderId(), req.supplierId(), req.branchId());
@@ -154,6 +156,7 @@ public class PurchaseReceiptService {
     // CONFIRM — nhap kho thuc su
     // ──────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseReceiptDate(#id)", branchId = "@periodGuardDateResolver.purchaseReceiptBranchId(#id)")
     public PurchaseReceiptDto confirm(Long id) {
         PurchaseReceipt receipt = findById(id);
         branchSecurity.requireBranchAccess(receipt.getBranchId());
@@ -204,6 +207,7 @@ public class PurchaseReceiptService {
     // CANCEL
     // ──────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseReceiptDate(#id)", branchId = "@periodGuardDateResolver.purchaseReceiptBranchId(#id)")
     public PurchaseReceiptDto cancel(Long id) {
         PurchaseReceipt receipt = findById(id);
         branchSecurity.requireBranchAccess(receipt.getBranchId());

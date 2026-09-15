@@ -1,5 +1,6 @@
 package com.chuanphat.warranty.core.service;
 
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.dto.InventoryExportRequest;
@@ -114,6 +115,7 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.transactionDate() ?: T(java.time.LocalDate).now()", branchId = "#request.branchId()")
     public InventoryTransactionDto importStock(InventoryImportRequest request) {
         branchSecurity.requireBranchAccess(request.branchId());
         Product product = productService.get(request.productId());
@@ -134,6 +136,7 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.transactionDate() ?: T(java.time.LocalDate).now()", branchId = "#request.branchId()")
     public InventoryTransactionDto exportStock(InventoryExportRequest request) {
         branchSecurity.requireBranchAccess(request.branchId());
         Product product = productService.get(request.productId());
@@ -155,6 +158,7 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.transactionDate() ?: T(java.time.LocalDate).now()", branchIds = {"#request.fromBranchId()", "#request.toBranchId()"})
     public void transfer(InventoryTransferRequest request) {
         if (request.fromBranchId().equals(request.toBranchId())) {
             throw new BusinessException("fromBranchId and toBranchId must be different");
@@ -172,6 +176,7 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.transactionDate() ?: T(java.time.LocalDate).now()", branchId = "#request.branchId()")
     public InventoryTransactionDto stocktake(InventoryStocktakeRequest request) {
         branchSecurity.requireBranchAccess(request.branchId());
         Product product = productService.get(request.productId());
@@ -206,17 +211,20 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void recordSale(Long branchId, Product product, int quantity, String orderNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
         recordSale(branchId, warehouse.getId(), product, quantity, orderNo);
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void recordSale(Long branchId, Long warehouseId, Product product, int quantity, String orderNo) {
         record(InventoryTransactionType.SALE, product, branchId, null, warehouseId, null, quantity, averageCost(branchId, warehouseId, product.getId()), LocalDate.now(), "Sale order " + orderNo);
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void recordPurchaseReturn(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
         BigDecimal averageCost = averageCost(branchId, warehouse.getId(), product.getId());
@@ -226,6 +234,7 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void returnStock(Long branchId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
         increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));
@@ -233,6 +242,7 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void processSalesReturn(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
         BigDecimal averageCost = increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));
@@ -240,12 +250,14 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void recordWriteOff(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
         record(InventoryTransactionType.WRITE_OFF, product, branchId, null, warehouse.getId(), null, quantity, averageCost(branchId, warehouse.getId(), product.getId()), LocalDate.now(), "Sales return write-off " + returnNo);
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void increaseForReturn(Long branchId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
         BigDecimal averageCost = increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));
@@ -253,12 +265,14 @@ public class InventoryService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void recordReservation(Long branchId, Product product, int quantity, String orderNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
         record(InventoryTransactionType.RESERVE, product, branchId, null, warehouse.getId(), null, quantity, averageCost(branchId, warehouse.getId(), product.getId()), LocalDate.now(), "Reserve for sales order " + orderNo);
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public void recordReservationRelease(Long branchId, Product product, int quantity, String orderNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
         record(InventoryTransactionType.RELEASE_RESERVATION, product, null, branchId, null, warehouse.getId(), quantity, averageCost(branchId, warehouse.getId(), product.getId()), LocalDate.now(), "Release reservation " + orderNo);

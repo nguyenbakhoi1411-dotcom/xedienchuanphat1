@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.service;
 
 import com.chuanphat.warranty.auth.entity.AppUser;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.core.entity.ProductSerial;
 import com.chuanphat.warranty.core.entity.PurchaseReceipt;
 import com.chuanphat.warranty.core.entity.PurchaseReceiptItem;
@@ -84,6 +85,7 @@ public class PurchaseReturnService {
         return findById(id);
     }
 
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "@periodGuardDateResolver.purchaseReceiptBranchId(#purchaseReceiptId)")
     public PurchaseReturn create(Long purchaseReceiptId,
                                  PurchaseReturnReasonCode reasonCode,
                                  String reasonNote,
@@ -130,6 +132,7 @@ public class PurchaseReturnService {
         return returnRepo.save(ret);
     }
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseReturnDate(#id)", branchId = "@periodGuardDateResolver.purchaseReturnBranchId(#id)")
     public PurchaseReturn approve(Long id) {
         PurchaseReturn ret = findById(id);
         branchSecurity.requireBranchAccess(ret.getBranchId());
@@ -146,6 +149,7 @@ public class PurchaseReturnService {
         return returnRepo.save(ret);
     }
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseReturnDate(#id)", branchId = "@periodGuardDateResolver.purchaseReturnBranchId(#id)")
     public PurchaseReturn reject(Long id, String reason) {
         PurchaseReturn ret = findById(id);
         branchSecurity.requireBranchAccess(ret.getBranchId());
@@ -157,6 +161,7 @@ public class PurchaseReturnService {
         return returnRepo.save(ret);
     }
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseReturnDate(#id)", branchId = "@periodGuardDateResolver.purchaseReturnBranchId(#id)")
     public PurchaseReturn shipBack(Long id) {
         PurchaseReturn ret = findById(id);
         branchSecurity.requireBranchAccess(ret.getBranchId());
@@ -182,10 +187,12 @@ public class PurchaseReturnService {
         return returnRepo.save(ret);
     }
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseReturnDate(#id)", branchId = "@periodGuardDateResolver.purchaseReturnBranchId(#id)")
     public PurchaseReturn complete(Long id) {
         return shipBack(id);
     }
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseReturnDate(#id)", branchId = "@periodGuardDateResolver.purchaseReturnBranchId(#id)")
     public PurchaseReturn cancel(Long id) {
         return reject(id, "Cancelled");
     }

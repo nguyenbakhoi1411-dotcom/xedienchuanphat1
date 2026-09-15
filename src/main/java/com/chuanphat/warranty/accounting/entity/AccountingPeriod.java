@@ -54,6 +54,9 @@ public class AccountingPeriod {
     private OffsetDateTime unlockedAt;
 
     @Column(length = 500)
+    private String unlockReason;
+
+    @Column(length = 500)
     private String note;
 
     @Column(nullable = false)
@@ -87,6 +90,8 @@ public class AccountingPeriod {
     public void setUnlockedBy(String unlockedBy) { this.unlockedBy = unlockedBy; }
     public OffsetDateTime getUnlockedAt() { return unlockedAt; }
     public void setUnlockedAt(OffsetDateTime unlockedAt) { this.unlockedAt = unlockedAt; }
+    public String getUnlockReason() { return unlockReason; }
+    public void setUnlockReason(String unlockReason) { this.unlockReason = unlockReason; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

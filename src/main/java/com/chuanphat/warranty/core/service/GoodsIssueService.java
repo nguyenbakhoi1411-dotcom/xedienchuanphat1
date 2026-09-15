@@ -1,5 +1,6 @@
 package com.chuanphat.warranty.core.service;
 
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.dto.GoodsIssueDto;
@@ -84,6 +85,7 @@ public class GoodsIssueService {
     // CREATE
     // ──────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "#req.issueDate() ?: T(java.time.LocalDate).now()", branchId = "#req.branchId()")
     public GoodsIssueDto create(GoodsIssueRequest req) {
         branchSecurity.requireBranchAccess(req.branchId());
 
@@ -135,6 +137,7 @@ public class GoodsIssueService {
     // ISSUE — xuat kho thuc su
     // ──────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.goodsIssueDate(#id)", branchId = "@periodGuardDateResolver.goodsIssueBranchId(#id)")
     public GoodsIssueDto issue(Long id) {
         GoodsIssue issue = findById(id);
         branchSecurity.requireBranchAccess(issue.getBranchId());
@@ -178,6 +181,7 @@ public class GoodsIssueService {
     // CANCEL
     // ──────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.goodsIssueDate(#id)", branchId = "@periodGuardDateResolver.goodsIssueBranchId(#id)")
     public GoodsIssueDto cancel(Long id) {
         GoodsIssue issue = findById(id);
         branchSecurity.requireBranchAccess(issue.getBranchId());

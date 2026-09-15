@@ -2,6 +2,7 @@ package com.chuanphat.warranty.accounting.service;
 
 import com.chuanphat.warranty.accounting.dto.TaxInvoiceDtos;
 import com.chuanphat.warranty.accounting.entity.TaxInvoice;
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.accounting.repository.TaxInvoiceRepository;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
@@ -59,6 +60,7 @@ public class TaxInvoiceService {
      * Gọi từ SalesService sau khi xuất hóa đơn.
      */
     @Transactional
+    @GuardAccountingPeriod(date = "#request.invoiceDate() ?: T(java.time.LocalDate).now()", branchId = "#request.branchId()")
     public TaxInvoiceDtos.TaxInvoiceResponse createOutputInvoice(TaxInvoiceDtos.CreateTaxInvoiceRequest request) {
         return create("OUTPUT", request);
     }
@@ -68,6 +70,7 @@ public class TaxInvoiceService {
      * Gọi từ PurchaseService khi nhập hàng.
      */
     @Transactional
+    @GuardAccountingPeriod(date = "#request.invoiceDate() ?: T(java.time.LocalDate).now()", branchId = "#request.branchId()")
     public TaxInvoiceDtos.TaxInvoiceResponse createInputInvoice(TaxInvoiceDtos.CreateTaxInvoiceRequest request) {
         return create("INPUT", request);
     }
@@ -102,6 +105,7 @@ public class TaxInvoiceService {
      * Hook điểm để gọi e-invoice API trong tương lai.
      */
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.taxInvoiceDate(#invoiceId)", branchId = "@periodGuardDateResolver.taxInvoiceBranchId(#invoiceId)")
     public TaxInvoiceDtos.TaxInvoiceResponse issue(Long invoiceId) {
         TaxInvoice invoice = getEntity(invoiceId);
         if (!"DRAFT".equals(invoice.getStatus())) {
@@ -117,6 +121,7 @@ public class TaxInvoiceService {
      * Hủy hóa đơn.
      */
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.taxInvoiceDate(#invoiceId)", branchId = "@periodGuardDateResolver.taxInvoiceBranchId(#invoiceId)")
     public TaxInvoiceDtos.TaxInvoiceResponse cancel(Long invoiceId, String reason) {
         TaxInvoice invoice = getEntity(invoiceId);
         if ("CANCELLED".equals(invoice.getStatus())) {
@@ -135,6 +140,7 @@ public class TaxInvoiceService {
      * Tạo hóa đơn điều chỉnh (hóa đơn cũ → ADJUSTED, tạo hóa đơn mới).
      */
     @Transactional
+    @GuardAccountingPeriod(date = "#adjustRequest.invoiceDate() ?: T(java.time.LocalDate).now()", branchId = "@periodGuardDateResolver.taxInvoiceBranchId(#originalInvoiceId)")
     public TaxInvoiceDtos.TaxInvoiceResponse adjust(Long originalInvoiceId, TaxInvoiceDtos.CreateTaxInvoiceRequest adjustRequest) {
         TaxInvoice original = getEntity(originalInvoiceId);
         if (!"ISSUED".equals(original.getStatus())) {

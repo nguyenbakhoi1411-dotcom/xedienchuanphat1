@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.service;
 
 import com.chuanphat.warranty.accounting.enums.PaymentMethod;
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.dto.PurchasePaymentDto;
 import com.chuanphat.warranty.core.dto.PurchasePaymentRequest;
@@ -38,6 +39,7 @@ public class PurchasePaymentService {
         this.branchSecurity = branchSecurity;
     }
 
+    @GuardAccountingPeriod(date = "#request.paymentDate() ?: T(java.time.LocalDate).now()", branchId = "@periodGuardDateResolver.supplierInvoiceBranchId(#request.supplierInvoiceId())")
     public PurchasePaymentResultDto pay(PurchasePaymentRequest request) {
         if (request.supplierInvoiceId() == null) {
             throw new BusinessException("Hoa don nha cung cap bat buoc khi thanh toan");
@@ -74,6 +76,7 @@ public class PurchasePaymentService {
         return result(saved, savedInvoice);
     }
 
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#invoice.branchId")
     public PurchasePayment applyReturnCredit(SupplierInvoice invoice, BigDecimal amount, String returnCode) {
         if (invoice.getStatus() != SupplierInvoiceStatus.MATCHED && invoice.getStatus() != SupplierInvoiceStatus.RESOLVED) {
             throw new BusinessException("Hoa don nha cung cap chua MATCHED/RESOLVED, khong duoc ghi giam tru tra hang");

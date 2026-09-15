@@ -18,6 +18,8 @@ public record JournalEntryResponse(
         String postedBy,
         BigDecimal totalDebit,
         BigDecimal totalCredit,
+        Integer adjustmentForYear,
+        Integer adjustmentForMonth,
         List<JournalEntryLineResponse> lines
 ) {
     public static JournalEntryResponse from(JournalEntry entry) {
@@ -32,6 +34,8 @@ public record JournalEntryResponse(
                 entry.getPostedBy(),
                 entry.getTotalDebit(),
                 entry.getTotalCredit(),
+                entry.getAdjustmentForYear(),
+                entry.getAdjustmentForMonth(),
                 entry.getLines().stream().map(JournalEntryLineResponse::from).toList()
         );
     }
@@ -48,6 +52,8 @@ public record JournalEntryResponse(
                 entry.getPostedBy(),
                 entry.getTotalDebit(),
                 entry.getTotalCredit(),
+                entry.getAdjustmentForYear(),
+                entry.getAdjustmentForMonth(),
                 List.of()
         );
     }

@@ -361,6 +361,8 @@ public class AccountingLedgerService {
         entry.setEntryDate(request.entryDate());
         entry.setAccountingYear(request.entryDate().getYear());
         entry.setAccountingMonth(request.entryDate().getMonthValue());
+        entry.setAdjustmentForYear(request.adjustmentForYear());
+        entry.setAdjustmentForMonth(request.adjustmentForMonth());
         entry.setReferenceType(request.referenceType());
         entry.setReferenceId(request.referenceId());
         entry.setDescription(request.description());

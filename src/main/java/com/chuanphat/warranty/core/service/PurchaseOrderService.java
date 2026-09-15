@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.service;
 
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.core.dto.PurchaseOrderDto;
 import com.chuanphat.warranty.core.dto.PurchaseOrderRequest;
 import com.chuanphat.warranty.core.entity.PurchaseOrder;
@@ -80,6 +81,7 @@ public class PurchaseOrderService {
 
     // ── CREATE ─────────────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "#req.purchaseDate() ?: T(java.time.LocalDate).now()", branchId = "#req.branchId()")
     public PurchaseOrderDto create(PurchaseOrderRequest req) {
         branchSecurity.requireBranchAccess(req.branchId());
         Supplier supplier = supplierService.findById(req.supplierId());
@@ -120,6 +122,7 @@ public class PurchaseOrderService {
 
     // ── SUBMIT ─────────────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseOrderDate(#id)", branchId = "@periodGuardDateResolver.purchaseOrderBranchId(#id)")
     public PurchaseOrderDto submit(Long id) {
         PurchaseOrder po = findById(id);
         branchSecurity.requireBranchAccess(po.getBranchId());
@@ -133,6 +136,7 @@ public class PurchaseOrderService {
 
     // ── APPROVE ────────────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseOrderDate(#id)", branchId = "@periodGuardDateResolver.purchaseOrderBranchId(#id)")
     public PurchaseOrderDto approve(Long id) {
         PurchaseOrder po = findById(id);
         branchSecurity.requireBranchAccess(po.getBranchId());
@@ -150,6 +154,7 @@ public class PurchaseOrderService {
 
     // ── REJECT ─────────────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseOrderDate(#id)", branchId = "@periodGuardDateResolver.purchaseOrderBranchId(#id)")
     public PurchaseOrderDto reject(Long id, String reason) {
         PurchaseOrder po = findById(id);
         branchSecurity.requireBranchAccess(po.getBranchId());
@@ -163,6 +168,7 @@ public class PurchaseOrderService {
 
     // ── CANCEL ─────────────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.purchaseOrderDate(#id)", branchId = "@periodGuardDateResolver.purchaseOrderBranchId(#id)")
     public PurchaseOrderDto cancel(Long id, String reason) {
         PurchaseOrder po = findById(id);
         branchSecurity.requireBranchAccess(po.getBranchId());

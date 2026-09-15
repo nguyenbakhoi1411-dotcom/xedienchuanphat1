@@ -31,10 +31,11 @@ public class AccountingPeriodDtos {
         OffsetDateTime lockedAt,
         String unlockedBy,
         OffsetDateTime unlockedAt,
+        String unlockReason,
         String note,
         OffsetDateTime createdAt,
         String createdBy
     ) {}
     
-    public record LockUnlockRequest(String note) {}
+    public record LockUnlockRequest(String note, String reason) {}
 }

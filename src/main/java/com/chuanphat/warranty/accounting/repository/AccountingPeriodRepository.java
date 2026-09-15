@@ -18,4 +18,6 @@ public interface AccountingPeriodRepository extends JpaRepository<AccountingPeri
     Optional<AccountingPeriod> findLockedPeriodForDate(LocalDate date, Long branchId);
     
     boolean existsByPeriodCode(String periodCode);
+
+    Optional<AccountingPeriod> findByYearAndMonthAndBranchIdIsNull(Integer year, Integer month);
 }

@@ -3,6 +3,7 @@ package com.chuanphat.warranty.core.service;
 import com.chuanphat.warranty.accounting.dto.CreateReceiptRequest;
 import com.chuanphat.warranty.accounting.dto.RecordSalesPaymentRequest;
 import com.chuanphat.warranty.accounting.enums.PaymentMethod;
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.accounting.service.AccountingService;
 import com.chuanphat.warranty.audit.dto.CreateAuditLogRequest;
 import com.chuanphat.warranty.audit.enums.AuditAction;
@@ -199,6 +200,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.orderDate() ?: T(java.time.LocalDate).now()", branchId = "#request.branchId()")
     public SalesOrderResponse create(CreateSalesOrderRequest request) {
         Customer customer = validateCustomerBranch(request.customerId(), request.branchId());
         requireDiscountApprovalIfNeeded(nullToZero(request.discountAmount()), request.voucherCode(), request.items());
@@ -242,6 +244,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#id)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#id)")
     public SalesOrderResponse confirm(Long id, SalesOrderStatusRequest request) {
         SalesOrder order = getOrderEntity(id);
         branchSecurity.requireBranchAccess(order.getBranchId());
@@ -251,6 +254,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#id)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#id)")
     public SalesOrderResponse cancel(Long id, SalesOrderStatusRequest request) {
         SalesOrder order = getOrderEntity(id);
         branchSecurity.requireBranchAccess(order.getBranchId());
@@ -265,6 +269,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#id)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#id)")
     public SalesOrderResponse deliver(Long id) {
         SalesOrder order = getOrderEntity(id);
         branchSecurity.requireBranchAccess(order.getBranchId());
@@ -287,6 +292,7 @@ public class SalesService {
 
     /** Quan ly duyet giam gia — yeu cau quyen SALES_DISCOUNT_APPROVE. */
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#id)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#id)")
     public SalesOrderResponse approveDiscount(Long id, String note) {
         if (!hasAuthority("SALES_DISCOUNT_APPROVE")) {
             throw new AccessDeniedException("Requried SALES_DISCOUNT_APPROVE permission to approve discount");
@@ -315,6 +321,7 @@ public class SalesService {
 
     /** Quan ly duyet ban chiu vuot han muc cong no. */
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#id)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#id)")
     public SalesOrderResponse approveCredit(Long id, String note) {
         if (!hasAuthority("SALES_CREDIT_APPROVE")) {
             throw new AccessDeniedException("Required SALES_CREDIT_APPROVE permission to approve credit");
@@ -341,6 +348,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#id)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#id)")
     public SalesOrderResponse rejectCredit(Long id, String note) {
         if (!hasAuthority("SALES_CREDIT_APPROVE")) {
             throw new AccessDeniedException("Required SALES_CREDIT_APPROVE permission to reject credit");
@@ -362,6 +370,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#id)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#id)")
     public SalesOrderResponse rejectDiscount(Long id, String note) {
         if (!hasAuthority("SALES_DISCOUNT_APPROVE")) {
             throw new AccessDeniedException("Required SALES_DISCOUNT_APPROVE permission to reject discount");
@@ -384,6 +393,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.paymentDate() ?: T(java.time.LocalDate).now()", branchId = "@periodGuardDateResolver.salesOrderBranchId(#orderId)")
     public SalesPaymentResponse addPayment(Long orderId, PaymentEntryRequest request) {
         SalesOrder order = getOrderEntity(orderId);
         branchSecurity.requireBranchAccess(order.getBranchId());
@@ -522,6 +532,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#orderId)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#orderId)")
     public InstallmentResponse createInstallment(Long orderId, CreateInstallmentRequest request) {
         SalesOrder order = getOrderEntity(orderId);
         branchSecurity.requireBranchAccess(order.getBranchId());
@@ -554,6 +565,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.paymentDate() ?: T(java.time.LocalDate).now()", branchId = "@periodGuardDateResolver.installmentBranchId(#id)")
     public InstallmentResponse updateInstallmentStatus(Long id, com.chuanphat.warranty.core.dto.UpdateInstallmentStatusRequest request) {
         InstallmentApplication installment = installmentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Installment application not found: " + id));
@@ -583,6 +595,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesOrderDate(#orderId)", branchId = "@periodGuardDateResolver.salesOrderBranchId(#orderId)")
     public InvoiceResponse createInvoice(Long orderId, CreateInvoiceRequest request) {
         SalesOrder order = getOrderEntity(orderId);
         branchSecurity.requireBranchAccess(order.getBranchId());
@@ -590,6 +603,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.invoiceDate(#id)", branchId = "@periodGuardDateResolver.invoiceBranchId(#id)")
     public InvoiceResponse issueInvoice(Long id) {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Invoice not found: " + id));
@@ -677,6 +691,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.returnDate() ?: T(java.time.LocalDate).now()", branchId = "@periodGuardDateResolver.salesOrderBranchId(#request.orderId())")
     public SalesReturnResponse createReturn(CreateSalesReturnRequest request) {
         if (request.reasonCode() == null) {
             throw new BusinessException("Return reason code is required");
@@ -742,6 +757,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesReturnDate(#id)", branchId = "@periodGuardDateResolver.salesReturnBranchId(#id)")
     public SalesReturnResponse approveReturn(Long id, ApproveSalesReturnRequest request) {
         SalesReturn salesReturn = returnRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sales return not found: " + id));
@@ -860,6 +876,7 @@ public class SalesService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.salesReturnDate(#id)", branchId = "@periodGuardDateResolver.salesReturnBranchId(#id)")
     public SalesReturnResponse rejectReturn(Long id, RejectSalesReturnRequest request) {
         SalesReturn salesReturn = returnRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sales return not found: " + id));

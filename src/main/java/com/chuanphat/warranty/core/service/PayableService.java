@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.service;
 
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.core.dto.PayableDto;
 import com.chuanphat.warranty.core.dto.PayablePayRequest;
 import com.chuanphat.warranty.core.entity.Payable;
@@ -102,6 +103,7 @@ public class PayableService {
      * @param amount tong tien nhap
      * @param paymentTermsDays so ngay credit
      */
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public Payable createFromReceipt(Long supplierId, Long branchId,
                                      Long sourceId, String sourceNo,
                                      BigDecimal amount, int paymentTermsDays) {
@@ -132,6 +134,7 @@ public class PayableService {
     }
 
     /** Tao khoang phai thu tu tra hang (NCC no lai minh) */
+    @GuardAccountingPeriod(date = "T(java.time.LocalDate).now()", branchId = "#branchId")
     public Payable createReturnCredit(Long supplierId, Long branchId,
                                       Long sourceId, String sourceNo,
                                       BigDecimal amount) {
@@ -156,6 +159,7 @@ public class PayableService {
 
     // ── PAYMENT ────────────────────────────────────────────────────
 
+    @GuardAccountingPeriod(date = "#req.paymentDate() ?: T(java.time.LocalDate).now()", branchId = "@periodGuardDateResolver.payableBranchId(#req.payableId())")
     public PayableDto pay(PayablePayRequest req) {
         // Pessimistic lock de tranh thanh toan dong thoi
         Payable payable = payableRepo.findWithLockById(req.payableId())

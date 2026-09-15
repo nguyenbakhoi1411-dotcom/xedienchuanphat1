@@ -38,6 +38,10 @@ public class JournalEntry {
 
     private Integer accountingMonth;
 
+    private Integer adjustmentForYear;
+
+    private Integer adjustmentForMonth;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
     private JournalReferenceType referenceType = JournalReferenceType.MANUAL;
@@ -88,6 +92,10 @@ public class JournalEntry {
     public void setAccountingYear(Integer accountingYear) { this.accountingYear = accountingYear; }
     public Integer getAccountingMonth() { return accountingMonth; }
     public void setAccountingMonth(Integer accountingMonth) { this.accountingMonth = accountingMonth; }
+    public Integer getAdjustmentForYear() { return adjustmentForYear; }
+    public void setAdjustmentForYear(Integer adjustmentForYear) { this.adjustmentForYear = adjustmentForYear; }
+    public Integer getAdjustmentForMonth() { return adjustmentForMonth; }
+    public void setAdjustmentForMonth(Integer adjustmentForMonth) { this.adjustmentForMonth = adjustmentForMonth; }
     public JournalReferenceType getReferenceType() { return referenceType; }
     public void setReferenceType(JournalReferenceType referenceType) { this.referenceType = referenceType; }
     public String getReferenceId() { return referenceId; }
