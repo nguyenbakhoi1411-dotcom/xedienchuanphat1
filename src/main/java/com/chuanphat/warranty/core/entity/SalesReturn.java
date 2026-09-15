@@ -1,5 +1,7 @@
 package com.chuanphat.warranty.core.entity;
 
+import com.chuanphat.warranty.core.enums.SalesReturnDisposition;
+import com.chuanphat.warranty.core.enums.SalesReturnReasonCode;
 import com.chuanphat.warranty.core.enums.SalesReturnStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -19,6 +21,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "sales_returns")
@@ -51,10 +54,36 @@ public class SalesReturn {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private SalesReturnStatus status = SalesReturnStatus.COMPLETED;
+    private SalesReturnStatus status = SalesReturnStatus.REQUESTED;
 
     @Column(length = 500)
     private String reason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 40)
+    private SalesReturnReasonCode reasonCode;
+
+    @Column(length = 500)
+    private String reasonNote;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private SalesReturnDisposition disposition;
+
+    @Column(length = 120)
+    private String createdBy;
+
+    @Column(length = 120)
+    private String approvedBy;
+
+    private OffsetDateTime approvedAt;
+
+    @Column(length = 120)
+    private String rejectedBy;
+
+    private OffsetDateTime rejectedAt;
+
+    private OffsetDateTime receivedAt;
 
     @Column(nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
@@ -65,6 +94,9 @@ public class SalesReturn {
 
     @Column(length = 80)
     private String reversalEntryNo;
+
+    @Column(name = "exchange_group_id")
+    private UUID exchangeGroupId;
 
     @OneToMany(mappedBy = "salesReturn", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SalesReturnItem> items = new ArrayList<>();
@@ -88,11 +120,31 @@ public class SalesReturn {
     public void setStatus(SalesReturnStatus status) { this.status = status; }
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
+    public SalesReturnReasonCode getReasonCode() { return reasonCode; }
+    public void setReasonCode(SalesReturnReasonCode reasonCode) { this.reasonCode = reasonCode; }
+    public String getReasonNote() { return reasonNote; }
+    public void setReasonNote(String reasonNote) { this.reasonNote = reasonNote; this.reason = reasonNote; }
+    public SalesReturnDisposition getDisposition() { return disposition; }
+    public void setDisposition(SalesReturnDisposition disposition) { this.disposition = disposition; }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+    public OffsetDateTime getApprovedAt() { return approvedAt; }
+    public void setApprovedAt(OffsetDateTime approvedAt) { this.approvedAt = approvedAt; }
+    public String getRejectedBy() { return rejectedBy; }
+    public void setRejectedBy(String rejectedBy) { this.rejectedBy = rejectedBy; }
+    public OffsetDateTime getRejectedAt() { return rejectedAt; }
+    public void setRejectedAt(OffsetDateTime rejectedAt) { this.rejectedAt = rejectedAt; }
+    public OffsetDateTime getReceivedAt() { return receivedAt; }
+    public void setReceivedAt(OffsetDateTime receivedAt) { this.receivedAt = receivedAt; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public boolean isAccountingReversed() { return accountingReversed; }
     public void setAccountingReversed(boolean accountingReversed) { this.accountingReversed = accountingReversed; }
     public String getReversalEntryNo() { return reversalEntryNo; }
     public void setReversalEntryNo(String reversalEntryNo) { this.reversalEntryNo = reversalEntryNo; }
+    public UUID getExchangeGroupId() { return exchangeGroupId; }
+    public void setExchangeGroupId(UUID exchangeGroupId) { this.exchangeGroupId = exchangeGroupId; }
     public List<SalesReturnItem> getItems() { return items; }
     public void addItem(SalesReturnItem item) { items.add(item); item.setSalesReturn(this); }
 }

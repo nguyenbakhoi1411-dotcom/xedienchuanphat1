@@ -174,6 +174,7 @@ export interface IncomeStatementItem {
   previousValue?: number;
   difference?: number;
   percentChange?: number;
+  percentOfRevenue?: number;
   note?: string;
   isTotalRow?: boolean;
   [key: string]: any;
@@ -224,6 +225,18 @@ export interface IncomeStatementReport {
     operatingMargin?: number;
     netProfitMargin?: number;
   };
+
+  revenue?: number;
+  revenueGrowth?: number;
+  grossProfit?: number;
+  operatingProfit?: number;
+  operatingProfitPrevious?: number;
+  netProfit?: number;
+  netProfitPrevious?: number;
+  profitBeforeTax?: number;
+  profitBeforeTaxPrevious?: number;
+  incomeTax?: number;
+  incomeTaxPrevious?: number;
   revenueSection?: IncomeStatementItem[];
   grossProfitSection?: IncomeStatementItem[];
   operatingExpensesSection?: IncomeStatementItem[];
@@ -272,6 +285,39 @@ export interface CashFlowReport {
 
   isReconciled?: boolean;
   reconciliationError?: number;
+  operatingActivities?: number;
+  investingActivities?: number;
+  financingActivities?: number;
+  netCashFlow?: number;
+  netCashFlowPrevious?: number;
+  openingCashBalance?: number;
+  openingCashBalancePrevious?: number;
+  closingCashBalance?: number;
+  closingCashBalancePrevious?: number;
+  operatingDetails?: {
+    revenueFromSales?: number;
+    cashFromCustomers?: number;
+    cashForSupplies?: number;
+    cashForWages?: number;
+    cashForTaxes?: number;
+    otherOperatingExpenses?: number;
+  };
+  investingDetails?: {
+    cashForAssets?: number;
+    cashFromAssetSales?: number;
+    cashForLoans?: number;
+    cashFromLoans?: number;
+  };
+  financingDetails?: {
+    cashFromEquity?: number;
+    cashForDividends?: number;
+    cashFromBanks?: number;
+    cashForDebtPayment?: number;
+  };
+  reconciliation?: {
+    balanceSheetCash?: number;
+    difference?: number;
+  };
   [key: string]: any;
 }
 
@@ -363,7 +409,7 @@ export interface FavoriteReport {
 export interface RecentReport {
   id: string;
   reportId: string;
-  viewedAt: string;
+  viewedAt: string | Date;
   viewCount: number;
 }
 

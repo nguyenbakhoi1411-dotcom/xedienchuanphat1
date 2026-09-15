@@ -37,6 +37,9 @@ public class SalesReturnItem {
     @JoinColumn(name = "serial_id")
     private ProductSerial serial;
 
+    @Column(name = "batch_id")
+    private Long batchId;
+
     @Column(nullable = false)
     private int quantity;
 
@@ -59,6 +62,8 @@ public class SalesReturnItem {
     public void setProduct(Product product) { this.product = product; }
     public ProductSerial getSerial() { return serial; }
     public void setSerial(ProductSerial serial) { this.serial = serial; }
+    public Long getBatchId() { return batchId; }
+    public void setBatchId(Long batchId) { this.batchId = batchId; }
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
     public BigDecimal getUnitPrice() { return unitPrice; }

@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.entity;
 
 import com.chuanphat.warranty.accounting.enums.PaymentMethod;
+import com.chuanphat.warranty.core.enums.SalesPaymentEntryType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -45,6 +46,10 @@ public class SalesPayment {
     @Column(length = 500)
     private String note;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SalesPaymentEntryType entryType = SalesPaymentEntryType.RECEIPT;
+
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean installmentDisbursement = false;
 
@@ -66,6 +71,8 @@ public class SalesPayment {
     public void setReferenceNo(String referenceNo) { this.referenceNo = referenceNo; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+    public SalesPaymentEntryType getEntryType() { return entryType; }
+    public void setEntryType(SalesPaymentEntryType entryType) { this.entryType = entryType == null ? SalesPaymentEntryType.RECEIPT : entryType; }
     public boolean isInstallmentDisbursement() { return installmentDisbursement; }
     public void setInstallmentDisbursement(boolean installmentDisbursement) { this.installmentDisbursement = installmentDisbursement; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

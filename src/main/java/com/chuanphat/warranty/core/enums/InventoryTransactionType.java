@@ -22,5 +22,6 @@ public enum InventoryTransactionType {
     GOODS_ISSUE,              // Xuat kho tu phieu xuat
     WRITE_OFF,                // Huy/xoa so
     COUNT_ADJUSTMENT_IN,      // Dieu chinh tang sau kiem ke
-    COUNT_ADJUSTMENT_OUT      // Dieu chinh giam sau kiem ke
+    COUNT_ADJUSTMENT_OUT,     // Dieu chinh giam sau kiem ke
+    PURCHASE_RETURN           // Xuat kho tra lai nha cung cap
 }

@@ -2,6 +2,7 @@ package com.chuanphat.warranty.core.dto;
 
 import com.chuanphat.warranty.accounting.enums.PaymentMethod;
 import com.chuanphat.warranty.core.entity.SalesPayment;
+import com.chuanphat.warranty.core.enums.SalesPaymentEntryType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -15,6 +16,7 @@ public record SalesPaymentResponse(
         Long bankAccountId,
         String referenceNo,
         String note,
+        SalesPaymentEntryType entryType,
         boolean installmentDisbursement,
         OffsetDateTime createdAt
 ) {
@@ -28,6 +30,7 @@ public record SalesPaymentResponse(
                 payment.getBankAccountId(),
                 payment.getReferenceNo(),
                 payment.getNote(),
+                payment.getEntryType(),
                 payment.isInstallmentDisbursement(),
                 payment.getCreatedAt()
         );

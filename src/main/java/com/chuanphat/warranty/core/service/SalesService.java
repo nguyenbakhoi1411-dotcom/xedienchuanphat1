@@ -8,8 +8,11 @@ import com.chuanphat.warranty.audit.dto.CreateAuditLogRequest;
 import com.chuanphat.warranty.audit.enums.AuditAction;
 import com.chuanphat.warranty.audit.enums.AuditModule;
 import com.chuanphat.warranty.audit.service.AuditLogService;
+import com.chuanphat.warranty.auth.entity.AppUser;
+import com.chuanphat.warranty.accounting.repository.ReceivableRepository;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.core.dto.ApproveSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.ConvertQuotationRequest;
 import com.chuanphat.warranty.core.dto.CreateInstallmentRequest;
 import com.chuanphat.warranty.core.dto.CreateInvoiceRequest;
@@ -25,6 +28,7 @@ import com.chuanphat.warranty.core.dto.PaymentEntryRequest;
 import com.chuanphat.warranty.core.dto.QuotationListResponse;
 import com.chuanphat.warranty.core.dto.QuotationResponse;
 import com.chuanphat.warranty.core.dto.QuotationStatusRequest;
+import com.chuanphat.warranty.core.dto.RejectSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.SalesOrderResponse;
 import com.chuanphat.warranty.core.dto.SalesOrderListResponse;
 import com.chuanphat.warranty.core.dto.SalesOrderStatusRequest;
@@ -51,7 +55,10 @@ import com.chuanphat.warranty.core.enums.PaymentStatus;
 import com.chuanphat.warranty.core.enums.ProductCategory;
 import com.chuanphat.warranty.core.enums.QuotationStatus;
 import com.chuanphat.warranty.core.enums.ReturnSerialDisposition;
+import com.chuanphat.warranty.core.enums.SalesPaymentEntryType;
+import com.chuanphat.warranty.core.enums.SalesReturnDisposition;
 import com.chuanphat.warranty.core.enums.SalesOrderStatus;
+import com.chuanphat.warranty.core.enums.CreditApprovalStatus;
 import com.chuanphat.warranty.core.enums.DiscountApprovalStatus;
 import com.chuanphat.warranty.core.enums.SalesReturnStatus;
 import com.chuanphat.warranty.core.enums.SerialStatus;
@@ -61,6 +68,7 @@ import com.chuanphat.warranty.core.repository.ProductSerialRepository;
 import com.chuanphat.warranty.core.repository.QuotationRepository;
 import com.chuanphat.warranty.core.repository.SalesOrderRepository;
 import com.chuanphat.warranty.core.repository.SalesPaymentRepository;
+import com.chuanphat.warranty.core.repository.SalesReturnItemRepository;
 import com.chuanphat.warranty.core.repository.SalesReturnRepository;
 import com.chuanphat.warranty.dto.CreateWarrantyRequest;
 import com.chuanphat.warranty.entity.WarrantyPolicy;
@@ -103,6 +111,7 @@ public class SalesService {
     private final SalesPaymentRepository paymentRepository;
     private final InstallmentApplicationRepository installmentRepository;
     private final SalesReturnRepository returnRepository;
+    private final SalesReturnItemRepository returnItemRepository;
     private final ProductSerialRepository serialRepository;
     private final InvoiceRepository invoiceRepository;
     private final VoucherRepository voucherRepository;
@@ -119,6 +128,7 @@ public class SalesService {
     private final SettingService settingService;
     private final ExportDocumentService exportDocumentService;
     private final NotificationService notificationService;
+    private final ReceivableRepository receivableRepository;
 
     public SalesService(
             SalesOrderRepository salesOrderRepository,
@@ -126,6 +136,7 @@ public class SalesService {
             SalesPaymentRepository paymentRepository,
             InstallmentApplicationRepository installmentRepository,
             SalesReturnRepository returnRepository,
+            SalesReturnItemRepository returnItemRepository,
             ProductSerialRepository serialRepository,
             InvoiceRepository invoiceRepository,
             VoucherRepository voucherRepository,
@@ -141,13 +152,15 @@ public class SalesService {
             BranchSecurity branchSecurity,
             SettingService settingService,
             ExportDocumentService exportDocumentService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            ReceivableRepository receivableRepository
     ) {
         this.salesOrderRepository = salesOrderRepository;
         this.quotationRepository = quotationRepository;
         this.paymentRepository = paymentRepository;
         this.installmentRepository = installmentRepository;
         this.returnRepository = returnRepository;
+        this.returnItemRepository = returnItemRepository;
         this.serialRepository = serialRepository;
         this.invoiceRepository = invoiceRepository;
         this.voucherRepository = voucherRepository;
@@ -164,6 +177,7 @@ public class SalesService {
         this.settingService = settingService;
         this.exportDocumentService = exportDocumentService;
         this.notificationService = notificationService;
+        this.receivableRepository = receivableRepository;
     }
 
     @Transactional(readOnly = true)
@@ -202,14 +216,16 @@ public class SalesService {
         BigDecimal subtotal = addOrderItems(order, request.items());
         BigDecimal discount = resolveDiscount(order.getBranchId(), subtotal, order.getVoucherCode(), orderProductIds(order), nullToZero(request.discountAmount()));
         applyTotals(order, subtotal, discount);
+        checkAndMarkDiscountApproval(order, nullToZero(request.discountAmount()));
         validatePayments(order.getTotalAmount(), normalizedPayments(request));
+        boolean shouldConfirm = request.confirm() == null || Boolean.TRUE.equals(request.confirm());
+        checkAndMarkCreditApproval(order, customer, normalizedPayments(request), shouldConfirm);
 
         SalesOrder saved = salesOrderRepository.save(order);
         audit(AuditAction.CREATE_ORDER, AuditModule.SALES, "SalesOrder", saved.getId(), null, saved.getOrderNo());
         notificationService.notifyAllOnce("NEW_ORDER", NotificationSeverity.SUCCESS, "SALES", saved.getId(), "Don hang moi", "Don " + saved.getOrderNo() + " vua duoc tao");
 
-        boolean shouldConfirm = request.confirm() == null || Boolean.TRUE.equals(request.confirm());
-        if (shouldConfirm) {
+        if (shouldConfirm && !isWaitingApproval(saved)) {
             confirmOrder(saved, new SalesOrderStatusRequest(saved.getReservationUntil(), null), false);
             consumeVoucher(saved);
             for (PaymentEntryRequest payment : normalizedPayments(request)) {
@@ -218,7 +234,7 @@ public class SalesService {
         }
 
         boolean shouldIssueInvoice = request.issueInvoice() == null ? shouldConfirm : Boolean.TRUE.equals(request.issueInvoice());
-        if (shouldIssueInvoice) {
+        if (shouldIssueInvoice && !isWaitingApproval(saved)) {
             createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
         }
 
@@ -255,6 +271,12 @@ public class SalesService {
         if (order.getStatus() == SalesOrderStatus.CANCELLED || order.getStatus() == SalesOrderStatus.RETURNED) {
             throw new BusinessException("Order cannot be delivered in status " + order.getStatus());
         }
+        if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+            throw new BusinessException("Order is waiting for discount approval");
+        }
+        if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is waiting for credit approval");
+        }
         issueStockIfNeeded(order);
         order.setStatus(SalesOrderStatus.DELIVERED);
         order.setDeliveredAt(OffsetDateTime.now());
@@ -274,16 +296,68 @@ public class SalesService {
         if (order.getStatus() != SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
             throw new BusinessException("Order is not waiting for discount approval");
         }
-        String approver = branchSecurity.currentUser().getUsername();
+        AppUser approverUser = branchSecurity.currentUser();
+        if (approverUser.getId().equals(order.getEmployeeId())) {
+            throw new BusinessException("Order creator cannot approve their own discount");
+        }
+        String approver = approverUser.getUsername();
         order.setDiscountApprovalStatus(DiscountApprovalStatus.APPROVED);
         order.setApprovedBy(approver);
         order.setApprovedAt(OffsetDateTime.now());
         order.setApprovalNote(note);
-        order.setStatus(SalesOrderStatus.CONFIRMED);
-        order.setConfirmedAt(OffsetDateTime.now());
+        order.setStatus(SalesOrderStatus.DRAFT);
+        confirmOrder(order, new SalesOrderStatusRequest(order.getReservationUntil(), null), false);
         audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesOrder", order.getId(), "Approved discount: " + note, order.getOrderNo());
         notificationService.notifyAllOnce("DISCOUNT_APPROVED", NotificationSeverity.SUCCESS, "SALES", order.getId(),
                 "Giam gia da duoc duyet", "Don " + order.getOrderNo() + " da duoc " + approver + " duyet giam gia");
+        return SalesOrderResponse.from(order);
+    }
+
+    /** Quan ly duyet ban chiu vuot han muc cong no. */
+    @Transactional
+    public SalesOrderResponse approveCredit(Long id, String note) {
+        if (!hasAuthority("SALES_CREDIT_APPROVE")) {
+            throw new AccessDeniedException("Required SALES_CREDIT_APPROVE permission to approve credit");
+        }
+        SalesOrder order = getOrderEntity(id);
+        branchSecurity.requireBranchAccess(order.getBranchId());
+        if (order.getStatus() != SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is not waiting for credit approval");
+        }
+        AppUser approverUser = branchSecurity.currentUser();
+        if (approverUser.getId().equals(order.getEmployeeId())) {
+            throw new BusinessException("Order creator cannot approve their own credit exception");
+        }
+        order.setCreditApprovalStatus(CreditApprovalStatus.APPROVED);
+        order.setCreditApprovedBy(approverUser.getUsername());
+        order.setCreditApprovedAt(OffsetDateTime.now());
+        order.setCreditApprovalNote(note);
+        order.setStatus(SalesOrderStatus.DRAFT);
+        confirmOrder(order, new SalesOrderStatusRequest(order.getReservationUntil(), null), false);
+        audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesOrder", order.getId(), "Approved credit: " + note, order.getOrderNo());
+        notificationService.notifyAllOnce("CREDIT_APPROVED", NotificationSeverity.SUCCESS, "SALES", order.getId(),
+                "Ban chiu da duoc duyet", "Don " + order.getOrderNo() + " da duoc " + approverUser.getUsername() + " duyet han muc cong no");
+        return SalesOrderResponse.from(order);
+    }
+
+    @Transactional
+    public SalesOrderResponse rejectCredit(Long id, String note) {
+        if (!hasAuthority("SALES_CREDIT_APPROVE")) {
+            throw new AccessDeniedException("Required SALES_CREDIT_APPROVE permission to reject credit");
+        }
+        SalesOrder order = getOrderEntity(id);
+        branchSecurity.requireBranchAccess(order.getBranchId());
+        if (order.getStatus() != SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is not waiting for credit approval");
+        }
+        AppUser reviewer = branchSecurity.currentUser();
+        order.setCreditApprovalStatus(CreditApprovalStatus.REJECTED);
+        order.setCreditApprovedBy(reviewer.getUsername());
+        order.setCreditApprovedAt(OffsetDateTime.now());
+        order.setCreditApprovalNote(note);
+        order.setStatus(SalesOrderStatus.CANCELLED);
+        order.setCancelledAt(OffsetDateTime.now());
+        audit(AuditAction.CANCEL_ORDER, AuditModule.SALES, "SalesOrder", order.getId(), "Rejected credit: " + note, order.getOrderNo());
         return SalesOrderResponse.from(order);
     }
 
@@ -424,21 +498,24 @@ public class SalesService {
         }
         applyTotals(order, quotation.getSubtotal(), quotation.getDiscountAmount());
         validatePayments(order.getTotalAmount(), request.payments() == null ? List.of() : request.payments());
+        Customer customer = customerService.get(order.getCustomerId());
+        checkAndMarkCreditApproval(order, customer, request.payments() == null ? List.of() : request.payments(), true);
 
         SalesOrder saved = salesOrderRepository.save(order);
         quotation.setStatus(QuotationStatus.ACCEPTED);
         audit(AuditAction.CREATE_ORDER, AuditModule.SALES, "SalesOrder", saved.getId(), quotation.getQuotationNo(), saved.getOrderNo());
         notificationService.notifyAllOnce("NEW_ORDER", NotificationSeverity.SUCCESS, "SALES", saved.getId(), "Don hang moi", "Don " + saved.getOrderNo() + " vua duoc tao tu bao gia");
 
-        confirmOrder(saved, new SalesOrderStatusRequest(saved.getReservationUntil(), null), false);
-        consumeVoucher(saved);
-        Customer customer = customerService.get(saved.getCustomerId());
-        if (request.payments() != null) {
+        if (!isWaitingApproval(saved)) {
+            confirmOrder(saved, new SalesOrderStatusRequest(saved.getReservationUntil(), null), false);
+            consumeVoucher(saved);
+        }
+        if (request.payments() != null && !isWaitingApproval(saved)) {
             for (PaymentEntryRequest payment : request.payments()) {
                 addPaymentInternal(saved, customer, payment, false);
             }
         }
-        if (Boolean.TRUE.equals(request.issueInvoice())) {
+        if (Boolean.TRUE.equals(request.issueInvoice()) && !isWaitingApproval(saved)) {
             createInvoiceEntity(saved, new CreateInvoiceRequest(InvoiceStatus.ISSUED, null));
         }
         return SalesOrderResponse.from(saved);
@@ -601,6 +678,9 @@ public class SalesService {
 
     @Transactional
     public SalesReturnResponse createReturn(CreateSalesReturnRequest request) {
+        if (request.reasonCode() == null) {
+            throw new BusinessException("Return reason code is required");
+        }
         SalesOrder order = getOrderEntity(request.orderId());
         branchSecurity.requireBranchAccess(order.getBranchId());
         if (order.getStatus() == SalesOrderStatus.CANCELLED) {
@@ -616,7 +696,9 @@ public class SalesService {
         salesReturn.setBranchId(order.getBranchId());
         salesReturn.setCustomerId(order.getCustomerId());
         salesReturn.setReturnDate(request.returnDate() == null ? LocalDate.now() : request.returnDate());
-        salesReturn.setReason(request.reason());
+        salesReturn.setReasonCode(request.reasonCode());
+        salesReturn.setReasonNote(request.reasonNote());
+        salesReturn.setCreatedBy(currentUsername());
 
         BigDecimal returnAmount = BigDecimal.ZERO;
         for (CreateSalesReturnItemRequest itemRequest : request.items()) {
@@ -624,7 +706,9 @@ public class SalesService {
                     .filter(item -> item.getId().equals(itemRequest.orderItemId()))
                     .findFirst()
                     .orElseThrow(() -> new BusinessException("Order item not found in order: " + itemRequest.orderItemId()));
-            int availableToReturn = orderItem.getQuantity() - orderItem.getReturnedQuantity();
+            validateReturnedSerial(orderItem, itemRequest.serialId());
+            int alreadyAccepted = returnItemRepository.sumQuantityByOrderItemIdAndStatuses(orderItem.getId(), acceptedReturnStatuses());
+            int availableToReturn = orderItem.getQuantity() - alreadyAccepted;
             if (itemRequest.quantity() > availableToReturn) {
                 throw new BusinessException("Return quantity exceeds sold quantity");
             }
@@ -633,21 +717,12 @@ public class SalesService {
             returnItem.setOrderItem(orderItem);
             returnItem.setProduct(orderItem.getProduct());
             returnItem.setSerial(orderItem.getSerial());
+            returnItem.setBatchId(itemRequest.batchId());
             returnItem.setQuantity(itemRequest.quantity());
             returnItem.setUnitPrice(orderItem.getUnitPrice());
             returnItem.setLineAmount(orderItem.getUnitPrice().multiply(BigDecimal.valueOf(itemRequest.quantity())));
             returnItem.setSerialDisposition(itemRequest.serialDisposition() == null ? ReturnSerialDisposition.RETURNED : itemRequest.serialDisposition());
             salesReturn.addItem(returnItem);
-
-            orderItem.setReturnedQuantity(orderItem.getReturnedQuantity() + itemRequest.quantity());
-            if (orderItem.getSerial() != null) {
-                orderItem.getSerial().setStatus(returnItem.getSerialDisposition() == ReturnSerialDisposition.DAMAGED ? SerialStatus.DAMAGED : SerialStatus.RETURNED);
-                orderItem.getSerial().setReservedOrderNo(null);
-                orderItem.getSerial().setReservationUntil(null);
-            }
-            if (returnItem.getSerialDisposition() == ReturnSerialDisposition.RETURNED) {
-                inventoryService.returnStock(order.getBranchId(), orderItem.getProduct(), itemRequest.quantity(), salesReturn.getReturnNo());
-            }
             returnAmount = returnAmount.add(returnItem.getLineAmount());
         }
 
@@ -660,52 +735,147 @@ public class SalesService {
         }
         salesReturn.setReturnAmount(returnAmount);
         salesReturn.setRefundAmount(refundAmount);
-        salesReturn.setStatus(SalesReturnStatus.COMPLETED);
+        salesReturn.setStatus(SalesReturnStatus.REQUESTED);
         SalesReturn saved = returnRepository.save(salesReturn);
+        audit(AuditAction.CREATE_RETURN, AuditModule.SALES, "SalesReturn", saved.getId(), null, saved.getReturnNo());
+        return SalesReturnResponse.from(saved);
+    }
 
-        Customer customer = customerService.get(order.getCustomerId());
-        if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
-            accountingService.recordSalesRefund(
-                    saved.getReturnNo(),
-                    saved.getReturnDate(),
-                    customer.getId(),
-                    customer.getFullName(),
-                    refundAmount,
-                    request.refundMethod() == null ? PaymentMethod.CASH : request.refundMethod(),
-                    request.bankAccountId(),
-                    "Refund sales return " + saved.getReturnNo()
-            );
-            order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));
-            order.setPaymentStatus(paymentStatus(order.getTotalAmount(), order.getPaidAmount()));
-            audit(AuditAction.REFUND, AuditModule.SALES, "SalesReturn", saved.getId(), null, saved.getReturnNo());
+    @Transactional
+    public SalesReturnResponse approveReturn(Long id, ApproveSalesReturnRequest request) {
+        SalesReturn salesReturn = returnRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Sales return not found: " + id));
+        branchSecurity.requireBranchAccess(salesReturn.getBranchId());
+        if (salesReturn.getStatus() != SalesReturnStatus.REQUESTED) {
+            throw new BusinessException("Only requested returns can be approved");
+        }
+        AppUser approver = branchSecurity.currentUser();
+        if (approver.getUsername().equalsIgnoreCase(salesReturn.getCreatedBy())) {
+            throw new BusinessException("Return creator cannot approve their own return request");
+        }
+        SalesReturnDisposition disposition = request == null ? null : request.disposition();
+        if (disposition == null) {
+            throw new BusinessException("Return disposition is required");
         }
 
+        salesReturn.setDisposition(disposition);
+        salesReturn.setApprovedBy(approver.getUsername());
+        salesReturn.setApprovedAt(OffsetDateTime.now());
+        salesReturn.setStatus(SalesReturnStatus.APPROVED);
+
+        SalesOrder order = salesReturn.getOrder();
+        Customer customer = customerService.get(order.getCustomerId());
+        for (SalesReturnItem item : salesReturn.getItems()) {
+            SalesOrderItem orderItem = item.getOrderItem();
+            orderItem.setReturnedQuantity(orderItem.getReturnedQuantity() + item.getQuantity());
+            ProductSerial serial = orderItem.getSerial();
+            if (serial != null) {
+                serial.setStatus(item.getSerialDisposition() == ReturnSerialDisposition.DAMAGED ? SerialStatus.DAMAGED : SerialStatus.RETURNED);
+                serial.setReservedOrderNo(null);
+                serial.setReservationUntil(null);
+            }
+            if (disposition == SalesReturnDisposition.REFUND_TO_INVENTORY) {
+                inventoryService.processSalesReturn(order.getBranchId(), orderItem.getWarehouse() == null ? null : orderItem.getWarehouse().getId(), orderItem.getProduct(), item.getQuantity(), salesReturn.getReturnNo());
+            } else {
+                inventoryService.recordWriteOff(order.getBranchId(), orderItem.getWarehouse() == null ? null : orderItem.getWarehouse().getId(), orderItem.getProduct(), item.getQuantity(), salesReturn.getReturnNo());
+            }
+        }
+        salesReturn.setReceivedAt(OffsetDateTime.now());
+        salesReturn.setStatus(SalesReturnStatus.RECEIVED);
+
+        applyReturnFinancialLedger(salesReturn, order, customer);
         boolean allReturned = order.getItems().stream().allMatch(item -> item.getReturnedQuantity() >= item.getQuantity());
         if (allReturned) {
             order.setStatus(SalesOrderStatus.RETURNED);
             order.setReturnedAt(OffsetDateTime.now());
         }
-
-        // Đảo bút toán doanh thu + giá vốn (chống ghi trùng bằng flag accountingReversed)
-        if (!saved.isAccountingReversed()) {
-            BigDecimal returnCostAmount = saved.getItems().stream()
+        if (salesReturn.getStatus() == SalesReturnStatus.CREDITED && !salesReturn.isAccountingReversed()) {
+            BigDecimal returnCostAmount = salesReturn.getItems().stream()
                     .map(item -> item.getProduct().getImportPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             accountingService.recordSalesReturnReversal(
-                    saved.getReturnNo(),
-                    saved.getReturnDate(),
+                    salesReturn.getReturnNo(),
+                    salesReturn.getReturnDate(),
                     customer.getId(),
                     customer.getFullName(),
-                    saved.getReturnAmount(),
+                    salesReturn.getReturnAmount(),
                     returnCostAmount,
-                    "Sales return reversal " + saved.getReturnNo()
+                    "Sales return reversal " + salesReturn.getReturnNo()
             );
-            saved.setAccountingReversed(true);
-            saved.setReversalEntryNo(saved.getReturnNo() + "-REV");
+            salesReturn.setAccountingReversed(true);
+            salesReturn.setReversalEntryNo(salesReturn.getReturnNo() + "-REV");
         }
 
-        audit(AuditAction.CREATE_RETURN, AuditModule.SALES, "SalesReturn", saved.getId(), null, saved.getReturnNo());
-        return SalesReturnResponse.from(saved);
+        audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesReturn", salesReturn.getId(), request == null ? null : request.note(), salesReturn.getReturnNo());
+        return SalesReturnResponse.from(salesReturn);
+    }
+
+    private void applyReturnFinancialLedger(SalesReturn salesReturn, SalesOrder order, Customer customer) {
+        BigDecimal paidByLedger = paymentRepository.sumAmountByOrderId(order.getId());
+        BigDecimal returnAmount = salesReturn.getReturnAmount();
+        BigDecimal requestedRefundAmount = salesReturn.getRefundAmount() != null
+                && salesReturn.getRefundAmount().compareTo(BigDecimal.ZERO) > 0
+                ? salesReturn.getRefundAmount()
+                : returnAmount;
+        if (paidByLedger.compareTo(order.getTotalAmount()) >= 0) {
+            SalesPayment refund = new SalesPayment();
+            refund.setOrder(order);
+            refund.setPaymentMethod(PaymentMethod.CASH);
+            refund.setAmount(requestedRefundAmount.negate());
+            refund.setPaymentDate(salesReturn.getReturnDate());
+            refund.setReferenceNo(salesReturn.getReturnNo() + "-REFUND");
+            refund.setNote("Refund sales return " + salesReturn.getReturnNo());
+            refund.setEntryType(SalesPaymentEntryType.REFUND);
+            paymentRepository.save(refund);
+            order.setPaidAmount(order.getPaidAmount().subtract(requestedRefundAmount).max(BigDecimal.ZERO));
+            order.setPaymentStatus(paymentStatus(order.getTotalAmount(), order.getPaidAmount()));
+            salesReturn.setRefundAmount(requestedRefundAmount);
+            salesReturn.setStatus(SalesReturnStatus.REFUNDED);
+            audit(AuditAction.REFUND, AuditModule.SALES, "SalesReturn", salesReturn.getId(), null, salesReturn.getReturnNo());
+            return;
+        }
+
+        salesReturn.setRefundAmount(BigDecimal.ZERO);
+        salesReturn.setStatus(SalesReturnStatus.CREDITED);
+    }
+
+    private void validateReturnedSerial(SalesOrderItem orderItem, Long requestedSerialId) {
+        ProductSerial soldSerial = orderItem.getSerial();
+        if (soldSerial == null && requestedSerialId != null) {
+            throw new BusinessException("Order item was not sold with a serial");
+        }
+        if (soldSerial != null && (requestedSerialId == null || !soldSerial.getId().equals(requestedSerialId))) {
+            throw new BusinessException("Return serial must match the serial originally sold on the order");
+        }
+    }
+
+    private List<SalesReturnStatus> acceptedReturnStatuses() {
+        return List.of(
+                SalesReturnStatus.APPROVED,
+                SalesReturnStatus.RECEIVED,
+                SalesReturnStatus.REFUNDED,
+                SalesReturnStatus.CREDITED,
+                SalesReturnStatus.COMPLETED
+        );
+    }
+
+    @Transactional
+    public SalesReturnResponse rejectReturn(Long id, RejectSalesReturnRequest request) {
+        SalesReturn salesReturn = returnRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Sales return not found: " + id));
+        branchSecurity.requireBranchAccess(salesReturn.getBranchId());
+        if (salesReturn.getStatus() != SalesReturnStatus.REQUESTED) {
+            throw new BusinessException("Only requested returns can be rejected");
+        }
+        AppUser reviewer = branchSecurity.currentUser();
+        if (reviewer.getUsername().equalsIgnoreCase(salesReturn.getCreatedBy())) {
+            throw new BusinessException("Return creator cannot reject their own return request");
+        }
+        salesReturn.setRejectedBy(reviewer.getUsername());
+        salesReturn.setRejectedAt(OffsetDateTime.now());
+        salesReturn.setStatus(SalesReturnStatus.REJECTED);
+        audit(AuditAction.UPDATE_ORDER, AuditModule.SALES, "SalesReturn", salesReturn.getId(), request == null ? null : request.note(), salesReturn.getReturnNo());
+        return SalesReturnResponse.from(salesReturn);
     }
 
     @Transactional(readOnly = true)
@@ -744,7 +914,18 @@ public class SalesService {
         if (order.getStatus() == SalesOrderStatus.CANCELLED || order.getStatus() == SalesOrderStatus.RETURNED) {
             throw new BusinessException("Order cannot be confirmed in status " + order.getStatus());
         }
+        if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+            throw new BusinessException("Order is waiting for discount approval");
+        }
+        if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is waiting for credit approval");
+        }
         if (order.getStatus() == SalesOrderStatus.DRAFT) {
+            Customer customer = customerService.get(order.getCustomerId());
+            checkAndMarkCreditApproval(order, customer, List.of(), true);
+            if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+                return;
+            }
             order.setConfirmedAt(OffsetDateTime.now());
         }
         if (request != null && request.reservationUntil() != null) {
@@ -768,6 +949,12 @@ public class SalesService {
     private SalesPayment addPaymentInternal(SalesOrder order, Customer customer, PaymentEntryRequest request, boolean installmentDisbursement) {
         if (order.getStatus() == SalesOrderStatus.CANCELLED || order.getStatus() == SalesOrderStatus.RETURNED) {
             throw new BusinessException("Cannot add payment to order in status " + order.getStatus());
+        }
+        if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+            throw new BusinessException("Order is waiting for discount approval");
+        }
+        if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is waiting for credit approval");
         }
         recordOrderAccounting(order);
         BigDecimal amount = request.amount();
@@ -815,6 +1002,12 @@ public class SalesService {
     }
 
     private Invoice createInvoiceEntity(SalesOrder order, CreateInvoiceRequest request) {
+        if (order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL) {
+            throw new BusinessException("Order is waiting for discount approval");
+        }
+        if (order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL) {
+            throw new BusinessException("Order is waiting for credit approval");
+        }
         Invoice existing = invoiceRepository.findByOrder_Id(order.getId()).orElse(null);
         if (existing != null) {
             return existing;
@@ -1216,14 +1409,46 @@ public class SalesService {
         return OffsetDateTime.now().plusMinutes(value);
     }
 
+    private boolean isWaitingApproval(SalesOrder order) {
+        return order.getStatus() == SalesOrderStatus.WAITING_DISCOUNT_APPROVAL
+                || order.getStatus() == SalesOrderStatus.WAITING_CREDIT_APPROVAL;
+    }
+
+    private void checkAndMarkCreditApproval(SalesOrder order, Customer customer, List<PaymentEntryRequest> payments, boolean shouldConfirm) {
+        if (!shouldConfirm || order.getStatus() != SalesOrderStatus.DRAFT) {
+            return;
+        }
+        if (order.getCreditApprovalStatus() == CreditApprovalStatus.APPROVED || hasAuthority("SALES_CREDIT_APPROVE")) {
+            return;
+        }
+        BigDecimal creditLimit = nullToZero(customer.getCreditLimit());
+        if (creditLimit.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal expectedPaid = payments == null ? BigDecimal.ZERO : payments.stream()
+                .map(PaymentEntryRequest::amount)
+                .map(this::nullToZero)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal newDebt = order.getTotalAmount().subtract(expectedPaid);
+        if (newDebt.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal currentDebt = nullToZero(customer.getTotalDebt()).max(nullToZero(receivableRepository.balanceByCustomerId(customer.getId())));
+        BigDecimal projectedDebt = currentDebt.add(newDebt);
+        if (projectedDebt.compareTo(creditLimit) > 0) {
+            order.setCreditApprovalStatus(CreditApprovalStatus.PENDING);
+            order.setStatus(SalesOrderStatus.WAITING_CREDIT_APPROVAL);
+        }
+    }
+
     /**
      * Neu discount vuot nguong (maxDiscountPct) va nguoi dung khong co quyen APPROVE:
      *   - Dat trang thai don hang -> WAITING_DISCOUNT_APPROVAL
      *   - Khong throw exception (don van duoc luu, cho quan ly duyet)
      * Neu co quyen APPROVE hoac discount hop le: khong lam gi.
      */
-    private void checkAndMarkDiscountApproval(SalesOrder order) {
-        BigDecimal discount = order.getDiscountAmount();
+    private void checkAndMarkDiscountApproval(SalesOrder order, BigDecimal manualDiscount) {
+        BigDecimal discount = nullToZero(manualDiscount);
         BigDecimal subtotal = order.getSubtotal();
         if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) == 0) return;
         if (discount == null || discount.compareTo(BigDecimal.ZERO) <= 0) return;
@@ -1245,6 +1470,15 @@ public class SalesService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(item -> authority.equals(item.getAuthority()));
+    }
+
+    private String currentUsername() {
+        try {
+            return branchSecurity.currentUser().getUsername();
+        } catch (RuntimeException ex) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            return authentication == null ? "system" : authentication.getName();
+        }
     }
 
     private boolean matchesCsv(String csv, Long value) {

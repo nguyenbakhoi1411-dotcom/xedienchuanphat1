@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.dto;
 
 import com.chuanphat.warranty.core.entity.SalesOrder;
+import com.chuanphat.warranty.core.enums.CreditApprovalStatus;
 import com.chuanphat.warranty.core.enums.DiscountApprovalStatus;
 import com.chuanphat.warranty.core.enums.PaymentStatus;
 import com.chuanphat.warranty.core.enums.SalesOrderStatus;
@@ -8,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 public record SalesOrderResponse(
         Long id,
@@ -37,6 +39,11 @@ public record SalesOrderResponse(
         String approvedBy,
         OffsetDateTime approvedAt,
         String approvalNote,
+        CreditApprovalStatus creditApprovalStatus,
+        String creditApprovedBy,
+        OffsetDateTime creditApprovedAt,
+        String creditApprovalNote,
+        UUID exchangeGroupId,
         // Flags
         boolean accountingRecorded,
         boolean stockIssued,
@@ -70,6 +77,11 @@ public record SalesOrderResponse(
                 order.getApprovedBy(),
                 order.getApprovedAt(),
                 order.getApprovalNote(),
+                order.getCreditApprovalStatus(),
+                order.getCreditApprovedBy(),
+                order.getCreditApprovedAt(),
+                order.getCreditApprovalNote(),
+                order.getExchangeGroupId(),
                 order.isAccountingRecorded(),
                 order.isStockIssued(),
                 order.isWarrantyCreated(),

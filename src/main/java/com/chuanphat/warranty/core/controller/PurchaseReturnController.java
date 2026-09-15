@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.controller;
 
 import com.chuanphat.warranty.core.entity.PurchaseReturn;
+import com.chuanphat.warranty.core.enums.PurchaseReturnReasonCode;
 import com.chuanphat.warranty.core.service.PurchaseReturnService;
 import com.chuanphat.warranty.core.service.PurchaseReturnService.ReturnItemRequest;
 import jakarta.validation.Valid;
@@ -41,8 +42,17 @@ public class PurchaseReturnController {
     @ResponseStatus(HttpStatus.CREATED)
     public PurchaseReturn create(@Valid @RequestBody CreateReturnRequest req) {
         return returnService.create(
-                req.supplierId(), req.branchId(), req.purchaseOrderId(),
-                req.refundMethod(), req.reason(), req.note(), req.items());
+                req.purchaseReceiptId(), req.reasonCode(), req.reasonNote(), req.note(), req.items());
+    }
+
+    @PostMapping("/{id}/approve")
+    public PurchaseReturn approve(@PathVariable Long id) {
+        return returnService.approve(id);
+    }
+
+    @PostMapping("/{id}/ship-back")
+    public PurchaseReturn shipBack(@PathVariable Long id) {
+        return returnService.shipBack(id);
     }
 
     @PostMapping("/{id}/complete")
@@ -50,18 +60,18 @@ public class PurchaseReturnController {
         return returnService.complete(id);
     }
 
-    @PostMapping("/{id}/cancel")
-    public PurchaseReturn cancel(@PathVariable Long id) {
-        return returnService.cancel(id);
+    @PostMapping("/{id}/reject")
+    public PurchaseReturn reject(@PathVariable Long id, @RequestBody(required = false) RejectReturnRequest req) {
+        return returnService.reject(id, req == null ? null : req.reason());
     }
 
     public record CreateReturnRequest(
-            @NotNull Long supplierId,
-            @NotNull Long branchId,
-            Long purchaseOrderId,
-            String refundMethod,    // DEDUCT_PAYABLE | CASH_REFUND
-            String reason,
+            @NotNull Long purchaseReceiptId,
+            @NotNull PurchaseReturnReasonCode reasonCode,
+            String reasonNote,
             String note,
             @NotNull List<ReturnItemRequest> items
     ) {}
+
+    public record RejectReturnRequest(String reason) {}
 }

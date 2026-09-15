@@ -188,7 +188,7 @@ SELECT X,
        CURRENT_TIMESTAMP
 FROM SYSTEM_RANGE(1, 100);
 
-MERGE INTO customers (id, phone, full_name, email, address, source, branch_id, tier, rank, score, status, total_purchase_amount, total_purchase_count, total_debt, lifetime_value, created_at) KEY(id)
+MERGE INTO customers (id, phone, full_name, email, address, source, branch_id, tier, rank, score, status, total_purchase_amount, total_purchase_count, total_debt, credit_limit, lifetime_value, created_at) KEY(id)
 SELECT X,
        '09' || LPAD(CAST(20000000 + X AS VARCHAR), 8, '0'),
        CASE MOD(X, 10) WHEN 1 THEN 'Nguyen Van Minh' WHEN 2 THEN 'Tran Thi Huong' WHEN 3 THEN 'Le Quoc Bao' WHEN 4 THEN 'Pham Ngoc Anh' WHEN 5 THEN 'Hoang Thanh Tung' WHEN 6 THEN 'Vo Thi Mai' WHEN 7 THEN 'Dang Gia Khang' WHEN 8 THEN 'Bui Minh Thu' WHEN 9 THEN 'Do Van Phuc' ELSE 'Phan Thanh Lam' END || ' ' || X,
@@ -204,10 +204,11 @@ SELECT X,
        0,
        0,
        0,
+       0,
        DATEADD('DAY', -MOD(X, 365), TIMESTAMP '2026-06-06 10:00:00')
 FROM SYSTEM_RANGE(1, 100);
 
-MERGE INTO inventory_stocks (id, branch_id, warehouse_id, product_id, quantity_on_hand, reserved_quantity, available_quantity, min_quantity, max_stock_level, updated_at) KEY(id)
+MERGE INTO inventory_stocks (id, branch_id, warehouse_id, product_id, quantity_on_hand, reserved_quantity, available_quantity, min_quantity, max_quantity, updated_at) KEY(id)
 SELECT (b.X - 1) * 50 + p.X,
        b.X,
        b.X,
@@ -225,7 +226,7 @@ MERGE INTO sales_orders (
     id, order_no, branch_id, customer_id, employee_id, order_date, status,
     subtotal, discount_amount, voucher_code, total_amount, vat_rate, vat_amount,
     paid_amount, payment_status, accounting_recorded, stock_issued, warranty_created,
-    voucher_consumed, max_discount_pct, discount_approval_status, created_at
+    voucher_consumed, max_discount_pct, discount_approval_status, credit_approval_status, created_at
 ) KEY(id)
 SELECT X,
        'SO-2026-' || LPAD(CAST(X AS VARCHAR), 5, '0'),
@@ -248,6 +249,7 @@ SELECT X,
        FALSE,
        5.00,
        CASE WHEN MOD(X, 7) = 0 THEN 'APPROVED' ELSE 'NONE' END,
+       'NONE',
        DATEADD('DAY', -MOD(X, 365), TIMESTAMP '2026-06-06 10:00:00')
 FROM SYSTEM_RANGE(1, 200);
 
@@ -323,7 +325,7 @@ FROM SYSTEM_RANGE(1, 50);
 
 MERGE INTO suppliers (
     id, code, name, tax_code, phone, email, website, address, contact_person,
-    current_debt, credit_limit, payment_terms_days, rating, notes, status, created_at
+    current_debt, credit_limit, payment_terms_days, rating, notes, status, category, created_at
 ) KEY(id)
 SELECT X,
        'NCC-' || LPAD(CAST(X AS VARCHAR), 3, '0'),
@@ -351,6 +353,7 @@ SELECT X,
        CAST(3 + MOD(X, 3) AS SMALLINT),
        'Seed supplier ' || X,
        'ACTIVE',
+       CASE WHEN MOD(X, 5) IN (1, 2, 3, 4) THEN 'EV_SUPPLIER' ELSE 'OTHER' END,
        TIMESTAMP '2026-01-10 08:00:00'
 FROM SYSTEM_RANGE(1, 20);
 
@@ -379,11 +382,12 @@ SELECT X,
        TRUE
 FROM SYSTEM_RANGE(1, 30);
 
-MERGE INTO purchase_order_items (id, purchase_order_id, product_id, quantity, unit_cost, line_total) KEY(id)
+MERGE INTO purchase_order_items (id, purchase_order_id, product_id, quantity, received_quantity, unit_cost, line_total) KEY(id)
 SELECT X,
        MOD(X - 1, 30) + 1,
        MOD(X - 1, 50) + 1,
        MOD(X, 5) + 1,
+       0,
        CASE WHEN MOD(X - 1, 50) + 1 <= 30 THEN 10800000 + MOD(X, 8) * 350000 ELSE 1200000 + MOD(X, 10) * 250000 END,
        (MOD(X, 5) + 1) * CASE WHEN MOD(X - 1, 50) + 1 <= 30 THEN 10800000 + MOD(X, 8) * 350000 ELSE 1200000 + MOD(X, 10) * 250000 END
 FROM SYSTEM_RANGE(1, 60);
@@ -480,7 +484,7 @@ MERGE INTO vouchers (id, code, name, discount_type, discount_value, minimum_orde
 (1, 'CPWELCOME', 'Uu dai khach hang moi', 'AMOUNT', 500000, 10000000, DATE '2026-06-01', DATE '2026-12-31', 200, 12, 'ACTIVE'),
 (2, 'PIN10', 'Giam gia pin lithium', 'PERCENT', 10, 3000000, DATE '2026-06-01', DATE '2026-09-30', 100, 8, 'ACTIVE');
 
-MERGE INTO marketing_campaigns (id, name, source, start_date, end_date, budget, status, note) KEY(id) VALUES
+MERGE INTO marketing_campaigns (id, campaign_name, channel, start_date, end_date, budget, status, note) KEY(id) VALUES
 (1, 'Facebook Lead Thang 6', 'FACEBOOK', DATE '2026-06-01', DATE '2026-06-30', 25000000, 'RUNNING', 'Tap trung xe may dien CP S1'),
 (2, 'Zalo cham soc khach cu', 'ZALO', DATE '2026-06-05', DATE '2026-07-05', 8000000, 'PLANNED', 'Nhac bao duong va doi pin');
 

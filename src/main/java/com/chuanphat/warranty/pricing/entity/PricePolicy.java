@@ -28,7 +28,7 @@ public class PricePolicy {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private PriceChangeType priceChangeType;
-    @Column(name = "value", nullable = false, precision = 14, scale = 2)
+    @Column(name = "\"value\"", nullable = false, precision = 14, scale = 2)
     private BigDecimal value = BigDecimal.ZERO;
     @Column(nullable = false)
     private LocalDate startDate;
