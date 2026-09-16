@@ -1,5 +1,6 @@
 package com.chuanphat.warranty.accounting.service;
 
+import com.chuanphat.warranty.accounting.enums.AccountMappingTransactionType;
 import com.chuanphat.warranty.core.entity.SalesOrder;
 import com.chuanphat.warranty.core.enums.SalesOrderStatus;
 import com.chuanphat.warranty.core.repository.SalesOrderRepository;
@@ -13,18 +14,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MisaExportService {
     private final SalesOrderRepository salesOrderRepository;
+    private final AccountMappingService accountMappingService;
 
-    public MisaExportService(SalesOrderRepository salesOrderRepository) {
+    public MisaExportService(SalesOrderRepository salesOrderRepository, AccountMappingService accountMappingService) {
         this.salesOrderRepository = salesOrderRepository;
+        this.accountMappingService = accountMappingService;
     }
 
     @Transactional(readOnly = true)
     public byte[] exportCsv(LocalDate fromDate, LocalDate toDate) {
-        StringBuilder csv = new StringBuilder("orderNo,orderDate,customerId,totalAmount\n");
+        StringBuilder csv = new StringBuilder("orderNo,orderDate,customerId,accountCode,totalAmount\n");
         for (MisaExportRow row : exportRows(fromDate, toDate)) {
             csv.append(escape(row.orderNo())).append(',')
                     .append(row.orderDate()).append(',')
                     .append(row.customerId()).append(',')
+                    .append(escape(row.accountCode())).append(',')
                     .append(row.totalAmount()).append('\n');
         }
         return csv.toString().getBytes(StandardCharsets.UTF_8);
@@ -39,12 +43,14 @@ public class MisaExportService {
 
     @Transactional(readOnly = true)
     public List<MisaExportRow> exportRows(LocalDate fromDate, LocalDate toDate) {
+        String salesAccountCode = accountMappingService.accountCodeFor(AccountMappingTransactionType.SALES_EV);
         return salesOrderRepository.findByOrderDateBetween(fromDate, toDate).stream()
                 .filter(order -> order.getStatus() != SalesOrderStatus.CANCELLED)
                 .map(order -> new MisaExportRow(
                         order.getOrderNo(),
                         order.getOrderDate(),
                         order.getCustomerId(),
+                        salesAccountCode,
                         money(order.getTotalAmount())
                 ))
                 .toList();
@@ -68,6 +74,7 @@ public class MisaExportService {
             String orderNo,
             LocalDate orderDate,
             Long customerId,
+            String accountCode,
             BigDecimal totalAmount
     ) {
     }

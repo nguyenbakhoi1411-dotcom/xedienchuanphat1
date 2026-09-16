@@ -30,7 +30,7 @@ class MisaExportControllerTest {
         LocalDate to = LocalDate.of(2026, 9, 30);
         when(reconciliationService.checkBeforeExport(from, to))
                 .thenReturn(MisaExportReconciliationResult.of(List.of()));
-        when(exportService.exportCsv(from, to)).thenReturn("orderNo,totalAmount\nSO-OK,1000\n".getBytes());
+        when(exportService.exportCsv(from, to)).thenReturn("orderNo,accountCode,totalAmount\nSO-OK,5111,1000\n".getBytes());
 
         MockMvcBuilders.standaloneSetup(new MisaExportController(reconciliationService, exportService)).build()
                 .perform(get("/api/accounting/misa-export")
@@ -38,7 +38,7 @@ class MisaExportControllerTest {
                         .param("toDate", "2026-09-30"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=misa-export-2026-09-01-2026-09-30.csv"))
-                .andExpect(content().bytes("orderNo,totalAmount\nSO-OK,1000\n".getBytes()));
+                .andExpect(content().bytes("orderNo,accountCode,totalAmount\nSO-OK,5111,1000\n".getBytes()));
     }
 
     @Test
