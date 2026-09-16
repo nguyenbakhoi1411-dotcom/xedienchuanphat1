@@ -16,6 +16,7 @@ import com.chuanphat.warranty.accounting.enums.AccountType;
 import com.chuanphat.warranty.accounting.enums.JournalEntryStatus;
 import com.chuanphat.warranty.accounting.enums.JournalReferenceType;
 import com.chuanphat.warranty.accounting.enums.PaymentMethod;
+import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.accounting.repository.ChartOfAccountRepository;
 import com.chuanphat.warranty.accounting.repository.JournalEntryLineRepository;
 import com.chuanphat.warranty.accounting.repository.JournalEntryRepository;
@@ -124,6 +125,7 @@ public class AccountingLedgerService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "#request.entryDate()")
     public JournalEntryResponse createJournalEntry(JournalEntryRequest request) {
         assertPeriodNotLocked(request.entryDate());
         JournalEntry entry = buildJournalEntry(request, currentUsername());
@@ -131,6 +133,7 @@ public class AccountingLedgerService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.journalEntryDate(#id)", branchId = "@periodGuardDateResolver.journalEntryBranchId(#id)")
     public JournalEntryResponse postJournalEntry(Long id) {
         JournalEntry entry = journalEntryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Journal entry not found: " + id));
@@ -140,6 +143,7 @@ public class AccountingLedgerService {
     }
 
     @Transactional
+    @GuardAccountingPeriod(date = "@periodGuardDateResolver.journalEntryDate(#id)", branchId = "@periodGuardDateResolver.journalEntryBranchId(#id)")
     public JournalEntryResponse cancelJournalEntry(Long id) {
         JournalEntry entry = journalEntryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Journal entry not found: " + id));

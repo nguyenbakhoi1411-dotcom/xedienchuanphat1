@@ -3,6 +3,7 @@ package com.chuanphat.warranty.accounting.period;
 import com.chuanphat.warranty.core.entity.GoodsIssue;
 import com.chuanphat.warranty.core.entity.InstallmentApplication;
 import com.chuanphat.warranty.core.entity.Invoice;
+import com.chuanphat.warranty.accounting.entity.JournalEntry;
 import com.chuanphat.warranty.core.entity.Payable;
 import com.chuanphat.warranty.core.entity.PurchaseOrder;
 import com.chuanphat.warranty.core.entity.PurchaseReceipt;
@@ -14,6 +15,7 @@ import com.chuanphat.warranty.accounting.entity.TaxInvoice;
 import com.chuanphat.warranty.core.repository.GoodsIssueRepository;
 import com.chuanphat.warranty.core.repository.InstallmentApplicationRepository;
 import com.chuanphat.warranty.core.repository.InvoiceRepository;
+import com.chuanphat.warranty.accounting.repository.JournalEntryRepository;
 import com.chuanphat.warranty.core.repository.PayableRepository;
 import com.chuanphat.warranty.core.repository.PurchaseOrderRepository;
 import com.chuanphat.warranty.core.repository.PurchaseReceiptRepository;
@@ -39,6 +41,7 @@ public class AccountingPeriodGuardDateResolver {
     private final TaxInvoiceRepository taxInvoiceRepository;
     private final InvoiceRepository invoiceRepository;
     private final InstallmentApplicationRepository installmentRepository;
+    private final JournalEntryRepository journalEntryRepository;
 
     public AccountingPeriodGuardDateResolver(
             SalesOrderRepository salesOrderRepository,
@@ -51,7 +54,8 @@ public class AccountingPeriodGuardDateResolver {
             GoodsIssueRepository goodsIssueRepository,
             TaxInvoiceRepository taxInvoiceRepository,
             InvoiceRepository invoiceRepository,
-            InstallmentApplicationRepository installmentRepository
+            InstallmentApplicationRepository installmentRepository,
+            JournalEntryRepository journalEntryRepository
     ) {
         this.salesOrderRepository = salesOrderRepository;
         this.salesReturnRepository = salesReturnRepository;
@@ -64,6 +68,7 @@ public class AccountingPeriodGuardDateResolver {
         this.taxInvoiceRepository = taxInvoiceRepository;
         this.invoiceRepository = invoiceRepository;
         this.installmentRepository = installmentRepository;
+        this.journalEntryRepository = journalEntryRepository;
     }
 
     public LocalDate salesOrderDate(Long id) {
@@ -150,6 +155,14 @@ public class AccountingPeriodGuardDateResolver {
         return installment(id).getOrder().getBranchId();
     }
 
+    public LocalDate journalEntryDate(Long id) {
+        return journalEntry(id).getEntryDate();
+    }
+
+    public Long journalEntryBranchId(Long id) {
+        return journalEntry(id).getBranchId();
+    }
+
     private SalesOrder salesOrder(Long id) {
         return salesOrderRepository.findById(id).orElseThrow(() -> new NotFoundException("Sales order not found: " + id));
     }
@@ -192,5 +205,9 @@ public class AccountingPeriodGuardDateResolver {
 
     private InstallmentApplication installment(Long id) {
         return installmentRepository.findById(id).orElseThrow(() -> new NotFoundException("Installment not found: " + id));
+    }
+
+    private JournalEntry journalEntry(Long id) {
+        return journalEntryRepository.findById(id).orElseThrow(() -> new NotFoundException("Journal entry not found: " + id));
     }
 }

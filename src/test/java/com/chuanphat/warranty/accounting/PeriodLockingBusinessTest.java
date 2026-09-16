@@ -13,6 +13,7 @@ import com.chuanphat.warranty.accounting.enums.JournalReferenceType;
 import com.chuanphat.warranty.accounting.period.AccountingPeriodLockAspect;
 import com.chuanphat.warranty.accounting.period.GuardAccountingPeriod;
 import com.chuanphat.warranty.accounting.repository.AccountingPeriodRepository;
+import com.chuanphat.warranty.accounting.service.AccountingLedgerService;
 import com.chuanphat.warranty.accounting.service.AccountingPeriodService;
 import com.chuanphat.warranty.core.service.GoodsIssueService;
 import com.chuanphat.warranty.core.service.InventoryService;
@@ -21,6 +22,7 @@ import com.chuanphat.warranty.core.service.PurchaseOrderService;
 import com.chuanphat.warranty.core.service.PurchasePaymentService;
 import com.chuanphat.warranty.core.service.PurchaseReceiptService;
 import com.chuanphat.warranty.core.service.PurchaseReturnService;
+import com.chuanphat.warranty.core.service.SalesExchangeService;
 import com.chuanphat.warranty.core.service.SalesService;
 import java.lang.reflect.Method;
 import java.time.LocalDate;
@@ -71,9 +73,29 @@ class PeriodLockingBusinessTest {
     void lockingPeriodPreventsSalesReturnOrPurchaseReturnInLockedPeriod() {
         assertGuarded(SalesService.class, "createReturn");
         assertGuarded(SalesService.class, "approveReturn");
+        assertGuarded(SalesService.class, "rejectReturn");
         assertGuarded(PurchaseReturnService.class, "create");
         assertGuarded(PurchaseReturnService.class, "shipBack");
         assertGuarded(PurchaseReturnService.class, "complete");
+    }
+
+    @Test
+    void salesExchangeDelegatesThroughGuardedSalesAndReturnFlows() throws NoSuchMethodException {
+        assertThat(SalesExchangeService.class.getDeclaredMethod("createExchange", com.chuanphat.warranty.core.dto.CreateSalesExchangeRequest.class)
+                        .getAnnotation(GuardAccountingPeriod.class))
+                .as("SalesExchangeService coordinates through injected SalesService, not self-invocation")
+                .isNull();
+
+        assertGuarded(SalesService.class, "createReturn");
+        assertGuarded(SalesService.class, "create");
+        assertGuarded(SalesService.class, "addPayment");
+    }
+
+    @Test
+    void accountingLedgerEntryPointsAreGuardedDirectly() {
+        assertGuarded(AccountingLedgerService.class, "createJournalEntry");
+        assertGuarded(AccountingLedgerService.class, "postJournalEntry");
+        assertGuarded(AccountingLedgerService.class, "cancelJournalEntry");
     }
 
     @Test
