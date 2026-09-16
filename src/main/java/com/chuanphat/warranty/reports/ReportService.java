@@ -1,6 +1,8 @@
 package com.chuanphat.warranty.reports;
 
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -91,6 +93,21 @@ public class ReportService {
         byte[] content = pdf ? exportDocumentService.reportPdf(data, meta) : exportDocumentService.reportExcel(data, meta);
         String fileName = exportDocumentService.fileName(normalizeType(type).toLowerCase(Locale.ROOT), fromDate, toDate, extension);
         return new ExportFile(fileName, contentType, content);
+    }
+
+    public Map<String, Object> snapshotData(String type, LocalDate fromDate, LocalDate toDate, String parametersJson) {
+        Map<String, Object> parameters = parseParameters(parametersJson);
+        return buildReport(
+                type,
+                fromDate,
+                toDate,
+                longValue(parameters.get("branchId")),
+                longValue(parameters.get("employeeId")),
+                longValue(parameters.get("productId")),
+                stringValue(parameters.get("productCategory")),
+                0,
+                500
+        );
     }
 
     public Map<String, Object> salesReport(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, String productCategory, int page, int pageSize) {
@@ -1037,6 +1054,31 @@ public class ReportService {
 
     private String normalizeType(String type) {
         return type == null ? "" : type.trim().replace('-', '_').toUpperCase(Locale.ROOT);
+    }
+
+    private Map<String, Object> parseParameters(String parametersJson) {
+        if (parametersJson == null || parametersJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return new ObjectMapper().readValue(parametersJson, new TypeReference<>() {});
+        } catch (Exception exception) {
+            return Map.of();
+        }
+    }
+
+    private Long longValue(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return Long.parseLong(text);
+        }
+        return null;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     public record ExportFile(String fileName, String contentType, byte[] content) {

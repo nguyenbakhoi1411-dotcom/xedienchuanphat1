@@ -6,6 +6,7 @@ import com.chuanphat.warranty.audit.enums.AuditModule;
 import com.chuanphat.warranty.audit.service.AuditLogService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -24,10 +25,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReportController {
     private final ReportService service;
     private final AuditLogService auditLogService;
+    private final ReportSnapshotService snapshotService;
 
-    public ReportController(ReportService service, AuditLogService auditLogService) {
+    public ReportController(ReportService service, AuditLogService auditLogService, ReportSnapshotService snapshotService) {
         this.service = service;
         this.auditLogService = auditLogService;
+        this.snapshotService = snapshotService;
     }
 
     @GetMapping("/{type}")
@@ -65,6 +68,16 @@ public class ReportController {
     ) {
         DateRange range = defaultRange(fromDate, toDate);
         ReportService.ExportFile file = service.export(type, format, range.fromDate(), range.toDate(), branchId, employeeId, productId, productCategory);
+        Map<String, Object> snapshotParameters = exportParameters(branchId, employeeId, productId, productCategory);
+        snapshotService.createOfficialSnapshot(
+                type,
+                format,
+                range.fromDate(),
+                range.toDate(),
+                snapshotParameters,
+                service.report(type, range.fromDate(), range.toDate(), branchId, employeeId, productId, productCategory, 0, 500),
+                authentication == null ? "system" : authentication.getName()
+        );
         auditLogService.record(new CreateAuditLogRequest(
                 authentication == null ? "system" : authentication.getName(),
                 AuditAction.EXPORT_REPORT,
@@ -207,5 +220,14 @@ public class ReportController {
             return forwardedFor.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private Map<String, Object> exportParameters(Long branchId, Long employeeId, Long productId, String productCategory) {
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("branchId", branchId);
+        parameters.put("employeeId", employeeId);
+        parameters.put("productId", productId);
+        parameters.put("productCategory", productCategory);
+        return parameters;
     }
 }

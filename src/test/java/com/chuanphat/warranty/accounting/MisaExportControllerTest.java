@@ -15,6 +15,7 @@ import com.chuanphat.warranty.accounting.dto.MisaExportReconciliationResult;
 import com.chuanphat.warranty.accounting.dto.ReconciliationIssue;
 import com.chuanphat.warranty.accounting.service.MisaExportReconciliationService;
 import com.chuanphat.warranty.accounting.service.MisaExportService;
+import com.chuanphat.warranty.reports.ReportSnapshotService;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -26,13 +27,14 @@ class MisaExportControllerTest {
     void exportSucceedsWhenAllReconciliationChecksPass() throws Exception {
         MisaExportReconciliationService reconciliationService = org.mockito.Mockito.mock(MisaExportReconciliationService.class);
         MisaExportService exportService = org.mockito.Mockito.mock(MisaExportService.class);
+        ReportSnapshotService snapshotService = org.mockito.Mockito.mock(ReportSnapshotService.class);
         LocalDate from = LocalDate.of(2026, 9, 1);
         LocalDate to = LocalDate.of(2026, 9, 30);
         when(reconciliationService.checkBeforeExport(from, to))
                 .thenReturn(MisaExportReconciliationResult.of(List.of()));
         when(exportService.exportCsv(from, to)).thenReturn("orderNo,accountCode,totalAmount\nSO-OK,5111,1000\n".getBytes());
 
-        MockMvcBuilders.standaloneSetup(new MisaExportController(reconciliationService, exportService)).build()
+        MockMvcBuilders.standaloneSetup(new MisaExportController(reconciliationService, exportService, snapshotService)).build()
                 .perform(get("/api/accounting/misa-export")
                         .param("fromDate", "2026-09-01")
                         .param("toDate", "2026-09-30"))
@@ -45,13 +47,14 @@ class MisaExportControllerTest {
     void misaExportEndpointReturnsConflictAndDoesNotGenerateFileWhenReconciliationHasIssues() throws Exception {
         MisaExportReconciliationService reconciliationService = org.mockito.Mockito.mock(MisaExportReconciliationService.class);
         MisaExportService exportService = org.mockito.Mockito.mock(MisaExportService.class);
+        ReportSnapshotService snapshotService = org.mockito.Mockito.mock(ReportSnapshotService.class);
         LocalDate from = LocalDate.of(2026, 9, 1);
         LocalDate to = LocalDate.of(2026, 9, 30);
         when(reconciliationService.checkBeforeExport(from, to)).thenReturn(MisaExportReconciliationResult.of(List.of(
                 new ReconciliationIssue(MisaExportReconciliationService.PAID_ORDER_MISSING_INVOICE, "SO-409", "missing invoice")
         )));
 
-        MockMvcBuilders.standaloneSetup(new MisaExportController(reconciliationService, exportService)).build()
+        MockMvcBuilders.standaloneSetup(new MisaExportController(reconciliationService, exportService, snapshotService)).build()
                 .perform(get("/api/accounting/misa-export")
                         .param("fromDate", "2026-09-01")
                         .param("toDate", "2026-09-30"))
