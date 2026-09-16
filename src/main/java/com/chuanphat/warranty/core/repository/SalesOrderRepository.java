@@ -56,7 +56,7 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
     @EntityGraph(attributePaths = {"quotation", "items", "items.product", "items.serial"})
     Optional<SalesOrder> findWithItemsById(Long id);
 
-    @EntityGraph(attributePaths = {"items", "items.product"})
+    @EntityGraph(attributePaths = {"items", "items.product", "items.warehouse"})
     List<SalesOrder> findByOrderDateBetween(LocalDate from, LocalDate to);
 
     List<SalesOrder> findByCustomerIdOrderByOrderDateDesc(Long customerId);
