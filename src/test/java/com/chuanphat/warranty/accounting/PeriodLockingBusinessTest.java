@@ -114,7 +114,7 @@ class PeriodLockingBusinessTest {
     }
 
     @Test
-    void unlockingPeriodRequiresReasonAndHighestAdminRole() throws NoSuchMethodException {
+    void unlockingPeriodRequiresReasonAndAdminOrChiefAccountantRole() throws NoSuchMethodException {
         AccountingPeriodService service = new AccountingPeriodService(org.mockito.Mockito.mock(AccountingPeriodRepository.class));
 
         assertThatThrownBy(() -> service.unlockMonthlyPeriod(2026, 9, "admin", null, " "))
@@ -124,7 +124,7 @@ class PeriodLockingBusinessTest {
         Method unlockByMonth = AccountingPeriodController.class.getDeclaredMethod(
                 "unlockByMonth", int.class, int.class, AccountingPeriodDtos.LockUnlockRequest.class,
                 org.springframework.security.core.userdetails.UserDetails.class);
-        assertThat(unlockByMonth.getAnnotation(PreAuthorize.class).value()).contains("SUPER_ADMIN");
+        assertThat(unlockByMonth.getAnnotation(PreAuthorize.class).value()).contains("ADMIN", "CHIEF_ACCOUNTANT");
     }
 
     @Test

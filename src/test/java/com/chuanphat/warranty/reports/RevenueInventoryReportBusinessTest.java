@@ -19,6 +19,7 @@ import com.chuanphat.warranty.reports.dto.RevenueReportDtos;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -36,7 +37,7 @@ class RevenueInventoryReportBusinessTest {
         when(repository.findByOrderDateBetween(from, to)).thenReturn(List.of(order));
         when(repository.findByOrderDateBetween(LocalDate.of(2026, 8, 25), LocalDate.of(2026, 8, 31))).thenReturn(List.of());
 
-        RevenueReportService service = new RevenueReportService(repository);
+        RevenueReportService service = new RevenueReportService(repository, allAccess());
 
         RevenueReportDtos.RevenueReportResponse report = service.report(from, to, RevenueReportDtos.PeriodGrouping.DAY);
 
@@ -66,7 +67,7 @@ class RevenueInventoryReportBusinessTest {
                 order("SO-PREV", LocalDate.of(2026, 9, 1), 101L, item(product(12L, "FOOD-1", ProductCategory.ACCESSORY), warehouse(1L, "Main"), "900"))
         ));
 
-        RevenueReportService service = new RevenueReportService(repository);
+        RevenueReportService service = new RevenueReportService(repository, allAccess());
 
         RevenueReportDtos.RevenueReportResponse report = service.report(from, to, RevenueReportDtos.PeriodGrouping.WEEK);
 
@@ -85,7 +86,7 @@ class RevenueInventoryReportBusinessTest {
         when(stockRepository.findAll()).thenReturn(List.of(stock(1L, warehouse, product, 3)));
         when(averageCostRepository.findAll()).thenReturn(List.of(averageCost(1L, warehouse, product, "123.45")));
 
-        InventoryValuationReportService service = new InventoryValuationReportService(stockRepository, averageCostRepository);
+        InventoryValuationReportService service = new InventoryValuationReportService(stockRepository, averageCostRepository, allAccess());
 
         var report = service.report();
 
@@ -112,7 +113,7 @@ class RevenueInventoryReportBusinessTest {
                 averageCost(1L, branch, product, "80")
         ));
 
-        InventoryValuationReportService service = new InventoryValuationReportService(stockRepository, averageCostRepository);
+        InventoryValuationReportService service = new InventoryValuationReportService(stockRepository, averageCostRepository, allAccess());
 
         var report = service.report();
         BigDecimal sumOfRows = report.perWarehouseValues().stream()
@@ -186,5 +187,12 @@ class RevenueInventoryReportBusinessTest {
         product.setImportPrice(BigDecimal.ZERO);
         product.setSalePrice(BigDecimal.ZERO);
         return product;
+    }
+
+    private static ReportAccessService allAccess() {
+        ReportAccessService access = org.mockito.Mockito.mock(ReportAccessService.class);
+        when(access.canViewAllReports()).thenReturn(true);
+        when(access.accessibleWarehouseIds()).thenReturn(Set.of());
+        return access;
     }
 }

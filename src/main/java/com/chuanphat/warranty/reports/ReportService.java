@@ -29,11 +29,18 @@ public class ReportService {
     private final JdbcTemplate jdbcTemplate;
     private final BranchSecurity branchSecurity;
     private final ExportDocumentService exportDocumentService;
+    private final ReportAccessService reportAccessService;
 
-    public ReportService(JdbcTemplate jdbcTemplate, BranchSecurity branchSecurity, ExportDocumentService exportDocumentService) {
+    public ReportService(
+            JdbcTemplate jdbcTemplate,
+            BranchSecurity branchSecurity,
+            ExportDocumentService exportDocumentService,
+            ReportAccessService reportAccessService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.branchSecurity = branchSecurity;
         this.exportDocumentService = exportDocumentService;
+        this.reportAccessService = reportAccessService;
     }
 
     public Map<String, Object> report(String type, LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, String productCategory, int page, int pageSize) {
@@ -52,8 +59,9 @@ public class ReportService {
     private Map<String, Object> buildReport(String type, LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, Long customerId, String status, String productCategory, int page, int pageSize) {
         int safePage = Math.max(page, 0);
         int safePageSize = Math.min(Math.max(pageSize, 1), 500);
+        Long scopedEmployeeId = scopedEmployeeId(employeeId);
         Map<String, Object> result = switch (normalizeType(type)) {
-            case "SALES", "SALES_REPORT", "REVENUE_TIME" -> salesReport(fromDate, toDate, branchId, employeeId, productId, customerId, status, productCategory, safePage, safePageSize);
+            case "SALES", "SALES_REPORT", "REVENUE_TIME" -> salesReport(fromDate, toDate, branchId, scopedEmployeeId, productId, customerId, status, productCategory, safePage, safePageSize);
             case "INVENTORY_VALUATION", "INVENTORY" -> inventoryValuation(branchId, productId, productCategory, safePage, safePageSize);
             case "INVENTORY_SERIAL" -> inventorySerial(branchId, productId, status, productCategory, safePage, safePageSize);
             case "LOW_STOCK" -> lowStock(branchId, productId, productCategory, safePage, safePageSize);
@@ -63,14 +71,14 @@ public class ReportService {
             case "STOCK_MOVEMENT" -> stockMovement(fromDate, toDate, branchId, productId, productCategory, safePage, safePageSize);
             case "CUSTOMER_DEBT_AGING", "DEBT" -> customerDebtAging(branchId, safePage, safePageSize);
             case "SUPPLIER_DEBT_AGING" -> supplierDebtAging(branchId, safePage, safePageSize);
-            case "PROFIT_LOSS", "PROFIT" -> profitLoss(fromDate, toDate, branchId, employeeId, productId, productCategory, safePage, safePageSize);
+            case "PROFIT_LOSS", "PROFIT" -> profitLoss(fromDate, toDate, branchId, scopedEmployeeId, productId, productCategory, safePage, safePageSize);
             case "CASH_FLOW" -> cashFlow(fromDate, toDate, branchId, safePage, safePageSize);
-            case "PRODUCT_PERFORMANCE", "TOP_PRODUCTS" -> productPerformance(fromDate, toDate, branchId, employeeId, productId, productCategory, safePage, safePageSize);
+            case "PRODUCT_PERFORMANCE", "TOP_PRODUCTS" -> productPerformance(fromDate, toDate, branchId, scopedEmployeeId, productId, productCategory, safePage, safePageSize);
             case "BRANCH_PERFORMANCE", "REVENUE_BRANCH" -> branchPerformance(fromDate, toDate, branchId, safePage, safePageSize);
-            case "EMPLOYEE_PERFORMANCE", "REVENUE_EMPLOYEE" -> employeePerformance(fromDate, toDate, branchId, employeeId, productId, productCategory, safePage, safePageSize);
-            case "WARRANTY_COST", "WARRANTY_REPAIR" -> warrantyCost(fromDate, toDate, branchId, employeeId, productCategory, safePage, safePageSize);
-            case "WARRANTY_ANALYSIS" -> warrantyAnalysis(fromDate, toDate, branchId, employeeId, productCategory, safePage, safePageSize);
-            case "EXECUTIVE_OPERATION" -> executiveOperation(fromDate, toDate, branchId, employeeId, productId, productCategory, safePage, safePageSize);
+            case "EMPLOYEE_PERFORMANCE", "REVENUE_EMPLOYEE" -> employeePerformance(fromDate, toDate, branchId, scopedEmployeeId, productId, productCategory, safePage, safePageSize);
+            case "WARRANTY_COST", "WARRANTY_REPAIR" -> warrantyCost(fromDate, toDate, branchId, scopedEmployeeId, productCategory, safePage, safePageSize);
+            case "WARRANTY_ANALYSIS" -> warrantyAnalysis(fromDate, toDate, branchId, scopedEmployeeId, productCategory, safePage, safePageSize);
+            case "EXECUTIVE_OPERATION" -> executiveOperation(fromDate, toDate, branchId, scopedEmployeeId, productId, productCategory, safePage, safePageSize);
             case "MARKETING_SOURCE", "NEW_CUSTOMERS" -> marketingSource(fromDate, toDate, branchId, safePage, safePageSize);
             default -> throw new IllegalArgumentException("Unsupported report type: " + type);
         };
@@ -116,6 +124,7 @@ public class ReportService {
 
     public Map<String, Object> salesReport(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, Long customerId, String status, String productCategory, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         long totalItems = number("""
                 select count(distinct so.order_date)
                 from sales_orders so
@@ -500,6 +509,7 @@ public class ReportService {
 
     public Map<String, Object> productPerformance(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, String productCategory, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         long totalItems = number("""
                 select count(*) from (
                   select p.product_name
@@ -571,6 +581,7 @@ public class ReportService {
 
     public Map<String, Object> revenueTime(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         return report("Doanh thu theo thoi gian", "Doanh thu theo ngay trong khoang loc", "Doanh thu",
                 List.of(col("period", "Ngay"), col("orders", "Don hang"), col("revenue", "Doanh thu")),
                 queryForList("""
@@ -591,6 +602,7 @@ public class ReportService {
 
     public Map<String, Object> revenueBranch(LocalDate fromDate, LocalDate toDate, Long branchId, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        Long scopedEmployeeId = scopedEmployeeId(null);
         long totalItems = number("select count(*) from branches b where (? is null or b.id = ?)", scopedBranchId, scopedBranchId).longValue();
         return report("Doanh thu theo chi nhanh", "So sanh doanh thu giua cac chi nhanh", "Doanh thu",
                 List.of(col("branch", "Chi nhanh"), col("orders", "Don hang"), col("revenue", "Doanh thu")),
@@ -598,11 +610,12 @@ public class ReportService {
                         select b.name branch, count(distinct so.id) orders, coalesce(sum(so.total_amount),0) revenue
                         from branches b
                         left join sales_orders so on so.branch_id = b.id and so.status <> 'CANCELLED' and so.order_date between ? and ?
+                            and (? is null or so.employee_id = ?)
                         where (? is null or b.id = ?)
                         group by b.id, b.name
                         order by coalesce(sum(so.total_amount),0) desc
                         limit ? offset ?
-                        """, fromDate, toDate, scopedBranchId, scopedBranchId, pageSize, page * pageSize),
+                        """, fromDate, toDate, scopedEmployeeId, scopedEmployeeId, scopedBranchId, scopedBranchId, pageSize, page * pageSize),
                 page, pageSize, totalItems);
     }
 
@@ -616,6 +629,7 @@ public class ReportService {
 
     public Map<String, Object> revenueEmployee(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, String productCategory, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         long totalItems = number("""
                 select count(*) from (
                   select au.full_name
@@ -651,6 +665,7 @@ public class ReportService {
 
     public Map<String, Object> topProducts(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         return report("San pham ban chay", "Xep hang san pham theo so luong ban", "So luong ban",
                 List.of(col("product", "San pham"), col("sku", "SKU"), col("quantity", "Da ban"), col("revenue", "Doanh thu")),
                 queryForList("""
@@ -704,6 +719,7 @@ public class ReportService {
 
     public Map<String, Object> profit(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, String productCategory) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         return report("Loi nhuan co ban", "Doanh thu tru gia von ghi nhan", "Doanh thu",
                 List.of(col("metric", "Chi tieu"), col("amount", "So tien")),
                 queryForList("""
@@ -757,6 +773,7 @@ public class ReportService {
 
     public Map<String, Object> warrantyRepair(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, String productCategory, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         long totalItems = number("""
                 select count(*) from (
                   select st.status
@@ -792,6 +809,7 @@ public class ReportService {
 
     public Map<String, Object> warrantyAnalysis(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, String productCategory, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         long totalItems = number("""
                 select count(*) from (
                   select coalesce(st.component_type, 'UNKNOWN') component
@@ -831,6 +849,7 @@ public class ReportService {
 
     public Map<String, Object> executiveOperation(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, Long productId, String productCategory, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        employeeId = scopedEmployeeId(employeeId);
         long totalItems = number("select count(*) from branches b where (? is null or b.id = ?)", scopedBranchId, scopedBranchId).longValue();
         return report("Executive Operation", "Lai lo chi nhanh, dong tien, canh bao va du bao nhap hang.", "Doanh thu",
                 List.of(col("branch", "Chi nhanh"), col("revenue", "Doanh thu"), col("costOfGoodsSold", "Gia von"), col("grossProfit", "Loi nhuan gop"), col("cashIn", "Tien vao"), col("cashOut", "Tien ra"), col("lowStockItems", "Canh bao ton")),
@@ -1025,6 +1044,17 @@ public class ReportService {
 
     private String compactSql(String sql) {
         return sql == null ? "" : sql.replaceAll("\\s+", " ").trim();
+    }
+
+    private Long scopedEmployeeId(Long requestedEmployeeId) {
+        if (reportAccessService.canViewAllReports()) {
+            return requestedEmployeeId;
+        }
+        Long currentEmployeeId = reportAccessService.currentEmployeeId().orElse(-1L);
+        if (requestedEmployeeId == null) {
+            return currentEmployeeId;
+        }
+        return requestedEmployeeId.equals(currentEmployeeId) ? requestedEmployeeId : -1L;
     }
 
     private void validateDateRange(LocalDate fromDate, LocalDate toDate, int maxDays) {

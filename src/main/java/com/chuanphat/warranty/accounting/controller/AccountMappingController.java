@@ -3,6 +3,9 @@ package com.chuanphat.warranty.accounting.controller;
 import com.chuanphat.warranty.accounting.dto.AccountMappingDtos;
 import com.chuanphat.warranty.accounting.enums.AccountMappingTransactionType;
 import com.chuanphat.warranty.accounting.service.AccountMappingService;
+import com.chuanphat.warranty.audit.annotation.Audited;
+import com.chuanphat.warranty.audit.enums.AuditAction;
+import com.chuanphat.warranty.audit.enums.AuditModule;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,6 +35,7 @@ public class AccountMappingController {
 
     @PatchMapping
     @PreAuthorize("hasAnyRole('ADMIN','CHIEF_ACCOUNTANT')")
+    @Audited(action = AuditAction.UPDATE_ACCOUNT, module = AuditModule.ACCOUNTING, entityType = "AccountMapping")
     public AccountMappingDtos.AccountMappingResponse updateMapping(
             @Valid @RequestBody AccountMappingDtos.UpdateAccountMappingRequest request,
             @AuthenticationPrincipal UserDetails user

@@ -16,15 +16,18 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RevenueReportService {
     private final SalesOrderRepository salesOrderRepository;
+    private final ReportAccessService reportAccessService;
 
-    public RevenueReportService(SalesOrderRepository salesOrderRepository) {
+    public RevenueReportService(SalesOrderRepository salesOrderRepository, ReportAccessService reportAccessService) {
         this.salesOrderRepository = salesOrderRepository;
+        this.reportAccessService = reportAccessService;
     }
 
     @Transactional(readOnly = true)
@@ -36,9 +39,9 @@ public class RevenueReportService {
         validateRange(fromDate, toDate);
         RevenueReportDtos.PeriodGrouping effectiveGrouping = grouping == null ? RevenueReportDtos.PeriodGrouping.DAY : grouping;
 
-        List<SalesOrder> currentOrders = salesOrderRepository.findByOrderDateBetween(fromDate, toDate);
+        List<SalesOrder> currentOrders = scopeToSalesStaff(salesOrderRepository.findByOrderDateBetween(fromDate, toDate));
         BigDecimal totalRevenue = totalRevenue(currentOrders);
-        BigDecimal previousPeriodRevenue = totalRevenue(salesOrderRepository.findByOrderDateBetween(previousFrom(fromDate, toDate), fromDate.minusDays(1)));
+        BigDecimal previousPeriodRevenue = totalRevenue(scopeToSalesStaff(salesOrderRepository.findByOrderDateBetween(previousFrom(fromDate, toDate), fromDate.minusDays(1))));
 
         return new RevenueReportDtos.RevenueReportResponse(
                 fromDate,
@@ -49,6 +52,19 @@ public class RevenueReportService {
                 totalRevenue.subtract(previousPeriodRevenue),
                 rows(currentOrders, effectiveGrouping)
         );
+    }
+
+    private List<SalesOrder> scopeToSalesStaff(List<SalesOrder> orders) {
+        if (reportAccessService.canViewAllReports()) {
+            return orders;
+        }
+        Optional<Long> currentEmployeeId = reportAccessService.currentEmployeeId();
+        if (currentEmployeeId.isEmpty()) {
+            return List.of();
+        }
+        return orders.stream()
+                .filter(order -> currentEmployeeId.get().equals(order.getEmployeeId()))
+                .toList();
     }
 
     private List<RevenueReportDtos.RevenueReportRow> rows(List<SalesOrder> orders, RevenueReportDtos.PeriodGrouping grouping) {

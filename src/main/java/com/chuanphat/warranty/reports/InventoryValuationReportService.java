@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -20,13 +21,16 @@ public class InventoryValuationReportService {
 
     private final InventoryStockRepository inventoryStockRepository;
     private final InventoryAverageCostRepository inventoryAverageCostRepository;
+    private final ReportAccessService reportAccessService;
 
     public InventoryValuationReportService(
             InventoryStockRepository inventoryStockRepository,
-            InventoryAverageCostRepository inventoryAverageCostRepository
+            InventoryAverageCostRepository inventoryAverageCostRepository,
+            ReportAccessService reportAccessService
     ) {
         this.inventoryStockRepository = inventoryStockRepository;
         this.inventoryAverageCostRepository = inventoryAverageCostRepository;
+        this.reportAccessService = reportAccessService;
     }
 
     @Transactional(readOnly = true)
@@ -34,7 +38,9 @@ public class InventoryValuationReportService {
         Map<AverageCostKey, InventoryAverageCost> averageCosts = inventoryAverageCostRepository.findAll().stream()
                 .collect(Collectors.toMap(this::key, Function.identity(), (first, ignored) -> first));
 
+        Set<Long> allowedWarehouseIds = reportAccessService.accessibleWarehouseIds();
         List<InventoryValuationReportDtos.InventoryValuationWarehouseRow> rows = inventoryStockRepository.findAll().stream()
+                .filter(stock -> reportAccessService.canViewAllReports() || allowedWarehouseIds.contains(stock.getWarehouse() == null ? null : stock.getWarehouse().getId()))
                 .map(stock -> row(stock, averageCosts.get(key(stock))))
                 .sorted(Comparator.comparing((InventoryValuationReportDtos.InventoryValuationWarehouseRow row) -> row.warehouseName() == null ? "" : row.warehouseName())
                         .thenComparing(row -> row.productCode() == null ? "" : row.productCode()))

@@ -23,7 +23,12 @@ class ReportSecurityBusinessTest {
     @Test
     @SuppressWarnings("unchecked")
     void hidesCostAndProfitWithoutPermissionAndRevealsWithPermission() throws Exception {
-        ReportService service = new ReportService(org.mockito.Mockito.mock(JdbcTemplate.class), org.mockito.Mockito.mock(BranchSecurity.class), org.mockito.Mockito.mock(ExportDocumentService.class));
+        ReportService service = new ReportService(
+                org.mockito.Mockito.mock(JdbcTemplate.class),
+                org.mockito.Mockito.mock(BranchSecurity.class),
+                org.mockito.Mockito.mock(ExportDocumentService.class),
+                org.mockito.Mockito.mock(ReportAccessService.class)
+        );
         Method method = ReportService.class.getDeclaredMethod("maskSensitive", Map.class);
         method.setAccessible(true);
         Map<String, Object> report = Map.of(
