@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,7 @@ public class PurchaseReceiptService {
     private final PayableService payableService;
     private final BranchSecurity branchSecurity;
     private final PurchaseReceiptProperties receiptProperties;
+    private final WarehouseAccessService warehouseAccessService;
 
     public PurchaseReceiptService(
             PurchaseReceiptRepository receiptRepo,
@@ -63,7 +65,8 @@ public class PurchaseReceiptService {
             InventoryService inventoryService,
             PayableService payableService,
             BranchSecurity branchSecurity,
-            PurchaseReceiptProperties receiptProperties
+            PurchaseReceiptProperties receiptProperties,
+            WarehouseAccessService warehouseAccessService
     ) {
         this.receiptRepo = receiptRepo;
         this.productRepo = productRepo;
@@ -75,6 +78,7 @@ public class PurchaseReceiptService {
         this.payableService = payableService;
         this.branchSecurity = branchSecurity;
         this.receiptProperties = receiptProperties;
+        this.warehouseAccessService = warehouseAccessService;
     }
 
     // ──────────────────────────────────────────────
@@ -85,17 +89,25 @@ public class PurchaseReceiptService {
     public PageResponse<PurchaseReceiptDto> list(Long branchId, ReceiptStatus status, int page, int size) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        if (scopedBranchId == null) {
-            if (status != null) return PageResponse.from(receiptRepo.findByStatus(status, pageable).map(PurchaseReceiptDto::from));
-            return PageResponse.from(receiptRepo.findAll(pageable).map(PurchaseReceiptDto::from));
+        if (warehouseAccessService.isPrivileged()) {
+            if (scopedBranchId == null) {
+                if (status != null) return PageResponse.from(receiptRepo.findByStatus(status, pageable).map(PurchaseReceiptDto::from));
+                return PageResponse.from(receiptRepo.findAll(pageable).map(PurchaseReceiptDto::from));
+            }
+            if (status != null) return PageResponse.from(receiptRepo.findByBranchIdAndStatus(scopedBranchId, status, pageable).map(PurchaseReceiptDto::from));
+            return PageResponse.from(receiptRepo.findByBranchId(scopedBranchId, pageable).map(PurchaseReceiptDto::from));
         }
-        if (status != null) return PageResponse.from(receiptRepo.findByBranchIdAndStatus(scopedBranchId, status, pageable).map(PurchaseReceiptDto::from));
-        return PageResponse.from(receiptRepo.findByBranchId(scopedBranchId, pageable).map(PurchaseReceiptDto::from));
+        List<Long> warehouseIds = warehouseAccessService.currentAccessibleWarehouseIds(scopedBranchId);
+        if (warehouseIds.isEmpty()) return PageResponse.from(Page.empty(pageable));
+        if (status != null) return PageResponse.from(receiptRepo.findByWarehouse_IdInAndStatus(warehouseIds, status, pageable).map(PurchaseReceiptDto::from));
+        return PageResponse.from(receiptRepo.findByWarehouse_IdIn(warehouseIds, pageable).map(PurchaseReceiptDto::from));
     }
 
     @Transactional(readOnly = true)
     public PurchaseReceiptDto get(Long id) {
-        return PurchaseReceiptDto.from(findById(id));
+        PurchaseReceipt receipt = findById(id);
+        warehouseAccessService.requireView(resolveEffectiveWarehouse(receipt).getId());
+        return PurchaseReceiptDto.from(receipt);
     }
 
     // ──────────────────────────────────────────────
@@ -111,14 +123,17 @@ public class PurchaseReceiptService {
         Supplier supplier = supplierRepo.findById(req.supplierId())
                 .orElseThrow(() -> new BusinessException("Khong tim thay nha cung cap: " + req.supplierId()));
 
-        Warehouse warehouse = null;
+        Warehouse warehouse;
         if (req.warehouseId() != null) {
             warehouse = warehouseRepo.findById(req.warehouseId())
                     .orElseThrow(() -> new BusinessException("Khong tim thay kho: " + req.warehouseId()));
             if (!warehouse.getBranchId().equals(req.branchId())) {
                 throw new BusinessException("Kho khong thuoc chi nhanh nay");
             }
+        } else {
+            warehouse = resolveMainWarehouse(req.branchId());
         }
+        warehouseAccessService.requireOperate(warehouse.getId());
 
         PurchaseReceipt receipt = new PurchaseReceipt();
         receipt.setReceiptNo(generateReceiptNo());
@@ -157,6 +172,7 @@ public class PurchaseReceiptService {
     public PurchaseReceiptDto confirm(Long id) {
         PurchaseReceipt receipt = findById(id);
         branchSecurity.requireBranchAccess(receipt.getBranchId());
+        warehouseAccessService.requireOperate(resolveEffectiveWarehouse(receipt).getId());
 
         if (receipt.getStatus() != ReceiptStatus.DRAFT) {
             throw new BusinessException("Chi co the xac nhan phieu o trang thai DRAFT");
@@ -207,6 +223,7 @@ public class PurchaseReceiptService {
     public PurchaseReceiptDto cancel(Long id) {
         PurchaseReceipt receipt = findById(id);
         branchSecurity.requireBranchAccess(receipt.getBranchId());
+        warehouseAccessService.requireOperate(resolveEffectiveWarehouse(receipt).getId());
         if (receipt.getStatus() == ReceiptStatus.CONFIRMED) {
             throw new BusinessException("Khong the huy phieu da xac nhan. Tao phieu dieu chinh thay.");
         }
@@ -259,12 +276,15 @@ public class PurchaseReceiptService {
 
     private Warehouse resolveEffectiveWarehouse(PurchaseReceipt receipt) {
         if (receipt.getWarehouse() != null) return receipt.getWarehouse();
-        // Tim kho chinh cua chi nhanh
+        return resolveMainWarehouse(receipt.getBranchId());
+    }
+
+    private Warehouse resolveMainWarehouse(Long branchId) {
         return warehouseRepo.findByBranchIdAndTypeAndStatus(
-                        receipt.getBranchId(),
+                        branchId,
                         com.chuanphat.warranty.core.enums.WarehouseType.MAIN,
                         com.chuanphat.warranty.core.enums.RecordStatus.ACTIVE)
-                .orElseThrow(() -> new BusinessException("Khong tim thay kho chinh cho chi nhanh: " + receipt.getBranchId()));
+                .orElseThrow(() -> new BusinessException("Khong tim thay kho chinh cho chi nhanh: " + branchId));
     }
 
     private PurchaseReceipt findById(Long id) {

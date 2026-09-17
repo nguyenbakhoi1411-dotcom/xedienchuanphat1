@@ -35,6 +35,7 @@ import com.chuanphat.warranty.core.repository.WarehouseRepository;
 import com.chuanphat.warranty.core.service.InventoryService;
 import com.chuanphat.warranty.core.service.PayableService;
 import com.chuanphat.warranty.core.service.PurchaseReceiptService;
+import com.chuanphat.warranty.core.service.WarehouseAccessService;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -59,6 +60,7 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
     @Mock InventoryService inventoryService;
     @Mock PayableService payableService;
     @Mock BranchSecurity branchSecurity;
+    @Mock WarehouseAccessService warehouseAccessService;
 
     PurchaseReceiptProperties properties;
     PurchaseReceiptService service;
@@ -76,10 +78,13 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
                 inventoryService,
                 payableService,
                 branchSecurity,
-                properties);
+                properties,
+                warehouseAccessService);
         lenient().when(receiptRepo.findMaxReceiptSeq()).thenReturn(0);
         lenient().when(receiptRepo.save(any(PurchaseReceipt.class))).thenAnswer(invocation -> withId(invocation.getArgument(0), 300L));
         lenient().when(purchaseOrderRepository.save(any(PurchaseOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(warehouseRepo.findByBranchIdAndTypeAndStatus(eq(1L), any(), any()))
+                .thenReturn(Optional.of(warehouse(20L)));
     }
 
     @Test

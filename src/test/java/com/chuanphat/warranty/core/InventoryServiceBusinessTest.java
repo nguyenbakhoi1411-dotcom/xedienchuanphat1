@@ -25,6 +25,7 @@ import com.chuanphat.warranty.core.repository.InventoryTransactionRepository;
 import com.chuanphat.warranty.core.repository.WarehouseRepository;
 import com.chuanphat.warranty.core.service.InventoryService;
 import com.chuanphat.warranty.core.service.ProductService;
+import com.chuanphat.warranty.core.service.WarehouseAccessService;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -44,6 +45,7 @@ class InventoryServiceBusinessTest {
     @Mock WarehouseRepository warehouseRepository;
     @Mock ProductService productService;
     @Mock BranchSecurity branchSecurity;
+    @Mock WarehouseAccessService warehouseAccessService;
 
     InventoryService service;
     Product product;
@@ -51,7 +53,7 @@ class InventoryServiceBusinessTest {
 
     @BeforeEach
     void setUp() {
-        service = new InventoryService(stockRepository, transactionRepository, averageCostRepository, warehouseRepository, productService, branchSecurity);
+        service = new InventoryService(stockRepository, transactionRepository, averageCostRepository, warehouseRepository, productService, branchSecurity, warehouseAccessService);
         product = product(7L);
         warehouse = warehouse(3L, 2L);
     }

@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class InventoryCountService {
     private final InventoryStockRepository stockRepo;
     private final InventoryService inventoryService;
     private final BranchSecurity branchSecurity;
+    private final WarehouseAccessService warehouseAccessService;
 
     public InventoryCountService(
             InventoryCountRepository countRepo,
@@ -47,7 +49,8 @@ public class InventoryCountService {
             WarehouseRepository warehouseRepo,
             InventoryStockRepository stockRepo,
             InventoryService inventoryService,
-            BranchSecurity branchSecurity
+            BranchSecurity branchSecurity,
+            WarehouseAccessService warehouseAccessService
     ) {
         this.countRepo = countRepo;
         this.productRepo = productRepo;
@@ -55,6 +58,7 @@ public class InventoryCountService {
         this.stockRepo = stockRepo;
         this.inventoryService = inventoryService;
         this.branchSecurity = branchSecurity;
+        this.warehouseAccessService = warehouseAccessService;
     }
 
     // ──────────────────────────────────────────────
@@ -65,17 +69,25 @@ public class InventoryCountService {
     public PageResponse<InventoryCountDto> list(Long branchId, InventoryCountStatus status, int page, int size) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        if (scopedBranchId == null) {
-            if (status != null) return PageResponse.from(countRepo.findByStatus(status, pageable).map(InventoryCountDto::from));
-            return PageResponse.from(countRepo.findAll(pageable).map(InventoryCountDto::from));
+        if (warehouseAccessService.isPrivileged()) {
+            if (scopedBranchId == null) {
+                if (status != null) return PageResponse.from(countRepo.findByStatus(status, pageable).map(InventoryCountDto::from));
+                return PageResponse.from(countRepo.findAll(pageable).map(InventoryCountDto::from));
+            }
+            if (status != null) return PageResponse.from(countRepo.findByBranchIdAndStatus(scopedBranchId, status, pageable).map(InventoryCountDto::from));
+            return PageResponse.from(countRepo.findByBranchId(scopedBranchId, pageable).map(InventoryCountDto::from));
         }
-        if (status != null) return PageResponse.from(countRepo.findByBranchIdAndStatus(scopedBranchId, status, pageable).map(InventoryCountDto::from));
-        return PageResponse.from(countRepo.findByBranchId(scopedBranchId, pageable).map(InventoryCountDto::from));
+        List<Long> warehouseIds = warehouseAccessService.currentAccessibleWarehouseIds(scopedBranchId);
+        if (warehouseIds.isEmpty()) return PageResponse.from(Page.empty(pageable));
+        if (status != null) return PageResponse.from(countRepo.findByWarehouse_IdInAndStatus(warehouseIds, status, pageable).map(InventoryCountDto::from));
+        return PageResponse.from(countRepo.findByWarehouse_IdIn(warehouseIds, pageable).map(InventoryCountDto::from));
     }
 
     @Transactional(readOnly = true)
     public InventoryCountDto get(Long id) {
-        return InventoryCountDto.from(findById(id));
+        InventoryCount count = findById(id);
+        warehouseAccessService.requireView(effectiveWarehouse(count).getId());
+        return InventoryCountDto.from(count);
     }
 
     // ──────────────────────────────────────────────
@@ -85,12 +97,19 @@ public class InventoryCountService {
     public InventoryCountDto create(InventoryCountRequest req) {
         branchSecurity.requireBranchAccess(req.branchId());
 
-        Warehouse warehouse = null;
+        Warehouse warehouse;
         Long warehouseId = req.warehouseId();
         if (warehouseId != null) {
             warehouse = warehouseRepo.findById(warehouseId)
-                    .orElseThrow(() -> new BusinessException("Khong tim thay kho: " + warehouseId));
+                    .orElseThrow(() -> new BusinessException("Khong tim thay kho: " + req.warehouseId()));
+            if (!req.branchId().equals(warehouse.getBranchId())) {
+                throw new BusinessException("Kho khong thuoc chi nhanh nay");
+            }
+        } else {
+            warehouse = resolveMainWarehouse(req.branchId());
+            warehouseId = warehouse.getId();
         }
+        warehouseAccessService.requireOperate(warehouse.getId());
 
         InventoryCount count = new InventoryCount();
         count.setCountNo(generateCountNo());
@@ -139,6 +158,7 @@ public class InventoryCountService {
     public InventoryCountDto startCounting(Long id) {
         InventoryCount count = findById(id);
         branchSecurity.requireBranchAccess(count.getBranchId());
+        warehouseAccessService.requireOperate(effectiveWarehouse(count).getId());
         if (count.getStatus() != InventoryCountStatus.DRAFT) {
             throw new BusinessException("Chi chuyen trang thai tu DRAFT");
         }
@@ -153,6 +173,7 @@ public class InventoryCountService {
     public InventoryCountDto submitCounts(Long id, List<InventoryCountItemSubmit> submissions) {
         InventoryCount count = findById(id);
         branchSecurity.requireBranchAccess(count.getBranchId());
+        warehouseAccessService.requireOperate(effectiveWarehouse(count).getId());
         if (count.getStatus() != InventoryCountStatus.COUNTING
                 && count.getStatus() != InventoryCountStatus.DRAFT) {
             throw new BusinessException("Chi nhap so luong khi phieu o trang thai DRAFT/COUNTING");
@@ -182,6 +203,7 @@ public class InventoryCountService {
     public InventoryCountDto requestApproval(Long id) {
         InventoryCount count = findById(id);
         branchSecurity.requireBranchAccess(count.getBranchId());
+        warehouseAccessService.requireOperate(effectiveWarehouse(count).getId());
         if (count.getStatus() != InventoryCountStatus.COUNTING) {
             throw new BusinessException("Phai o trang thai COUNTING truoc khi gui duyet");
         }
@@ -201,6 +223,7 @@ public class InventoryCountService {
     public InventoryCountDto approve(Long id) {
         InventoryCount count = findById(id);
         branchSecurity.requireBranchAccess(count.getBranchId());
+        warehouseAccessService.requireManage(effectiveWarehouse(count).getId());
         if (count.getStatus() != InventoryCountStatus.PENDING_APPROVAL) {
             throw new BusinessException("Phai o trang thai PENDING_APPROVAL de duyet");
         }
@@ -244,6 +267,7 @@ public class InventoryCountService {
     public InventoryCountDto cancel(Long id) {
         InventoryCount count = findById(id);
         branchSecurity.requireBranchAccess(count.getBranchId());
+        warehouseAccessService.requireOperate(effectiveWarehouse(count).getId());
         if (count.getStatus() == InventoryCountStatus.APPROVED) {
             throw new BusinessException("Khong the huy phieu kiem ke da duyet");
         }
@@ -275,5 +299,9 @@ public class InventoryCountService {
                         com.chuanphat.warranty.core.enums.WarehouseType.MAIN,
                         com.chuanphat.warranty.core.enums.RecordStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException("Khong tim thay kho chinh cho chi nhanh: " + branchId));
+    }
+
+    private Warehouse effectiveWarehouse(InventoryCount count) {
+        return count.getWarehouse() != null ? count.getWarehouse() : resolveMainWarehouse(count.getBranchId());
     }
 }

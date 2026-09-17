@@ -13,6 +13,8 @@ import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,7 @@ public class GoodsIssueService {
     private final InventoryService inventoryService;
     private final InventoryAverageCostRepository avgCostRepo;
     private final BranchSecurity branchSecurity;
+    private final WarehouseAccessService warehouseAccessService;
 
     public GoodsIssueService(
             GoodsIssueRepository issueRepo,
@@ -47,7 +50,8 @@ public class GoodsIssueService {
             ProductSerialRepository serialRepo,
             InventoryService inventoryService,
             InventoryAverageCostRepository avgCostRepo,
-            BranchSecurity branchSecurity
+            BranchSecurity branchSecurity,
+            WarehouseAccessService warehouseAccessService
     ) {
         this.issueRepo = issueRepo;
         this.productRepo = productRepo;
@@ -56,6 +60,7 @@ public class GoodsIssueService {
         this.inventoryService = inventoryService;
         this.avgCostRepo = avgCostRepo;
         this.branchSecurity = branchSecurity;
+        this.warehouseAccessService = warehouseAccessService;
     }
 
     // ──────────────────────────────────────────────
@@ -66,18 +71,27 @@ public class GoodsIssueService {
     public PageResponse<GoodsIssueDto> list(Long branchId, String status, GoodsIssueType type, int page, int size) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        if (scopedBranchId == null) {
-            if (status != null) return PageResponse.from(issueRepo.findByStatus(status, pageable).map(GoodsIssueDto::from));
-            return PageResponse.from(issueRepo.findAll(pageable).map(GoodsIssueDto::from));
+        if (warehouseAccessService.isPrivileged()) {
+            if (scopedBranchId == null) {
+                if (status != null) return PageResponse.from(issueRepo.findByStatus(status, pageable).map(GoodsIssueDto::from));
+                return PageResponse.from(issueRepo.findAll(pageable).map(GoodsIssueDto::from));
+            }
+            if (type != null) return PageResponse.from(issueRepo.findByBranchIdAndIssueType(scopedBranchId, type, pageable).map(GoodsIssueDto::from));
+            if (status != null) return PageResponse.from(issueRepo.findByBranchIdAndStatus(scopedBranchId, status, pageable).map(GoodsIssueDto::from));
+            return PageResponse.from(issueRepo.findByBranchId(scopedBranchId, pageable).map(GoodsIssueDto::from));
         }
-        if (type != null) return PageResponse.from(issueRepo.findByBranchIdAndIssueType(scopedBranchId, type, pageable).map(GoodsIssueDto::from));
-        if (status != null) return PageResponse.from(issueRepo.findByBranchIdAndStatus(scopedBranchId, status, pageable).map(GoodsIssueDto::from));
-        return PageResponse.from(issueRepo.findByBranchId(scopedBranchId, pageable).map(GoodsIssueDto::from));
+        List<Long> warehouseIds = warehouseAccessService.currentAccessibleWarehouseIds(scopedBranchId);
+        if (warehouseIds.isEmpty()) return PageResponse.from(Page.empty(pageable));
+        if (type != null) return PageResponse.from(issueRepo.findByWarehouse_IdInAndIssueType(warehouseIds, type, pageable).map(GoodsIssueDto::from));
+        if (status != null) return PageResponse.from(issueRepo.findByWarehouse_IdInAndStatus(warehouseIds, status, pageable).map(GoodsIssueDto::from));
+        return PageResponse.from(issueRepo.findByWarehouse_IdIn(warehouseIds, pageable).map(GoodsIssueDto::from));
     }
 
     @Transactional(readOnly = true)
     public GoodsIssueDto get(Long id) {
-        return GoodsIssueDto.from(findById(id));
+        GoodsIssue issue = findById(id);
+        warehouseAccessService.requireView(effectiveWarehouse(issue).getId());
+        return GoodsIssueDto.from(issue);
     }
 
     // ──────────────────────────────────────────────
@@ -87,11 +101,17 @@ public class GoodsIssueService {
     public GoodsIssueDto create(GoodsIssueRequest req) {
         branchSecurity.requireBranchAccess(req.branchId());
 
-        Warehouse warehouse = null;
+        Warehouse warehouse;
         if (req.warehouseId() != null) {
             warehouse = warehouseRepo.findById(req.warehouseId())
                     .orElseThrow(() -> new BusinessException("Khong tim thay kho: " + req.warehouseId()));
+            if (!req.branchId().equals(warehouse.getBranchId())) {
+                throw new BusinessException("Kho khong thuoc chi nhanh nay");
+            }
+        } else {
+            warehouse = resolveMainWarehouse(req.branchId());
         }
+        warehouseAccessService.requireOperate(warehouse.getId());
 
         GoodsIssue issue = new GoodsIssue();
         issue.setIssueNo(generateIssueNo());
@@ -120,6 +140,9 @@ public class GoodsIssueService {
             if (itemReq.serialId() != null) {
                 ProductSerial serial = serialRepo.findById(itemReq.serialId())
                         .orElseThrow(() -> new BusinessException("Khong tim thay serial: " + itemReq.serialId()));
+                if (serial.getWarehouse() == null || !warehouse.getId().equals(serial.getWarehouse().getId())) {
+                    throw new BusinessException("Serial khong thuoc kho xuat hang");
+                }
                 item.setSerial(serial);
                 item.setUnitCost(serial.getPurchaseCost() != null ? serial.getPurchaseCost() : cost);
             }
@@ -138,6 +161,7 @@ public class GoodsIssueService {
     public GoodsIssueDto issue(Long id) {
         GoodsIssue issue = findById(id);
         branchSecurity.requireBranchAccess(issue.getBranchId());
+        warehouseAccessService.requireOperate(effectiveWarehouse(issue).getId());
 
         if (!"DRAFT".equals(issue.getStatus())) {
             throw new BusinessException("Chi xuat kho phieu o trang thai DRAFT");
@@ -181,6 +205,7 @@ public class GoodsIssueService {
     public GoodsIssueDto cancel(Long id) {
         GoodsIssue issue = findById(id);
         branchSecurity.requireBranchAccess(issue.getBranchId());
+        warehouseAccessService.requireOperate(effectiveWarehouse(issue).getId());
         if ("ISSUED".equals(issue.getStatus())) {
             throw new BusinessException("Khong the huy phieu xuat da thuc hien. Tao phieu nhap tra kho.");
         }
@@ -225,6 +250,17 @@ public class GoodsIssueService {
     private GoodsIssue findById(Long id) {
         return issueRepo.findById(id)
                 .orElseThrow(() -> new BusinessException("Khong tim thay phieu xuat: " + id));
+    }
+
+    private Warehouse effectiveWarehouse(GoodsIssue issue) {
+        return issue.getWarehouse() != null ? issue.getWarehouse() : resolveMainWarehouse(issue.getBranchId());
+    }
+
+    private Warehouse resolveMainWarehouse(Long branchId) {
+        return warehouseRepo.findByBranchIdAndTypeAndStatus(branchId,
+                        com.chuanphat.warranty.core.enums.WarehouseType.MAIN,
+                        com.chuanphat.warranty.core.enums.RecordStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException("Khong tim thay kho chinh cho chi nhanh: " + branchId));
     }
 
     private String generateIssueNo() {
