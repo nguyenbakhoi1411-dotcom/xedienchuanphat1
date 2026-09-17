@@ -104,6 +104,7 @@
 - Non-admin branch scope overrides forged `branchId`.
 - Revenue time, branch, employee, top products, inventory, debt, profit, and warranty repair reports use database data.
 - Export output includes current filtered report rows.
+- Monitor report snapshot storage growth; consider compression, size limits, or archival after production volume is known.
 
 ## Settings
 - Settings page loads from `/api/settings`.

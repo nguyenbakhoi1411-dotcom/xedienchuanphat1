@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.reports;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -103,5 +104,23 @@ class ReportSnapshotServiceBusinessTest {
         assertThat(comparison.snapshotDataJson()).contains("\"revenue\":100");
         assertThat(comparison.currentDataJson()).contains("\"revenue\":120");
         assertThat(comparison.snapshotHash()).isNotEqualTo(comparison.currentHash());
+    }
+
+    @Test
+    void tamperedSnapshotDataIsDetectedByStoredHash() {
+        snapshotService.createOfficialSnapshot(
+                "SALES",
+                "excel",
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 30),
+                Map.of(),
+                Map.of("revenue", 100),
+                "accountant"
+        );
+        savedSnapshot.get().setDataJson("{\"revenue\":999}");
+
+        assertThatThrownBy(() -> snapshotService.compareWithCurrent(100L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Report snapshot integrity check failed: 100");
     }
 }

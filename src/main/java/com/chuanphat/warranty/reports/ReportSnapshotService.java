@@ -63,6 +63,7 @@ public class ReportSnapshotService {
     public ReportSnapshotDtos.ReportSnapshotComparisonResponse compareWithCurrent(Long snapshotId) {
         ReportExportSnapshot snapshot = snapshotRepository.findById(snapshotId)
                 .orElseThrow(() -> new IllegalArgumentException("Report snapshot not found: " + snapshotId));
+        verifyIntegrity(snapshot);
         String currentJson = json(currentData(snapshot));
         String currentHash = sha256(currentJson);
         return new ReportSnapshotDtos.ReportSnapshotComparisonResponse(
@@ -73,6 +74,13 @@ public class ReportSnapshotService {
                 snapshot.getContentHash(),
                 currentHash
         );
+    }
+
+    private void verifyIntegrity(ReportExportSnapshot snapshot) {
+        String actualHash = sha256(snapshot.getDataJson());
+        if (!snapshot.getContentHash().equals(actualHash)) {
+            throw new IllegalStateException("Report snapshot integrity check failed: " + snapshot.getId());
+        }
     }
 
     private Object currentData(ReportExportSnapshot snapshot) {
