@@ -1,5 +1,6 @@
 package com.chuanphat.warranty.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -8,11 +9,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.SalesOrder;
+import com.chuanphat.warranty.core.entity.SalesOrderItem;
+import com.chuanphat.warranty.core.repository.ProductRepository;
+import com.chuanphat.warranty.core.repository.SalesOrderItemRepository;
 import com.chuanphat.warranty.core.repository.SalesOrderRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -20,13 +27,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class SalesDataScopeIntegrationTest {
+    private static final Long SALES_USER_ID = 102L;
+    private static final Long COWORKER_ID = 101L;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -34,7 +46,149 @@ class SalesDataScopeIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private SalesOrderRepository salesOrderRepository;
+
+    @Autowired
+    private SalesOrderItemRepository salesOrderItemRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Test
+    void salesStaffDashboardOnlyShowsOwnRevenue() throws Exception {
+        createOrder(SALES_USER_ID, new BigDecimal("135791"));
+        createOrder(COWORKER_ID, new BigDecimal("246802"));
+
+        MvcResult result = mockMvc.perform(get("/api/dashboard")
+                        .with(salesUser())
+                        .param("branchId", "1")
+                        .param("timeRange", "TODAY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topEmployees[*].employeeId", everyItem(is(102))))
+                .andReturn();
+
+        JsonNode currentMonth = findByText(
+                objectMapper.readTree(result.getResponse().getContentAsString()).get("revenueByMonth"),
+                "month",
+                YearMonth.now().toString()
+        );
+        assertThat(currentMonth.get("revenue").decimalValue())
+                .isEqualByComparingTo(expectedRevenue(SALES_USER_ID, LocalDate.now().withDayOfMonth(1), LocalDate.now()));
+    }
+
+    @Test
+    void forgedEmployeeIdCannotExposeCoworkerRevenue() throws Exception {
+        createOrder(SALES_USER_ID, new BigDecimal("357913"));
+        createOrder(COWORKER_ID, new BigDecimal("468024"));
+
+        mockMvc.perform(get("/api/dashboard")
+                        .with(salesUser())
+                        .param("branchId", "1")
+                        .param("employeeId", COWORKER_ID.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void forgedEmployeeIdCannotBypassReportScope() throws Exception {
+        mockMvc.perform(get("/api/reports/revenue-time")
+                        .with(salesUser())
+                        .param("branchId", "1")
+                        .param("employeeId", COWORKER_ID.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void dashboardSummaryCannotBypassEmployeeScope() throws Exception {
+        createOrder(SALES_USER_ID, new BigDecimal("579135"));
+        createOrder(COWORKER_ID, new BigDecimal("680246"));
+
+        mockMvc.perform(get("/api/dashboard/summary")
+                        .with(salesUser())
+                        .param("branchId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topEmployees").isNotEmpty())
+                .andExpect(jsonPath("$.topEmployees[*].employeeId", everyItem(is(102))));
+    }
+
+    @Test
+    void aiRevenueInsightOnlyUsesAuthenticatedEmployee() throws Exception {
+        createOrder(SALES_USER_ID, new BigDecimal("791357"));
+        createOrder(COWORKER_ID, new BigDecimal("802468"));
+
+        mockMvc.perform(post("/api/ai-assistant/ask")
+                        .with(salesUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "question", "Doanh thu hom nay",
+                                "branchId", 1
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.intent").value("REVENUE_TODAY"))
+                .andExpect(jsonPath("$.metrics[0].value")
+                        .value(expectedRevenue(SALES_USER_ID, LocalDate.now(), LocalDate.now()).doubleValue()));
+    }
+
+    @Test
+    void privilegedUserCanFilterRevenueByEmployee() throws Exception {
+        createOrder(SALES_USER_ID, new BigDecimal("913579"));
+        createOrder(COWORKER_ID, new BigDecimal("1024680"));
+
+        mockMvc.perform(get("/api/dashboard")
+                        .with(adminUser())
+                        .param("branchId", "1")
+                        .param("employeeId", COWORKER_ID.toString())
+                        .param("timeRange", "TODAY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topEmployees").isNotEmpty())
+                .andExpect(jsonPath("$.topEmployees[*].employeeId", everyItem(is(101))));
+    }
+
+    @Test
+    void revenueByBranchStillRespectsEmployeeScopeForSalesStaff() throws Exception {
+        createOrder(SALES_USER_ID, new BigDecimal("1135791"));
+        createOrder(COWORKER_ID, new BigDecimal("1246802"));
+
+        MvcResult result = mockMvc.perform(get("/api/dashboard/revenue-by-branch")
+                        .with(salesUser())
+                        .param("branchId", "1"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode branch = objectMapper.readTree(result.getResponse().getContentAsString()).get(0);
+        assertThat(branch.get("revenue").decimalValue())
+                .isEqualByComparingTo(expectedRevenue(SALES_USER_ID, LocalDate.now().withDayOfMonth(1), LocalDate.now()));
+    }
+
+    @Test
+    void topProductsEndpointRespectsEmployeeScopeIfApplicable() throws Exception {
+        Product product = productRepository.findById(1L).orElseThrow();
+        createOrderWithItem(SALES_USER_ID, product, 1, new BigDecimal("1357913"));
+        createOrderWithItem(COWORKER_ID, product, 100, new BigDecimal("2468024"));
+
+        MvcResult result = mockMvc.perform(get("/api/dashboard/top-products")
+                        .with(salesUser())
+                        .param("branchId", "1"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode productRow = findByLong(
+                objectMapper.readTree(result.getResponse().getContentAsString()),
+                "productId",
+                product.getId()
+        );
+        BigDecimal expected = jdbcTemplate.queryForObject("""
+                select coalesce(sum(soi.line_total), 0)
+                from sales_order_items soi
+                join sales_orders so on so.id = soi.order_id
+                where so.employee_id = ? and soi.product_id = ?
+                  and so.order_date >= ? and so.order_date <= ? and so.status <> 'CANCELLED'
+                """, BigDecimal.class, SALES_USER_ID, product.getId(),
+                LocalDate.now().withDayOfMonth(1), LocalDate.now());
+        assertThat(productRow.get("revenue").decimalValue()).isEqualByComparingTo(expected);
+    }
 
     @Test
     void forgedEmployeeIdOnOrderCreationReturnsForbidden() throws Exception {
@@ -44,7 +198,7 @@ class SalesDataScopeIntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "branchId", 1,
                                 "customerId", 1,
-                                "employeeId", 101,
+                                "employeeId", COWORKER_ID,
                                 "orderDate", LocalDate.now().toString(),
                                 "discountAmount", BigDecimal.ZERO,
                                 "confirm", false,
@@ -62,7 +216,7 @@ class SalesDataScopeIntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "branchId", 1,
                                 "customerId", 1,
-                                "employeeId", 101,
+                                "employeeId", COWORKER_ID,
                                 "quotationDate", LocalDate.now().toString(),
                                 "validUntil", LocalDate.now().plusDays(7).toString(),
                                 "discountAmount", BigDecimal.ZERO,
@@ -72,18 +226,9 @@ class SalesDataScopeIntegrationTest {
     }
 
     @Test
-    void forgedEmployeeDashboardFilterReturnsForbidden() throws Exception {
-        mockMvc.perform(get("/api/dashboard")
-                        .with(salesUser())
-                        .param("branchId", "1")
-                        .param("employeeId", "101"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
     void salesOrderListIsAlwaysScopedToAuthenticatedSalesUser() throws Exception {
-        salesOrderRepository.save(order(102L));
-        salesOrderRepository.save(order(101L));
+        createOrder(SALES_USER_ID, BigDecimal.TEN);
+        createOrder(COWORKER_ID, BigDecimal.TEN);
 
         mockMvc.perform(get("/api/sales/orders")
                         .with(salesUser())
@@ -96,23 +241,63 @@ class SalesDataScopeIntegrationTest {
 
     @Test
     void salesUserCannotReadAnotherEmployeesOrderInSameBranch() throws Exception {
-        SalesOrder otherEmployeesOrder = salesOrderRepository.save(order(101L));
+        SalesOrder otherEmployeesOrder = createOrder(COWORKER_ID, BigDecimal.TEN);
 
         mockMvc.perform(get("/api/sales/orders/{id}", otherEmployeesOrder.getId())
                         .with(salesUser()))
                 .andExpect(status().isForbidden());
     }
 
-    private SalesOrder order(Long employeeId) {
+    private SalesOrder createOrder(Long employeeId, BigDecimal totalAmount) {
         SalesOrder order = new SalesOrder();
         order.setOrderNo("SCOPE-" + employeeId + "-" + System.nanoTime());
         order.setBranchId(1L);
         order.setCustomerId(1L);
         order.setEmployeeId(employeeId);
+        order.setOrderDate(LocalDate.now());
         order.setVoucherCode("");
-        order.setSubtotal(BigDecimal.TEN);
-        order.setTotalAmount(BigDecimal.TEN);
-        return order;
+        order.setSubtotal(totalAmount);
+        order.setTotalAmount(totalAmount);
+        return salesOrderRepository.save(order);
+    }
+
+    private void createOrderWithItem(Long employeeId, Product product, int quantity, BigDecimal lineTotal) {
+        SalesOrder order = createOrder(employeeId, lineTotal);
+        SalesOrderItem item = new SalesOrderItem();
+        item.setOrder(order);
+        item.setProduct(product);
+        item.setQuantity(quantity);
+        item.setUnitPrice(lineTotal.divide(BigDecimal.valueOf(quantity)));
+        item.setListPrice(item.getUnitPrice());
+        item.setLineTotal(lineTotal);
+        salesOrderItemRepository.save(item);
+    }
+
+    private BigDecimal expectedRevenue(Long employeeId, LocalDate from, LocalDate to) {
+        return jdbcTemplate.queryForObject("""
+                select coalesce(sum(total_amount), 0)
+                from sales_orders
+                where employee_id = ? and branch_id = 1
+                  and order_date >= ? and order_date <= ? and status <> 'CANCELLED'
+                """, BigDecimal.class, employeeId, from, to);
+    }
+
+    private JsonNode findByText(JsonNode rows, String field, String expected) {
+        for (JsonNode row : rows) {
+            if (expected.equals(row.path(field).asText())) {
+                return row;
+            }
+        }
+        throw new AssertionError("No row found with " + field + "=" + expected);
+    }
+
+    private JsonNode findByLong(JsonNode rows, String field, Long expected) {
+        for (JsonNode row : rows) {
+            if (expected.equals(row.path(field).asLong())) {
+                return row;
+            }
+        }
+        throw new AssertionError("No row found with " + field + "=" + expected);
     }
 
     private RequestPostProcessor salesUser() {
@@ -121,8 +306,17 @@ class SalesDataScopeIntegrationTest {
                 new SimpleGrantedAuthority("SALES_VIEW"),
                 new SimpleGrantedAuthority("SALES_CREATE"),
                 new SimpleGrantedAuthority("DASHBOARD_VIEW"),
+                new SimpleGrantedAuthority("REPORT_VIEW"),
+                new SimpleGrantedAuthority("AI_ASSISTANT_USE"),
                 new SimpleGrantedAuthority("CUSTOMER_VIEW"),
                 new SimpleGrantedAuthority("PRODUCT_VIEW")
+        ));
+    }
+
+    private RequestPostProcessor adminUser() {
+        return user("admin").authorities(List.of(
+                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                new SimpleGrantedAuthority("DASHBOARD_VIEW")
         ));
     }
 }

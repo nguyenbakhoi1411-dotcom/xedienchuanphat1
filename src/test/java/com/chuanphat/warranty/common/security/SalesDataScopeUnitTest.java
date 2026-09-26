@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.chuanphat.warranty.auth.entity.AppUser;
+import com.chuanphat.warranty.auth.entity.Permission;
 import com.chuanphat.warranty.auth.entity.Role;
 import java.util.LinkedHashSet;
 import org.junit.jupiter.api.Test;
@@ -36,14 +37,35 @@ class SalesDataScopeUnitTest {
     }
 
     @Test
-    void managerMayReadTeamScopeButCannotCreateAsAnotherUser() {
+    void managerKeepsTeamViewButCannotUseEmployeeFilterOrCreateAsAnotherUser() {
         AppUser manager = user(101L, "BRANCH_MANAGER");
         when(branchSecurity.currentUser()).thenReturn(manager);
 
-        assertThat(scope.scopedEmployeeId(102L)).isEqualTo(102L);
         assertThat(scope.scopedEmployeeId(null)).isNull();
+        assertThatThrownBy(() -> scope.scopedEmployeeId(102L))
+                .isInstanceOf(AccessDeniedException.class);
+        scope.requireEmployeeAccess(102L);
         assertThatThrownBy(() -> scope.requireCurrentActor(102L))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void chiefAccountantMayFilterRevenueByEmployee() {
+        AppUser chiefAccountant = user(104L, "CHIEF_ACCOUNTANT");
+        when(branchSecurity.currentUser()).thenReturn(chiefAccountant);
+
+        assertThat(scope.scopedEmployeeId(102L)).isEqualTo(102L);
+        assertThat(scope.scopedEmployeeId(null)).isNull();
+    }
+
+    @Test
+    void reportViewAllPermissionMayFilterRevenueByEmployee() {
+        AppUser reportingUser = user(110L, "REPORTING_USER");
+        reportingUser.getRoles().iterator().next().getPermissions()
+                .add(new Permission("REPORT_VIEW_ALL", "REPORT", "VIEW_ALL"));
+        when(branchSecurity.currentUser()).thenReturn(reportingUser);
+
+        assertThat(scope.scopedEmployeeId(102L)).isEqualTo(102L);
     }
 
     private static AppUser user(Long id, String roleCode) {
