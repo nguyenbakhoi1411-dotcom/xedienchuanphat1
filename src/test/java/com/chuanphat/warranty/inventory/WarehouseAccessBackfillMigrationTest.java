@@ -11,7 +11,7 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 class WarehouseAccessBackfillMigrationTest {
     @Test
-    void backfillMigrationPreservesExistingAccessAtDeployTime() {
+    void migrationDoesNotBackfillWarehouseAssignmentsFromBranchAccess() {
         DataSource dataSource = dataSource();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("create table app_users (id bigint primary key, branch_id bigint)");
@@ -26,13 +26,7 @@ class WarehouseAccessBackfillMigrationTest {
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V64__employee_warehouse_access.sql"))
                 .execute(dataSource);
 
-        assertThat(jdbc.queryForObject(
-                "select count(*) from employee_warehouses where employee_id = 100 and access_level = 'OPERATE'",
-                Integer.class)).isEqualTo(2);
-        assertThat(jdbc.queryForObject(
-                "select count(*) from employee_warehouses where employee_id = 200 and warehouse_id = 2000 and access_level = 'OPERATE'",
-                Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("select count(*) from employee_warehouses", Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("select count(*) from employee_warehouses", Integer.class)).isZero();
     }
 
     private DataSource dataSource() {
