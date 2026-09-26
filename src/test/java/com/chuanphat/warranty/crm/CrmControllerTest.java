@@ -81,6 +81,12 @@ class CrmControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.customerId").value(customerId));
 
+        mockMvc.perform(post("/api/crm/customers/{customerId}/notes", customerId)
+                        .with(crmUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("content", "Gia mao actor", "createdBy", "manager1"))))
+                .andExpect(status().isForbidden());
+
         MvcResult taskResult = mockMvc.perform(post("/api/crm/tasks")
                         .with(crmUser())
                         .contentType(MediaType.APPLICATION_JSON)

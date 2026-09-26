@@ -51,6 +51,25 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
             """)
     Page<SalesOrderListResponse> findListByBranchId(Long branchId, Pageable pageable);
 
+    @Query(value = """
+            select new com.chuanphat.warranty.core.dto.SalesOrderListResponse(
+                so.id, so.orderNo, so.branchId, so.customerId, so.employeeId, q.id,
+                so.orderDate, so.status, so.subtotal, so.discountAmount, so.voucherCode,
+                so.totalAmount, so.paidAmount, so.paymentStatus, so.reservationUntil,
+                so.createdAt, so.note, count(soi.id)
+            )
+            from SalesOrder so
+            left join so.quotation q
+            left join so.items soi
+            where (:branchId is null or so.branchId = :branchId)
+              and so.employeeId = :employeeId
+            group by so.id, so.orderNo, so.branchId, so.customerId, so.employeeId, q.id,
+                so.orderDate, so.status, so.subtotal, so.discountAmount, so.voucherCode,
+                so.totalAmount, so.paidAmount, so.paymentStatus, so.reservationUntil,
+                so.createdAt, so.note
+            """)
+    Page<SalesOrderListResponse> findListByScope(Long branchId, Long employeeId, Pageable pageable);
+
     Optional<SalesOrder> findByOrderNo(String orderNo);
 
     @EntityGraph(attributePaths = {"quotation", "items", "items.product", "items.serial"})

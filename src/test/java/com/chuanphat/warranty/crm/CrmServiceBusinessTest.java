@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.entity.Customer;
 import com.chuanphat.warranty.core.repository.CustomerRepository;
 import com.chuanphat.warranty.core.repository.DepositRepository;
@@ -53,6 +54,7 @@ class CrmServiceBusinessTest {
     @Mock DepositRepository depositRepository;
     @Mock CustomerGroupRepository customerGroupRepository;
     @Mock CrmAlertService alertService;
+    @Mock BranchSecurity branchSecurity;
 
     CrmService service;
 
@@ -60,7 +62,7 @@ class CrmServiceBusinessTest {
     void setUp() {
         service = new CrmService(customerRepository, salesOrderRepository, salesPaymentRepository, warrantyRepository,
                 serviceTicketRepository, leadRepository, opportunityRepository, taskRepository, noteRepository,
-                serialRepository, quotationRepository, depositRepository, customerGroupRepository, alertService, new BigDecimal("30000000"));
+                serialRepository, quotationRepository, depositRepository, customerGroupRepository, alertService, branchSecurity, new BigDecimal("30000000"));
     }
 
     @Test

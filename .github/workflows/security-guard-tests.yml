@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
+          ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest,SalesDataScopeUnitTest,SalesDataScopeIntegrationTest,CrmControllerTest" test
           status=$?
           if [ "$status" -ne 0 ] && [ -d target/surefire-reports ]; then
             echo "::group::Surefire failure reports"

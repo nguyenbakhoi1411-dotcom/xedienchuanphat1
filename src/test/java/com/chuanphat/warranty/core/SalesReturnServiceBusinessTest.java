@@ -17,6 +17,7 @@ import com.chuanphat.warranty.accounting.service.AccountingService;
 import com.chuanphat.warranty.audit.service.AuditLogService;
 import com.chuanphat.warranty.auth.entity.AppUser;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.common.security.SalesDataScope;
 import com.chuanphat.warranty.core.dto.ApproveSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.CreateSalesReturnItemRequest;
 import com.chuanphat.warranty.core.dto.CreateSalesReturnRequest;
@@ -90,6 +91,7 @@ class SalesReturnServiceBusinessTest {
     @Mock PriceCalculationService priceCalculationService;
     @Mock AuditLogService auditLogService;
     @Mock BranchSecurity branchSecurity;
+    @Mock SalesDataScope salesDataScope;
     @Mock SettingService settingService;
     @Mock ExportDocumentService exportDocumentService;
     @Mock NotificationService notificationService;
@@ -107,7 +109,7 @@ class SalesReturnServiceBusinessTest {
                 returnRepository, returnItemRepository, serialRepository, invoiceRepository, voucherRepository,
                 productService, inventoryService, customerService, accountingService, warrantyService,
                 warrantyPolicyRepository, warrantyRepository, priceCalculationService, auditLogService,
-                branchSecurity, settingService, exportDocumentService, notificationService, receivableRepository);
+                branchSecurity, salesDataScope, settingService, exportDocumentService, notificationService, receivableRepository);
         product = product(10L);
         warehouse = warehouse(3L);
         order = order(1L, 100L, new BigDecimal("3000000"), new BigDecimal("3000000"));

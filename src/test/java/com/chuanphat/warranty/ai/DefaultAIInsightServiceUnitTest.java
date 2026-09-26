@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.chuanphat.warranty.audit.service.AuditLogService;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.common.security.SalesDataScope;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,13 +23,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class DefaultAIInsightServiceUnitTest {
     private JdbcTemplate jdbcTemplate;
     private BranchSecurity branchSecurity;
+    private SalesDataScope salesDataScope;
     private DefaultAIInsightService service;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
         branchSecurity = mock(BranchSecurity.class);
-        service = new DefaultAIInsightService(jdbcTemplate, branchSecurity, mock(AuditLogService.class), true, "mock");
+        salesDataScope = mock(SalesDataScope.class);
+        service = new DefaultAIInsightService(jdbcTemplate, branchSecurity, salesDataScope, mock(AuditLogService.class), true, "mock");
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 "sales",
                 "n/a",

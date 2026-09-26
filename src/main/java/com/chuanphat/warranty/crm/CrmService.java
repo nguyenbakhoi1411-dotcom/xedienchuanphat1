@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.crm;
 
 import com.chuanphat.warranty.common.dto.PageResponse;
+import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.entity.*;
 import com.chuanphat.warranty.core.enums.RecordStatus;
 import com.chuanphat.warranty.core.repository.*;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +44,7 @@ public class CrmService {
     private final DepositRepository depositRepository;
     private final CustomerGroupRepository customerGroupRepository;
     private final CrmAlertService alertService;
+    private final BranchSecurity branchSecurity;
     private final BigDecimal vipThreshold;
 
     public CrmService(
@@ -59,6 +62,7 @@ public class CrmService {
             DepositRepository depositRepository,
             CustomerGroupRepository customerGroupRepository,
             CrmAlertService alertService,
+            BranchSecurity branchSecurity,
             @Value("${app.crm.vip-threshold:30000000}") BigDecimal vipThreshold
     ) {
         this.customerRepository  = customerRepository;
@@ -75,6 +79,7 @@ public class CrmService {
         this.depositRepository   = depositRepository;
         this.customerGroupRepository = customerGroupRepository;
         this.alertService        = alertService;
+        this.branchSecurity      = branchSecurity;
         this.vipThreshold        = vipThreshold;
     }
 
@@ -374,7 +379,12 @@ public class CrmService {
         CustomerCareNote note = new CustomerCareNote();
         note.setCustomerId(customerId);
         note.setContent(request.content());
-        note.setCreatedBy(request.createdBy() == null || request.createdBy().isBlank() ? "system" : request.createdBy());
+        String currentUsername = branchSecurity.currentUser().getUsername();
+        if (request.createdBy() != null && !request.createdBy().isBlank()
+                && !currentUsername.equalsIgnoreCase(request.createdBy())) {
+            throw new AccessDeniedException("createdBy must match the authenticated user");
+        }
+        note.setCreatedBy(currentUsername);
         // Cập nhật lastCareDate trên Customer
         customerRepository.findById(customerId).ifPresent(c -> {
             c.setLastCareDate(LocalDate.now());
