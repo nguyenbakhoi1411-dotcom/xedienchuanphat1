@@ -9,4 +9,5 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Employee> findByBranchIdOrderByFullName(Long branchId);
     List<Employee> findByStatusOrderByFullName(String status);
     Optional<Employee> findByEmployeeCodeIgnoreCase(String employeeCode);
+    Optional<Employee> findByUserId(Long userId);
 }

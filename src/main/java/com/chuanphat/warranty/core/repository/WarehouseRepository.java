@@ -4,6 +4,7 @@ import com.chuanphat.warranty.core.entity.Warehouse;
 import com.chuanphat.warranty.core.enums.RecordStatus;
 import com.chuanphat.warranty.core.enums.WarehouseType;
 import java.util.Optional;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +17,8 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Long> {
     Page<Warehouse> findByBranchId(Long branchId, Pageable pageable);
 
     Page<Warehouse> findByStatusNot(RecordStatus status, Pageable pageable);
+
+    List<Warehouse> findByBranchIdOrderByWarehouseName(Long branchId);
+
+    Page<Warehouse> findByIdIn(List<Long> ids, Pageable pageable);
 }

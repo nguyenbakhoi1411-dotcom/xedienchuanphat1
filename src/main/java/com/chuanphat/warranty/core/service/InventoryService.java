@@ -26,6 +26,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,7 @@ public class InventoryService {
     private final WarehouseRepository warehouseRepository;
     private final ProductService productService;
     private final BranchSecurity branchSecurity;
+    private final WarehouseAccessService warehouseAccessService;
 
     public InventoryService(
             InventoryStockRepository stockRepository,
@@ -45,7 +48,8 @@ public class InventoryService {
             InventoryAverageCostRepository averageCostRepository,
             WarehouseRepository warehouseRepository,
             ProductService productService,
-            BranchSecurity branchSecurity
+            BranchSecurity branchSecurity,
+            WarehouseAccessService warehouseAccessService
     ) {
         this.stockRepository = stockRepository;
         this.transactionRepository = transactionRepository;
@@ -53,30 +57,45 @@ public class InventoryService {
         this.warehouseRepository = warehouseRepository;
         this.productService = productService;
         this.branchSecurity = branchSecurity;
+        this.warehouseAccessService = warehouseAccessService;
     }
 
     @Transactional(readOnly = true)
     public PageResponse<InventoryStockDto> list(Long branchId, Long warehouseId, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        PageRequest pageRequest = PageRequest.of(page, pageSize);
         if (warehouseId != null) {
             Warehouse warehouse = warehouseRepository.findById(warehouseId).orElseThrow(() -> new BusinessException("Warehouse not found"));
             branchSecurity.requireBranchAccess(warehouse.getBranchId());
-            return PageResponse.from(stockRepository.findByWarehouse_Id(warehouseId, PageRequest.of(page, pageSize)).map(this::stockDto));
+            warehouseAccessService.requireView(warehouseId);
+            return PageResponse.from(stockRepository.findByWarehouse_Id(warehouseId, pageRequest).map(this::stockDto));
         }
-        if (scopedBranchId == null) {
-            return PageResponse.from(stockRepository.findAll(PageRequest.of(page, pageSize)).map(this::stockDto));
+        if (warehouseAccessService.isPrivileged()) {
+            if (scopedBranchId == null) {
+                return PageResponse.from(stockRepository.findAll(pageRequest).map(this::stockDto));
+            }
+            return PageResponse.from(stockRepository.findByBranchId(scopedBranchId, pageRequest).map(this::stockDto));
         }
-        return PageResponse.from(stockRepository.findByBranchId(scopedBranchId, PageRequest.of(page, pageSize)).map(this::stockDto));
+        List<Long> warehouseIds = warehouseAccessService.currentAccessibleWarehouseIds(scopedBranchId);
+        return PageResponse.from(warehouseIds.isEmpty()
+                ? Page.<InventoryStock>empty(pageRequest).map(this::stockDto)
+                : stockRepository.findByWarehouse_IdIn(warehouseIds, pageRequest).map(this::stockDto));
     }
 
     @Transactional(readOnly = true)
     public PageResponse<WarehouseDto> warehouses(Long branchId, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
         PageRequest pageRequest = PageRequest.of(page, pageSize);
-        if (scopedBranchId == null) {
-            return PageResponse.from(warehouseRepository.findByStatusNot(RecordStatus.DELETED, pageRequest).map(WarehouseDto::from));
+        if (warehouseAccessService.isPrivileged()) {
+            if (scopedBranchId == null) {
+                return PageResponse.from(warehouseRepository.findByStatusNot(RecordStatus.DELETED, pageRequest).map(WarehouseDto::from));
+            }
+            return PageResponse.from(warehouseRepository.findByBranchId(scopedBranchId, pageRequest).map(WarehouseDto::from));
         }
-        return PageResponse.from(warehouseRepository.findByBranchId(scopedBranchId, pageRequest).map(WarehouseDto::from));
+        List<Long> warehouseIds = warehouseAccessService.currentAccessibleWarehouseIds(scopedBranchId);
+        return PageResponse.from(warehouseIds.isEmpty()
+                ? Page.<Warehouse>empty(pageRequest).map(WarehouseDto::from)
+                : warehouseRepository.findByIdIn(warehouseIds, pageRequest).map(WarehouseDto::from));
     }
 
     @Transactional
@@ -84,6 +103,7 @@ public class InventoryService {
         branchSecurity.requireBranchAccess(request.branchId());
         Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
+        warehouseAccessService.requireOperate(warehouse.getId());
         InventoryStock stock = stockRepository.findByBranchIdAndWarehouseIdAndProductId(request.branchId(), warehouse.getId(), request.productId()).orElseGet(InventoryStock::new);
         stock.setBranchId(request.branchId());
         stock.setWarehouse(warehouse);
@@ -99,6 +119,12 @@ public class InventoryService {
     public PageResponse<InventoryTransactionDto> transactions(Long branchId, InventoryTransactionType type, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page, pageSize);
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
+        if (!warehouseAccessService.isPrivileged()) {
+            List<Long> warehouseIds = warehouseAccessService.currentAccessibleWarehouseIds(scopedBranchId);
+            return PageResponse.from(warehouseIds.isEmpty()
+                    ? Page.<InventoryTransaction>empty(pageRequest).map(InventoryTransactionDto::from)
+                    : transactionRepository.findAccessible(warehouseIds, type, pageRequest).map(InventoryTransactionDto::from));
+        }
         if (type != null) {
             if (scopedBranchId != null) {
                 return PageResponse.from(transactionRepository
@@ -118,6 +144,7 @@ public class InventoryService {
         branchSecurity.requireBranchAccess(request.branchId());
         Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
+        warehouseAccessService.requireOperate(warehouse.getId());
         BigDecimal averageCost = increase(request.branchId(), warehouse, product, request.quantity(), request.unitCost());
         return InventoryTransactionDto.from(record(
                 InventoryTransactionType.IMPORT,
@@ -138,6 +165,7 @@ public class InventoryService {
         branchSecurity.requireBranchAccess(request.branchId());
         Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
+        warehouseAccessService.requireOperate(warehouse.getId());
         BigDecimal averageCost = averageCost(request.branchId(), warehouse.getId(), request.productId());
         decrease(request.branchId(), warehouse.getId(), request.productId(), request.quantity());
         return InventoryTransactionDto.from(record(
@@ -164,6 +192,8 @@ public class InventoryService {
         Product product = productService.get(request.productId());
         Warehouse fromWarehouse = resolveWarehouse(request.fromBranchId(), request.fromWarehouseId());
         Warehouse toWarehouse = resolveWarehouse(request.toBranchId(), request.toWarehouseId());
+        warehouseAccessService.requireOperate(fromWarehouse.getId());
+        warehouseAccessService.requireOperate(toWarehouse.getId());
         BigDecimal movingCost = averageCost(request.fromBranchId(), fromWarehouse.getId(), request.productId());
         decrease(request.fromBranchId(), fromWarehouse.getId(), request.productId(), request.quantity());
         increase(request.toBranchId(), toWarehouse, product, request.quantity(), movingCost);
@@ -176,6 +206,7 @@ public class InventoryService {
         branchSecurity.requireBranchAccess(request.branchId());
         Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
+        warehouseAccessService.requireOperate(warehouse.getId());
         InventoryStock stock = stockRepository.findByBranchIdAndWarehouseIdAndProductId(request.branchId(), warehouse.getId(), request.productId()).orElseGet(InventoryStock::new);
         int currentQuantity = stock.getQuantityOnHand();
         stock.setBranchId(request.branchId());

@@ -81,6 +81,26 @@ public interface ProductSerialRepository extends JpaRepository<ProductSerial, Lo
             Pageable pageable
     );
 
+    @Query("""
+            select s from ProductSerial s
+            where (:keyword is null or :keyword = ''
+                   or lower(s.serialNumber) like lower(concat('%', :keyword, '%'))
+                   or lower(s.frameNumber) like lower(concat('%', :keyword, '%'))
+                   or lower(s.engineNumber) like lower(concat('%', :keyword, '%'))
+                   or lower(s.batterySerial) like lower(concat('%', :keyword, '%')))
+              and s.warehouse.id in :warehouseIds
+              and (:productId is null or s.product.id = :productId)
+              and (:status is null or s.status = :status)
+            order by s.createdAt desc
+            """)
+    Page<ProductSerial> searchAccessible(
+            @Param("keyword") String keyword,
+            @Param("warehouseIds") List<Long> warehouseIds,
+            @Param("productId") Long productId,
+            @Param("status") SerialStatus status,
+            Pageable pageable
+    );
+
     /**
      * Filter serial theo branchId va nhieu status cung luc.
      */

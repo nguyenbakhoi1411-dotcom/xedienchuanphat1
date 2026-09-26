@@ -20,8 +20,10 @@ import com.chuanphat.warranty.exception.BusinessException;
 import com.chuanphat.warranty.exception.ConflictException;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,19 +47,22 @@ public class SerialService {
     private final ProductRepository productRepo;
     private final WarehouseRepository warehouseRepo;
     private final BranchSecurity branchSecurity;
+    private final WarehouseAccessService warehouseAccessService;
 
     public SerialService(
             ProductSerialRepository serialRepo,
             ProductSerialHistoryRepository historyRepo,
             ProductRepository productRepo,
             WarehouseRepository warehouseRepo,
-            BranchSecurity branchSecurity
+            BranchSecurity branchSecurity,
+            WarehouseAccessService warehouseAccessService
     ) {
         this.serialRepo = serialRepo;
         this.historyRepo = historyRepo;
         this.productRepo = productRepo;
         this.warehouseRepo = warehouseRepo;
         this.branchSecurity = branchSecurity;
+        this.warehouseAccessService = warehouseAccessService;
     }
 
     // ──────────────────────────────────────────────
@@ -76,6 +81,17 @@ public class SerialService {
     ) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
         var pageable = PageRequest.of(page, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (warehouseId != null) {
+            Warehouse warehouse = requireWarehouse(warehouseId);
+            branchSecurity.requireBranchAccess(warehouse.getBranchId());
+            warehouseAccessService.requireView(warehouseId);
+        } else if (!warehouseAccessService.isPrivileged()) {
+            List<Long> warehouseIds = warehouseAccessService.currentAccessibleWarehouseIds(scopedBranchId);
+            if (warehouseIds.isEmpty()) {
+                return PageResponse.from(Page.empty(pageable));
+            }
+            return PageResponse.from(serialRepo.searchAccessible(keyword, warehouseIds, productId, status, pageable).map(ProductSerialDto::from));
+        }
         var result = serialRepo.search(keyword, scopedBranchId, warehouseId, productId, status, pageable);
         var dtoPage = result.map(ProductSerialDto::from);
         return PageResponse.from(dtoPage);
@@ -83,23 +99,27 @@ public class SerialService {
 
     @Transactional(readOnly = true)
     public ProductSerialDto get(Long id) {
-        return ProductSerialDto.from(findById(id));
+        ProductSerial serial = findById(id);
+        requireView(serial);
+        return ProductSerialDto.from(serial);
     }
 
     @Transactional(readOnly = true)
     public ProductSerialDto findByIdentifier(String identifier) {
         // Thu tim lan luot: serialNumber, frameNumber, engineNumber, batterySerial
-        return serialRepo.findBySerialNumberIgnoreCase(identifier)
+        ProductSerial serial = serialRepo.findBySerialNumberIgnoreCase(identifier)
                 .or(() -> serialRepo.findByFrameNumberIgnoreCase(identifier))
                 .or(() -> serialRepo.findByEngineNumberIgnoreCase(identifier))
                 .or(() -> serialRepo.findByBatterySerialIgnoreCase(identifier))
-                .map(ProductSerialDto::from)
                 .orElseThrow(() -> new BusinessException("Khong tim thay serial: " + identifier));
+        requireView(serial);
+        return ProductSerialDto.from(serial);
     }
 
     @Transactional(readOnly = true)
     public List<ProductSerialHistoryDto> getHistory(Long serialId) {
-        findById(serialId); // validate ton tai
+        ProductSerial serial = findById(serialId);
+        requireView(serial);
         return historyRepo.findBySerialIdOrderByCreatedAtDesc(serialId)
                 .stream().map(ProductSerialHistoryDto::from).toList();
     }
@@ -109,6 +129,14 @@ public class SerialService {
     // ──────────────────────────────────────────────
 
     public ProductSerialDto create(CreateSerialRequest req) {
+        branchSecurity.requireBranchAccess(req.branchId());
+        Warehouse warehouse = req.warehouseId() == null
+                ? resolveMainWarehouse(req.branchId())
+                : requireWarehouse(req.warehouseId());
+        if (!req.branchId().equals(warehouse.getBranchId())) {
+            throw new BusinessException("Kho khong thuoc chi nhanh nay");
+        }
+        warehouseAccessService.requireOperate(warehouse.getId());
         // Kiem tra trung lap
         if (serialRepo.existsBySerialNumberIgnoreCase(req.serialNumber())) {
             throw new ConflictException("Serial number da ton tai: " + req.serialNumber());
@@ -146,17 +174,13 @@ public class SerialService {
         serial.setNote(req.note());
         serial.setStatus(SerialStatus.IN_STOCK);
 
-        if (req.warehouseId() != null) {
-            Warehouse wh = warehouseRepo.findById(req.warehouseId())
-                    .orElseThrow(() -> new BusinessException("Khong tim thay kho: " + req.warehouseId()));
-            serial.setWarehouse(wh);
-        }
+        serial.setWarehouse(warehouse);
 
         ProductSerial saved = serialRepo.save(serial);
 
         // Ghi lich su
         recordHistory(saved, "IMPORTED", null, SerialStatus.IN_STOCK,
-                "PURCHASE_RECEIPT", null, req.branchId(), req.branchId(), null, req.warehouseId());
+                "PURCHASE_RECEIPT", null, req.branchId(), req.branchId(), null, warehouse.getId());
 
         return ProductSerialDto.from(saved);
     }
@@ -167,6 +191,7 @@ public class SerialService {
 
     public ProductSerialDto updateStatus(Long id, UpdateSerialStatusRequest req) {
         ProductSerial serial = findWithLock(id);
+        requireOperate(serial);
         SerialStatus oldStatus = serial.getStatus();
         serial.setStatus(req.newStatus());
         if (req.note() != null) serial.setNote(req.note());
@@ -184,6 +209,7 @@ public class SerialService {
 
     public ProductSerialDto transfer(Long id, TransferSerialRequest req) {
         ProductSerial serial = findWithLock(id);
+        requireOperate(serial);
 
         // Kiem tra khong ban serial dang ban
         if (serial.getStatus() == SerialStatus.SOLD) {
@@ -193,15 +219,18 @@ public class SerialService {
         Long fromBranchId = serial.getBranchId();
         Long fromWarehouseId = warehouseId(serial);
         Long toWarehouseId = req.toWarehouseId();
+        Warehouse destination = req.toWarehouseId() == null
+                ? resolveMainWarehouse(req.toBranchId())
+                : requireWarehouse(req.toWarehouseId());
+        if (!req.toBranchId().equals(destination.getBranchId())) {
+            throw new BusinessException("Kho dich khong thuoc chi nhanh dich");
+        }
+        branchSecurity.requireBranchAccess(req.toBranchId());
+        warehouseAccessService.requireOperate(destination.getId());
+        toWarehouseId = destination.getId();
 
         serial.setBranchId(req.toBranchId());
-        if (req.toWarehouseId() != null) {
-            Warehouse wh = warehouseRepo.findById(req.toWarehouseId())
-                    .orElseThrow(() -> new BusinessException("Khong tim thay kho: " + req.toWarehouseId()));
-            serial.setWarehouse(wh);
-        } else {
-            serial.setWarehouse(null);
-        }
+        serial.setWarehouse(destination);
 
         SerialStatus oldStatus = serial.getStatus();
         serial.setStatus(SerialStatus.TRANSFERRED);
@@ -229,6 +258,7 @@ public class SerialService {
 
     public ProductSerialDto markDefective(Long id, String reason) {
         ProductSerial serial = findWithLock(id);
+        requireOperate(serial);
         if (serial.getStatus() == SerialStatus.SOLD) {
             throw new BusinessException("Khong the danh dau loi serial da ban. Dung bao hanh/sua chua thay.");
         }
@@ -248,6 +278,7 @@ public class SerialService {
 
     public ProductSerialDto sendToWarranty(Long id, String sourceDocType, String sourceDocId) {
         ProductSerial serial = findWithLock(id);
+        requireOperate(serial);
         SerialStatus oldStatus = serial.getStatus();
         serial.setStatus(SerialStatus.WARRANTY);
         serialRepo.save(serial);
@@ -259,6 +290,7 @@ public class SerialService {
 
     public ProductSerialDto sendToRepair(Long id, String ticketNo) {
         ProductSerial serial = findWithLock(id);
+        requireOperate(serial);
         SerialStatus oldStatus = serial.getStatus();
         serial.setStatus(SerialStatus.REPAIRING);
         serial.setLastServiceTicketNo(ticketNo);
@@ -271,6 +303,7 @@ public class SerialService {
 
     public ProductSerialDto returnFromRepair(Long id, String note) {
         ProductSerial serial = findWithLock(id);
+        requireOperate(serial);
         SerialStatus oldStatus = serial.getStatus();
         serial.setStatus(SerialStatus.IN_STOCK);
         serial.setLastServicedAt(LocalDate.now());
@@ -294,6 +327,7 @@ public class SerialService {
      */
     public ProductSerial validateAndLockForSale(Long serialId, Long customerId) {
         ProductSerial serial = findWithLock(serialId);
+        requireOperate(serial);
         switch (serial.getStatus()) {
             case SOLD -> throw new BusinessException(
                     "Serial " + serial.getSerialNumber() + " da duoc ban roi.");
@@ -330,6 +364,35 @@ public class SerialService {
 
     private Long warehouseId(ProductSerial s) {
         return s.getWarehouse() != null ? s.getWarehouse().getId() : null;
+    }
+
+    private void requireView(ProductSerial serial) {
+        branchSecurity.requireBranchAccess(serial.getBranchId());
+        warehouseAccessService.requireView(requiredWarehouseId(serial));
+    }
+
+    private void requireOperate(ProductSerial serial) {
+        branchSecurity.requireBranchAccess(serial.getBranchId());
+        warehouseAccessService.requireOperate(requiredWarehouseId(serial));
+    }
+
+    private Long requiredWarehouseId(ProductSerial serial) {
+        if (serial.getWarehouse() == null) {
+            throw new AccessDeniedException("Serial is not assigned to an accessible warehouse");
+        }
+        return serial.getWarehouse().getId();
+    }
+
+    private Warehouse requireWarehouse(Long warehouseId) {
+        return warehouseRepo.findById(warehouseId)
+                .orElseThrow(() -> new BusinessException("Khong tim thay kho: " + warehouseId));
+    }
+
+    private Warehouse resolveMainWarehouse(Long branchId) {
+        return warehouseRepo.findByBranchIdAndTypeAndStatus(branchId,
+                        com.chuanphat.warranty.core.enums.WarehouseType.MAIN,
+                        com.chuanphat.warranty.core.enums.RecordStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException("Khong tim thay kho chinh cho chi nhanh: " + branchId));
     }
 
     private void recordHistory(

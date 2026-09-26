@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.chuanphat.warranty.core.entity.InventoryAverageCost;
+import com.chuanphat.warranty.auth.entity.AppUser;
+import com.chuanphat.warranty.auth.entity.Role;
+import com.chuanphat.warranty.auth.repository.AppUserRepository;
+import com.chuanphat.warranty.auth.repository.RoleRepository;
 import com.chuanphat.warranty.core.entity.InventoryStock;
 import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.ProductSerial;
@@ -76,6 +80,12 @@ class InventorySecurityIntegrationTest {
     @Autowired
     private InventoryAverageCostRepository averageCostRepository;
 
+    @Autowired
+    private AppUserRepository userRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
     private Product testProduct;
     private Warehouse testWarehouse;
     private Supplier testSupplier;
@@ -83,6 +93,18 @@ class InventorySecurityIntegrationTest {
     @BeforeEach
     void setup() {
         String suffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+
+        if (userRepository.findByUsernameIgnoreCase("admin").isEmpty()) {
+            Role adminRole = roleRepository.findByCode("ADMIN")
+                    .orElseGet(() -> roleRepository.save(new Role("ADMIN", "Admin")));
+            AppUser admin = new AppUser();
+            admin.setUsername("admin");
+            admin.setEmail("admin-" + suffix + "@example.test");
+            admin.setFullName("Test Admin");
+            admin.setPasswordHash("not-used");
+            admin.setRole(adminRole);
+            userRepository.saveAndFlush(admin);
+        }
 
         testSupplier = new Supplier();
         testSupplier.setCode("SUP-" + suffix);

@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.core.repository;
 
 import com.chuanphat.warranty.core.entity.InventoryStock;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +26,8 @@ public interface InventoryStockRepository extends JpaRepository<InventoryStock, 
     Page<InventoryStock> findByBranchId(Long branchId, Pageable pageable);
 
     Page<InventoryStock> findByWarehouse_Id(Long warehouseId, Pageable pageable);
+
+    Page<InventoryStock> findByWarehouse_IdIn(List<Long> warehouseIds, Pageable pageable);
 
     @Query("select stock from InventoryStock stock where stock.availableQuantity <= stock.minStockLevel")
     Page<InventoryStock> findLowStock(Pageable pageable);
