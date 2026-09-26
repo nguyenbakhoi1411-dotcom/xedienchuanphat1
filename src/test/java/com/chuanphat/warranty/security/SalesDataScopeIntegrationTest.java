@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.SalesOrder;
 import com.chuanphat.warranty.core.entity.SalesOrderItem;
+import com.chuanphat.warranty.core.enums.PaymentStatus;
+import com.chuanphat.warranty.core.enums.SalesOrderStatus;
 import com.chuanphat.warranty.core.repository.ProductRepository;
 import com.chuanphat.warranty.core.repository.SalesOrderItemRepository;
 import com.chuanphat.warranty.core.repository.SalesOrderRepository;
@@ -248,6 +250,46 @@ class SalesDataScopeIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void managerCanExchangeSubordinateOrderWithoutEmployeeScopeBlocking() throws Exception {
+        Product product = productRepository.findById(31L).orElseThrow();
+        SalesOrder originalOrder = createDeliveredOrderWithItem(SALES_USER_ID, product);
+        SalesOrderItem originalItem = originalOrder.getItems().get(0);
+
+        mockMvc.perform(post("/api/sales/exchanges")
+                        .with(managerUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "originalSalesOrderId", originalOrder.getId(),
+                                "returnRequest", Map.of(
+                                        "orderId", originalOrder.getId(),
+                                        "refundAmount", BigDecimal.ZERO,
+                                        "refundMethod", "CASH",
+                                        "reasonCode", "WRONG_ITEM",
+                                        "reasonNote", "Manager exchanges subordinate order",
+                                        "items", List.of(Map.of(
+                                                "orderItemId", originalItem.getId(),
+                                                "quantity", 1,
+                                                "serialDisposition", "RETURNED"
+                                        ))
+                                ),
+                                "newOrderRequest", Map.of(
+                                        "branchId", 1,
+                                        "customerId", 1,
+                                        "employeeId", COWORKER_ID,
+                                        "orderDate", LocalDate.now().toString(),
+                                        "discountAmount", BigDecimal.ZERO,
+                                        "confirm", false,
+                                        "issueInvoice", false,
+                                        "items", List.of(Map.of("productId", product.getId(), "quantity", 1))
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exchangeGroupId").isNotEmpty())
+                .andExpect(jsonPath("$.salesReturn.orderId").value(originalOrder.getId()))
+                .andExpect(jsonPath("$.newOrder.employeeId").value(COWORKER_ID));
+    }
+
     private SalesOrder createOrder(Long employeeId, BigDecimal totalAmount) {
         SalesOrder order = new SalesOrder();
         order.setOrderNo("SCOPE-" + employeeId + "-" + System.nanoTime());
@@ -271,6 +313,23 @@ class SalesDataScopeIntegrationTest {
         item.setListPrice(item.getUnitPrice());
         item.setLineTotal(lineTotal);
         salesOrderItemRepository.save(item);
+    }
+
+    private SalesOrder createDeliveredOrderWithItem(Long employeeId, Product product) {
+        SalesOrder order = createOrder(employeeId, product.getSalePrice());
+        order.setStatus(SalesOrderStatus.DELIVERED);
+        order.setStockIssued(true);
+        order.setPaidAmount(product.getSalePrice());
+        order.setPaymentStatus(PaymentStatus.PAID);
+
+        SalesOrderItem item = new SalesOrderItem();
+        item.setProduct(product);
+        item.setQuantity(1);
+        item.setUnitPrice(product.getSalePrice());
+        item.setListPrice(product.getSalePrice());
+        item.setLineTotal(product.getSalePrice());
+        order.addItem(item);
+        return salesOrderRepository.save(order);
     }
 
     private BigDecimal expectedRevenue(Long employeeId, LocalDate from, LocalDate to) {
@@ -317,6 +376,17 @@ class SalesDataScopeIntegrationTest {
         return user("admin").authorities(List.of(
                 new SimpleGrantedAuthority("ROLE_ADMIN"),
                 new SimpleGrantedAuthority("DASHBOARD_VIEW")
+        ));
+    }
+
+    private RequestPostProcessor managerUser() {
+        return user("manager1").authorities(List.of(
+                new SimpleGrantedAuthority("ROLE_USER"),
+                new SimpleGrantedAuthority("SALES_VIEW"),
+                new SimpleGrantedAuthority("SALES_CREATE"),
+                new SimpleGrantedAuthority("SALES_RETURN"),
+                new SimpleGrantedAuthority("CUSTOMER_VIEW"),
+                new SimpleGrantedAuthority("PRODUCT_VIEW")
         ));
     }
 }
