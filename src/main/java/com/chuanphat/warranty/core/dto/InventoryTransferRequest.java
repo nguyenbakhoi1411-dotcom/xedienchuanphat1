@@ -12,6 +12,7 @@ public record InventoryTransferRequest(
         @NotNull Long productId,
         @Min(1) int quantity,
         LocalDate transactionDate,
-        String note
+        String note,
+        Long serialId
 ) {
 }

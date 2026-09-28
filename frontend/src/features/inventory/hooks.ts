@@ -35,7 +35,7 @@ export function useExportStock() {
 }
 
 export function useTransferStock() {
-  return useInventoryMutation<TransferStockPayload>((payload) => inventoryApi.transferStock(payload), "Da chuyen kho");
+  return useInventoryMutation<TransferStockPayload>((payload) => inventoryApi.transferStock(payload), "Da gui phieu chuyen cho duyet");
 }
 
 export function useStockCount() {

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { goodsIssueApi, inventoryCountApi, receiptApi, stockApi, warehouseApi } from "@/features/warehouse/api";
+import { InventoryTransferTab } from "@/features/warehouse/InventoryTransferTab";
 import type {
   GoodsIssue,
   InventoryCount,
@@ -638,7 +639,7 @@ const TABS: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[]
   { id: "receipts",  label: "Phiếu nhập", icon: ArrowDownToLine },
   { id: "issues",    label: "Phiếu xuất", icon: ArrowUpFromLine },
   { id: "counts",    label: "Kiểm kê",    icon: ClipboardList },
-  { id: "transfers", label: "Kho",        icon: Warehouse },
+  { id: "transfers", label: "Chuyển kho", icon: Repeat2 },
 ];
 
 export default function InventoryPage() {
@@ -722,7 +723,7 @@ export default function InventoryPage() {
             {tab === "receipts" && <ReceiptsTab />}
             {tab === "issues" && <GoodsIssuesTab />}
             {tab === "counts" && <CountsTab />}
-            {tab === "transfers" && <WarehousesTab />}
+            {tab === "transfers" && <InventoryTransferTab />}
           </div>
         </div>
       </div>

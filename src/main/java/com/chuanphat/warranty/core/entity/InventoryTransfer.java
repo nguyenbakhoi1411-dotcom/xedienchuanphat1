@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -85,6 +86,23 @@ public class InventoryTransfer {
 
     private OffsetDateTime receivedAt;
 
+    private OffsetDateTime rejectedAt;
+
+    @Column(length = 120)
+    private String rejectedBy;
+
+    private OffsetDateTime cancelledAt;
+
+    @Column(length = 120)
+    private String cancelledBy;
+
+    @Column(length = 500)
+    private String rejectionReason;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     public Long getId() { return id; }
     public String getTransferNo() { return transferNo; }
     public void setTransferNo(String transferNo) { this.transferNo = transferNo; }
@@ -123,4 +141,15 @@ public class InventoryTransfer {
     public void setShippedAt(OffsetDateTime shippedAt) { this.shippedAt = shippedAt; }
     public OffsetDateTime getReceivedAt() { return receivedAt; }
     public void setReceivedAt(OffsetDateTime receivedAt) { this.receivedAt = receivedAt; }
+    public OffsetDateTime getRejectedAt() { return rejectedAt; }
+    public void setRejectedAt(OffsetDateTime rejectedAt) { this.rejectedAt = rejectedAt; }
+    public String getRejectedBy() { return rejectedBy; }
+    public void setRejectedBy(String rejectedBy) { this.rejectedBy = rejectedBy; }
+    public OffsetDateTime getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(OffsetDateTime cancelledAt) { this.cancelledAt = cancelledAt; }
+    public String getCancelledBy() { return cancelledBy; }
+    public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public long getVersion() { return version; }
 }

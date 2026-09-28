@@ -35,8 +35,17 @@
 - Import increases stock and records inventory transaction.
 - Export decreases stock and blocks negative stock.
 - Transfer requires access to both source and destination branches.
+- Transfer uses maker-checker: create/submit do not move stock; approval requires MANAGE on both warehouses and moves aggregate stock atomically.
 - Stocktake updates quantity and records transaction.
 - Warehouse user cannot operate on another branch.
+
+### Go-Live Gate: Batch-Level Inventory and FEFO
+- [ ] Implement warehouse-scoped batch quantities and expiry-date tracking (master checklist items 5.1/5.3).
+- [ ] Implement and test FEFO issue allocation against batch quantities.
+- [ ] Transfer must decrement source batch quantities and increment/create destination batches while preserving expiry dates; add `transferMovesBatchQuantityAndPreservesExpiryDate`.
+- [ ] Reconcile existing aggregate `inventory_stocks` with batch-level balances before enabling batch tracking in production.
+
+Current implementation has no inventory batch entity/table or FEFO allocation. `GoodsIssueService` issues non-serial items by decrementing aggregate `InventoryStock`; return-item `batch_id` fields do not provide warehouse batch balances. The pre-PR4 `InventoryService.transfer` also moved only aggregate stock, and PR4 preserves that existing behavior. This is a pre-existing data-model gap, not a new PR4 regression, and must be resolved before go-live for perishable goods.
 
 ## Sales
 - Sales user can sell only in their assigned branch.

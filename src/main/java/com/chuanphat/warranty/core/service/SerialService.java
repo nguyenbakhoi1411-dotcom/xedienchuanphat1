@@ -192,6 +192,9 @@ public class SerialService {
     public ProductSerialDto updateStatus(Long id, UpdateSerialStatusRequest req) {
         ProductSerial serial = findWithLock(id);
         requireOperate(serial);
+        if (serial.getStatus() == SerialStatus.TRANSFERING || req.newStatus() == SerialStatus.TRANSFERING) {
+            throw new BusinessException("Serial đang chờ duyệt chuyển kho");
+        }
         SerialStatus oldStatus = serial.getStatus();
         serial.setStatus(req.newStatus());
         if (req.note() != null) serial.setNote(req.note());
@@ -208,48 +211,67 @@ public class SerialService {
     // ──────────────────────────────────────────────
 
     public ProductSerialDto transfer(Long id, TransferSerialRequest req) {
+        throw new BusinessException("Serial phải được chuyển qua phiếu chờ duyệt kho");
+    }
+
+    public ProductSerial validateTransferCandidate(Long id, Long productId, Long sourceWarehouseId) {
         ProductSerial serial = findWithLock(id);
-        requireOperate(serial);
-
-        // Kiem tra khong ban serial dang ban
-        if (serial.getStatus() == SerialStatus.SOLD) {
-            throw new BusinessException("Khong the chuyen kho serial da ban: " + serial.getSerialNumber());
+        if (serial.getStatus() != SerialStatus.IN_STOCK || serial.getWarehouse() == null
+                || !serial.getWarehouse().getId().equals(sourceWarehouseId)
+                || !serial.getProduct().getId().equals(productId)) {
+            throw new BusinessException("Serial không khả dụng tại kho nguồn");
         }
+        return serial;
+    }
 
-        Long fromBranchId = serial.getBranchId();
+    public void reserveForTransfer(Long id, String transferNo, Long sourceWarehouseId, Long productId) {
+        ProductSerial serial = validateTransferCandidate(id, productId, sourceWarehouseId);
+        serial.setStatus(SerialStatus.TRANSFERING);
+        serial.setReservedOrderNo(transferNo);
+        serialRepo.save(serial);
+        recordHistory(serial, "TRANSFER_SUBMITTED", SerialStatus.IN_STOCK, SerialStatus.TRANSFERING,
+                "INVENTORY_TRANSFER", transferNo, serial.getBranchId(), serial.getBranchId(),
+                sourceWarehouseId, sourceWarehouseId);
+    }
+
+    public void validatePendingTransfer(Long id, String transferNo, Long sourceWarehouseId, Long productId) {
+        ProductSerial serial = findWithLock(id);
+        if (serial.getStatus() != SerialStatus.TRANSFERING || !transferNo.equals(serial.getReservedOrderNo())
+                || !serial.getProduct().getId().equals(productId) || serial.getWarehouse() == null
+                || !serial.getWarehouse().getId().equals(sourceWarehouseId)) {
+            throw new BusinessException("Serial không còn được giữ bởi phiếu chuyển này");
+        }
+    }
+
+    public void completeApprovedTransfer(Long id, String transferNo, Warehouse destination,
+            Long sourceWarehouseId, Long productId, Long fromBranchId, Long toBranchId) {
+        ProductSerial serial = findWithLock(id);
+        if (serial.getStatus() != SerialStatus.TRANSFERING || !transferNo.equals(serial.getReservedOrderNo())
+                || serial.getWarehouse() == null || !serial.getWarehouse().getId().equals(sourceWarehouseId)
+                || !serial.getProduct().getId().equals(productId)) {
+            throw new BusinessException("Serial không còn được giữ bởi phiếu chuyển này");
+        }
         Long fromWarehouseId = warehouseId(serial);
-        Long toWarehouseId = req.toWarehouseId();
-        Warehouse destination = req.toWarehouseId() == null
-                ? resolveMainWarehouse(req.toBranchId())
-                : requireWarehouse(req.toWarehouseId());
-        if (!req.toBranchId().equals(destination.getBranchId())) {
-            throw new BusinessException("Kho dich khong thuoc chi nhanh dich");
-        }
-        branchSecurity.requireBranchAccess(req.toBranchId());
-        warehouseAccessService.requireOperate(destination.getId());
-        toWarehouseId = destination.getId();
-
-        serial.setBranchId(req.toBranchId());
+        serial.setBranchId(toBranchId);
         serial.setWarehouse(destination);
-
-        SerialStatus oldStatus = serial.getStatus();
-        serial.setStatus(SerialStatus.TRANSFERRED);
-        serialRepo.save(serial);
-
-        recordHistory(serial, "TRANSFERRED", oldStatus, SerialStatus.TRANSFERRED,
-                req.sourceDocumentType() != null ? req.sourceDocumentType() : "INVENTORY_TRANSFER",
-                req.sourceDocumentId(),
-                fromBranchId, req.toBranchId(), fromWarehouseId, toWarehouseId);
-
-        // Sau khi chuyen thanh cong, doi status thanh IN_STOCK o chi nhanh moi
         serial.setStatus(SerialStatus.IN_STOCK);
+        serial.setReservedOrderNo(null);
+        serial.setReservationUntil(null);
         serialRepo.save(serial);
-        recordHistory(serial, "RECEIVED", SerialStatus.TRANSFERRED, SerialStatus.IN_STOCK,
-                req.sourceDocumentType() != null ? req.sourceDocumentType() : "INVENTORY_TRANSFER",
-                req.sourceDocumentId(),
-                fromBranchId, req.toBranchId(), fromWarehouseId, toWarehouseId);
+        recordHistory(serial, "TRANSFER_APPROVED", SerialStatus.TRANSFERING, SerialStatus.IN_STOCK,
+                "INVENTORY_TRANSFER", transferNo, fromBranchId, toBranchId, fromWarehouseId, destination.getId());
+    }
 
-        return ProductSerialDto.from(serial);
+    public void releaseTransferReservation(Long id, String transferNo) {
+        ProductSerial serial = findWithLock(id);
+        if (serial.getStatus() != SerialStatus.TRANSFERING || !transferNo.equals(serial.getReservedOrderNo())) return;
+        Long warehouseId = warehouseId(serial);
+        serial.setStatus(SerialStatus.IN_STOCK);
+        serial.setReservedOrderNo(null);
+        serial.setReservationUntil(null);
+        serialRepo.save(serial);
+        recordHistory(serial, "TRANSFER_RELEASED", SerialStatus.TRANSFERING, SerialStatus.IN_STOCK,
+                "INVENTORY_TRANSFER", transferNo, serial.getBranchId(), serial.getBranchId(), warehouseId, warehouseId);
     }
 
     // ──────────────────────────────────────────────

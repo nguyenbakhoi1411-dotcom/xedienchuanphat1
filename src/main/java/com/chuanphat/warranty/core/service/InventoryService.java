@@ -14,6 +14,7 @@ import com.chuanphat.warranty.core.entity.InventoryTransaction;
 import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.Warehouse;
 import com.chuanphat.warranty.core.entity.InventoryAverageCost;
+import com.chuanphat.warranty.core.entity.InventoryTransfer;
 import com.chuanphat.warranty.core.enums.InventoryTransactionType;
 import com.chuanphat.warranty.core.enums.RecordStatus;
 import com.chuanphat.warranty.core.enums.WarehouseType;
@@ -183,22 +184,22 @@ public class InventoryService {
     }
 
     @Transactional
-    public void transfer(InventoryTransferRequest request) {
-        if (request.fromBranchId().equals(request.toBranchId())) {
-            throw new BusinessException("fromBranchId and toBranchId must be different");
-        }
-        branchSecurity.requireBranchAccess(request.fromBranchId());
-        branchSecurity.requireBranchAccess(request.toBranchId());
-        Product product = productService.get(request.productId());
-        Warehouse fromWarehouse = resolveWarehouse(request.fromBranchId(), request.fromWarehouseId());
-        Warehouse toWarehouse = resolveWarehouse(request.toBranchId(), request.toWarehouseId());
-        warehouseAccessService.requireOperate(fromWarehouse.getId());
-        warehouseAccessService.requireOperate(toWarehouse.getId());
-        BigDecimal movingCost = averageCost(request.fromBranchId(), fromWarehouse.getId(), request.productId());
-        decrease(request.fromBranchId(), fromWarehouse.getId(), request.productId(), request.quantity());
-        increase(request.toBranchId(), toWarehouse, product, request.quantity(), movingCost);
-        record(InventoryTransactionType.TRANSFER_OUT, product, request.fromBranchId(), request.toBranchId(), fromWarehouse.getId(), toWarehouse.getId(), request.quantity(), movingCost, request.transactionDate(), request.note());
-        record(InventoryTransactionType.TRANSFER_IN, product, request.fromBranchId(), request.toBranchId(), fromWarehouse.getId(), toWarehouse.getId(), request.quantity(), movingCost, request.transactionDate(), request.note());
+    public void applyApprovedTransfer(InventoryTransfer transfer, String actor) {
+        Long fromBranchId = transfer.getFromBranchId();
+        Long toBranchId = transfer.getToBranchId();
+        Long fromWarehouseId = transfer.getFromWarehouse().getId();
+        Long toWarehouseId = transfer.getToWarehouse().getId();
+        Long productId = transfer.getProduct().getId();
+        BigDecimal movingCost = averageCost(fromBranchId, fromWarehouseId, productId);
+        decrease(fromBranchId, fromWarehouseId, productId, transfer.getQuantity());
+        increase(toBranchId, transfer.getToWarehouse(), transfer.getProduct(), transfer.getQuantity(), movingCost);
+        transfer.setTransferCost(movingCost);
+        record(InventoryTransactionType.TRANSFER_OUT, transfer.getProduct(), fromBranchId, toBranchId,
+                fromWarehouseId, toWarehouseId, transfer.getQuantity(), movingCost,
+                transfer.getTransferDate(), transfer.getNote(), actor);
+        record(InventoryTransactionType.TRANSFER_IN, transfer.getProduct(), fromBranchId, toBranchId,
+                fromWarehouseId, toWarehouseId, transfer.getQuantity(), movingCost,
+                transfer.getTransferDate(), transfer.getNote(), actor);
     }
 
     @Transactional
@@ -371,6 +372,23 @@ public class InventoryService {
             LocalDate transactionDate,
             String note
     ) {
+        return record(type, product, fromBranchId, toBranchId, fromWarehouseId, toWarehouseId,
+                quantity, unitCost, transactionDate, note, "system");
+    }
+
+    private InventoryTransaction record(
+            InventoryTransactionType type,
+            Product product,
+            Long fromBranchId,
+            Long toBranchId,
+            Long fromWarehouseId,
+            Long toWarehouseId,
+            int quantity,
+            BigDecimal unitCost,
+            LocalDate transactionDate,
+            String note,
+            String createdBy
+    ) {
         InventoryTransaction transaction = new InventoryTransaction();
         transaction.setType(type);
         transaction.setTransactionNo(type.name() + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
@@ -384,7 +402,7 @@ public class InventoryService {
         transaction.setUnitCost(unitCost);
         transaction.setTotalCost((unitCost == null ? BigDecimal.ZERO : unitCost).multiply(BigDecimal.valueOf(quantity)));
         transaction.setNote(note);
-        transaction.setCreatedBy("system");
+        transaction.setCreatedBy(createdBy == null || createdBy.isBlank() ? "system" : createdBy);
         return transactionRepository.save(transaction);
     }
 }
