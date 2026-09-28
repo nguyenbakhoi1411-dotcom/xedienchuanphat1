@@ -5,11 +5,12 @@ import type { DashboardFilters as DashboardFiltersType } from "./types";
 type DashboardFiltersProps = {
   value: DashboardFiltersType;
   onChange: (value: DashboardFiltersType) => void;
+  canFilterByEmployee: boolean;
 };
 
-export function DashboardFilters({ value, onChange }: DashboardFiltersProps) {
+export function DashboardFilters({ value, onChange, canFilterByEmployee }: DashboardFiltersProps) {
   return (
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
+    <div className={`grid gap-2 sm:grid-cols-2 ${canFilterByEmployee ? "xl:grid-cols-7" : "xl:grid-cols-6"}`}>
       <input
         type="date"
         value={value.fromDate}
@@ -33,16 +34,18 @@ export function DashboardFilters({ value, onChange }: DashboardFiltersProps) {
         <option value="3">Chi nhánh Bình Thạnh</option>
       </select>
 
-      <select
-        value={value.employeeId}
-        onChange={(event) => onChange({ ...value, employeeId: event.target.value })}
-        className="erp-input"
-      >
-        <option value="all">Tất cả nhân viên</option>
-        <option value="102">Nhân viên bán hàng 1</option>
-        <option value="103">Nhân viên kho 1</option>
-        <option value="104">Kế toán 1</option>
-      </select>
+      {canFilterByEmployee ? (
+        <select
+          value={value.employeeId}
+          onChange={(event) => onChange({ ...value, employeeId: event.target.value })}
+          className="erp-input"
+        >
+          <option value="all">Tất cả nhân viên</option>
+          <option value="102">Nhân viên bán hàng 1</option>
+          <option value="103">Nhân viên kho 1</option>
+          <option value="104">Kế toán 1</option>
+        </select>
+      ) : null}
 
       <select
         value={value.productCategory}

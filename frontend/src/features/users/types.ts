@@ -5,6 +5,7 @@ export type RoleCode =
   | "SUPER_ADMIN"
   | "DIRECTOR"
   | "BRANCH_MANAGER"
+  | "CHIEF_ACCOUNTANT"
   | "SALES_STAFF"
   | "WAREHOUSE_STAFF"
   | "ACCOUNTANT"

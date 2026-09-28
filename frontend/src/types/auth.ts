@@ -22,6 +22,7 @@ export type Permission =
   | "RECEIPT_CREATE"
   | "PAYMENT_CREATE"
   | "REPORT_VIEW"
+  | "REPORT_VIEW_ALL"
   | "REPORT_EXPORT"
   | "EXPORT_REPORT"
   | "IMPORT_DATA"
@@ -74,7 +75,7 @@ export type Permission =
   | "PURCHASE_CREATE"
   | "AUDIT_VIEW";
 
-export type UserRole = "ADMIN" | "SUPER_ADMIN" | "DIRECTOR" | "BRANCH_MANAGER" | "ACCOUNTANT" | "SALES_STAFF" | "WAREHOUSE_STAFF" | "TECHNICIAN" | "MARKETING_STAFF" | "HR_MANAGER" | "AUDITOR";
+export type UserRole = "ADMIN" | "SUPER_ADMIN" | "DIRECTOR" | "BRANCH_MANAGER" | "CHIEF_ACCOUNTANT" | "ACCOUNTANT" | "SALES_STAFF" | "WAREHOUSE_STAFF" | "TECHNICIAN" | "MARKETING_STAFF" | "HR_MANAGER" | "AUDITOR";
 
 export type AuthUser = {
   id: number;
