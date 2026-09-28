@@ -303,9 +303,10 @@ class SalesDataScopeIntegrationTest {
     void managerCanExchangeSubordinateOrderWithoutEmployeeScopeBlocking() throws Exception {
         Product product = productRepository.findById(31L).orElseThrow();
         SalesOrder originalOrder = createDeliveredOrderWithItem(SALES_USER_ID, product);
+        createPayment(originalOrder);
         SalesOrderItem originalItem = originalOrder.getItems().get(0);
 
-        mockMvc.perform(post("/api/sales/exchanges")
+        MvcResult exchangeResult = mockMvc.perform(post("/api/sales/exchanges")
                         .with(managerUser())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -336,7 +337,22 @@ class SalesDataScopeIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.exchangeGroupId").isNotEmpty())
                 .andExpect(jsonPath("$.salesReturn.orderId").value(originalOrder.getId()))
-                .andExpect(jsonPath("$.newOrder.employeeId").value(COWORKER_ID));
+                .andExpect(jsonPath("$.newOrder.employeeId").value(COWORKER_ID))
+                .andReturn();
+
+        JsonNode exchange = objectMapper.readTree(exchangeResult.getResponse().getContentAsString());
+        long returnId = exchange.get("salesReturn").get("id").asLong();
+
+        mockMvc.perform(patch("/api/sales/returns/{id}/approve", returnId)
+                        .with(returnReviewer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "disposition", "REFUND_TO_INVENTORY",
+                                "note", "Independent reviewer approved cross-employee exchange return"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(originalOrder.getId()))
+                .andExpect(jsonPath("$.status").value("REFUNDED"));
     }
 
     private SalesOrder createOrder(Long employeeId, BigDecimal totalAmount) {
@@ -382,13 +398,7 @@ class SalesDataScopeIntegrationTest {
     }
 
     private SalesReturn createRequestedReturn(SalesOrder order, String createdBy) {
-        SalesPayment payment = new SalesPayment();
-        payment.setOrder(order);
-        payment.setPaymentMethod(PaymentMethod.CASH);
-        payment.setAmount(order.getTotalAmount());
-        payment.setPaymentDate(LocalDate.now());
-        payment.setReferenceNo("SCOPE-PAY-" + System.nanoTime());
-        salesPaymentRepository.save(payment);
+        createPayment(order);
 
         SalesOrderItem orderItem = order.getItems().get(0);
         SalesReturn salesReturn = new SalesReturn();
@@ -413,6 +423,16 @@ class SalesDataScopeIntegrationTest {
         returnItem.setSerialDisposition(ReturnSerialDisposition.RETURNED);
         salesReturn.addItem(returnItem);
         return salesReturnRepository.save(salesReturn);
+    }
+
+    private void createPayment(SalesOrder order) {
+        SalesPayment payment = new SalesPayment();
+        payment.setOrder(order);
+        payment.setPaymentMethod(PaymentMethod.CASH);
+        payment.setAmount(order.getTotalAmount());
+        payment.setPaymentDate(LocalDate.now());
+        payment.setReferenceNo("SCOPE-PAY-" + System.nanoTime());
+        salesPaymentRepository.save(payment);
     }
 
     private BigDecimal expectedRevenue(Long employeeId, LocalDate from, LocalDate to) {
@@ -481,6 +501,13 @@ class SalesDataScopeIntegrationTest {
                 new SimpleGrantedAuthority("SALES_RETURN_APPROVE"),
                 new SimpleGrantedAuthority("CUSTOMER_VIEW"),
                 new SimpleGrantedAuthority("PRODUCT_VIEW")
+        ));
+    }
+
+    private RequestPostProcessor returnReviewer() {
+        return user("admin").authorities(List.of(
+                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                new SimpleGrantedAuthority("SALES_RETURN_APPROVE")
         ));
     }
 }
