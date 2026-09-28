@@ -5,6 +5,7 @@ export const roleOptions: Array<{ value: RoleCode; label: string }> = [
   { value: "SUPER_ADMIN", label: "Super admin" },
   { value: "DIRECTOR", label: "Giam doc" },
   { value: "BRANCH_MANAGER", label: "Quan ly chi nhanh" },
+  { value: "CHIEF_ACCOUNTANT", label: "Ke toan truong" },
   { value: "SALES_STAFF", label: "Nhan vien ban hang" },
   { value: "WAREHOUSE_STAFF", label: "Nhan vien kho" },
   { value: "ACCOUNTANT", label: "Ke toan" },

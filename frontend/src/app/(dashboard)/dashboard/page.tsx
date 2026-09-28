@@ -1,7 +1,7 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { DashboardFilters } from "@/features/dashboard/DashboardFilters";
@@ -13,6 +13,8 @@ import { RevenueByMonthChart } from "@/features/dashboard/RevenueByMonthChart";
 import { TopProductsTable } from "@/features/dashboard/TopProductsTable";
 import { WarrantyTicketsTable } from "@/features/dashboard/WarrantyTicketsTable";
 import { useDashboard } from "@/features/dashboard/hooks";
+import { canFilterSalesDataByEmployee } from "@/lib/auth/salesDataScope";
+import { useCurrentUser } from "@/lib/auth/useCurrentUser";
 import type { DashboardFilters as DashboardFiltersType } from "@/features/dashboard/types";
 
 const defaultFilters: DashboardFiltersType = {
@@ -26,8 +28,14 @@ const defaultFilters: DashboardFiltersType = {
 };
 
 export default function DashboardPage() {
+  const currentUser = useCurrentUser();
   const [filters, setFilters] = useState<DashboardFiltersType>(defaultFilters);
-  const { data, isLoading, isError, refetch } = useDashboard(filters);
+  const canFilterByEmployee = canFilterSalesDataByEmployee(currentUser);
+  const scopedFilters = useMemo(
+    () => canFilterByEmployee ? filters : { ...filters, employeeId: "all" },
+    [canFilterByEmployee, filters]
+  );
+  const { data, isLoading, isError, refetch } = useDashboard(scopedFilters);
 
   return (
     <div className="space-y-5">
@@ -39,7 +47,11 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <DashboardFilters value={filters} onChange={setFilters} />
+          <DashboardFilters
+            value={filters}
+            onChange={setFilters}
+            canFilterByEmployee={canFilterByEmployee}
+          />
           <Button variant="secondary" onClick={() => void refetch()}>
             <RotateCcw className="h-4 w-4" />
             Làm mới

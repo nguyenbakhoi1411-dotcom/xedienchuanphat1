@@ -12,6 +12,7 @@ import com.chuanphat.warranty.auth.entity.AppUser;
 import com.chuanphat.warranty.accounting.repository.ReceivableRepository;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.common.security.SalesDataScope;
 import com.chuanphat.warranty.core.dto.ApproveSalesReturnRequest;
 import com.chuanphat.warranty.core.dto.ConvertQuotationRequest;
 import com.chuanphat.warranty.core.dto.CreateInstallmentRequest;
@@ -125,6 +126,7 @@ public class SalesService {
     private final PriceCalculationService priceCalculationService;
     private final AuditLogService auditLogService;
     private final BranchSecurity branchSecurity;
+    private final SalesDataScope salesDataScope;
     private final SettingService settingService;
     private final ExportDocumentService exportDocumentService;
     private final NotificationService notificationService;
@@ -150,6 +152,7 @@ public class SalesService {
             PriceCalculationService priceCalculationService,
             AuditLogService auditLogService,
             BranchSecurity branchSecurity,
+            SalesDataScope salesDataScope,
             SettingService settingService,
             ExportDocumentService exportDocumentService,
             NotificationService notificationService,
@@ -174,6 +177,7 @@ public class SalesService {
         this.priceCalculationService = priceCalculationService;
         this.auditLogService = auditLogService;
         this.branchSecurity = branchSecurity;
+        this.salesDataScope = salesDataScope;
         this.settingService = settingService;
         this.exportDocumentService = exportDocumentService;
         this.notificationService = notificationService;
@@ -184,6 +188,10 @@ public class SalesService {
     public PageResponse<SalesOrderListResponse> list(Long branchId, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
         PageRequest pageRequest = listPageRequest(page, pageSize);
+        Long scopedEmployeeId = salesDataScope.scopedEmployeeId(null);
+        if (scopedEmployeeId != null) {
+            return PageResponse.from(salesOrderRepository.findListByScope(scopedBranchId, scopedEmployeeId, pageRequest));
+        }
         if (scopedBranchId == null) {
             return PageResponse.from(salesOrderRepository.findList(pageRequest));
         }
@@ -195,6 +203,7 @@ public class SalesService {
         SalesOrder order = salesOrderRepository.findWithItemsById(id)
                 .orElseThrow(() -> new NotFoundException("Sales order not found: " + id));
         branchSecurity.requireBranchAccess(order.getBranchId());
+        salesDataScope.requireEmployeeAccess(order.getEmployeeId());
         return SalesOrderResponse.from(order);
     }
 
@@ -207,7 +216,7 @@ public class SalesService {
         order.setOrderNo(number("SO"));
         order.setBranchId(request.branchId());
         order.setCustomerId(request.customerId());
-        order.setEmployeeId(request.employeeId());
+        order.setEmployeeId(salesDataScope.requireCurrentActor(request.employeeId()));
         order.setOrderDate(request.orderDate() == null ? LocalDate.now() : request.orderDate());
         order.setVoucherCode(blankToEmpty(request.voucherCode()));
         order.setNote(request.note());
@@ -406,6 +415,10 @@ public class SalesService {
         expireQuotations();
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
         PageRequest pageRequest = listPageRequest(page, pageSize);
+        Long scopedEmployeeId = salesDataScope.scopedEmployeeId(null);
+        if (scopedEmployeeId != null) {
+            return PageResponse.from(quotationRepository.findListByScope(scopedBranchId, scopedEmployeeId, pageRequest));
+        }
         if (scopedBranchId == null) {
             return PageResponse.from(quotationRepository.findList(pageRequest));
         }
@@ -417,6 +430,7 @@ public class SalesService {
         Quotation quotation = quotationRepository.findWithItemsById(id)
                 .orElseThrow(() -> new NotFoundException("Quotation not found: " + id));
         branchSecurity.requireBranchAccess(quotation.getBranchId());
+        salesDataScope.requireEmployeeAccess(quotation.getEmployeeId());
         return QuotationResponse.from(quotation);
     }
 
@@ -432,7 +446,7 @@ public class SalesService {
         quotation.setQuotationNo(number("QT"));
         quotation.setBranchId(request.branchId());
         quotation.setCustomerId(request.customerId());
-        quotation.setEmployeeId(request.employeeId());
+        quotation.setEmployeeId(salesDataScope.requireCurrentActor(request.employeeId()));
         quotation.setQuotationDate(request.quotationDate() == null ? LocalDate.now() : request.quotationDate());
         quotation.setValidUntil(request.validUntil());
         quotation.setVoucherCode(blankToNull(request.voucherCode()));
@@ -482,7 +496,7 @@ public class SalesService {
         order.setQuotation(quotation);
         order.setBranchId(quotation.getBranchId());
         order.setCustomerId(quotation.getCustomerId());
-        order.setEmployeeId(request.employeeId());
+        order.setEmployeeId(salesDataScope.requireCurrentActor(request.employeeId()));
         order.setOrderDate(LocalDate.now());
         order.setVoucherCode(blankToEmpty(quotation.getVoucherCode()));
         order.setReservationUntil(resolveReservationUntil(request.reservationUntil(), null));
@@ -559,6 +573,7 @@ public class SalesService {
                 .orElseThrow(() -> new NotFoundException("Installment application not found: " + id));
         SalesOrder order = installment.getOrder();
         branchSecurity.requireBranchAccess(order.getBranchId());
+        salesDataScope.requireEmployeeAccess(order.getEmployeeId());
         InstallmentStatus oldStatus = installment.getStatus();
         installment.setStatus(request.status());
         if (request.note() != null && !request.note().isBlank()) {
@@ -594,6 +609,7 @@ public class SalesService {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Invoice not found: " + id));
         branchSecurity.requireBranchAccess(invoice.getOrder().getBranchId());
+        salesDataScope.requireEmployeeAccess(invoice.getOrder().getEmployeeId());
         issueInvoiceEntity(invoice);
         return InvoiceResponse.from(invoice);
     }
@@ -603,6 +619,7 @@ public class SalesService {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Invoice not found: " + id));
         branchSecurity.requireBranchAccess(invoice.getOrder().getBranchId());
+        salesDataScope.requireEmployeeAccess(invoice.getOrder().getEmployeeId());
         return InvoiceResponse.from(invoice);
     }
 
@@ -611,6 +628,7 @@ public class SalesService {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Invoice not found: " + id));
         branchSecurity.requireBranchAccess(invoice.getOrder().getBranchId());
+        salesDataScope.requireEmployeeAccess(invoice.getOrder().getEmployeeId());
         Customer customer = customerService.get(invoice.getOrder().getCustomerId());
         return exportDocumentService.businessPdf(new ExportDocumentService.BusinessDocument(
                 "Hoa don ban hang",
@@ -746,6 +764,7 @@ public class SalesService {
         SalesReturn salesReturn = returnRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sales return not found: " + id));
         branchSecurity.requireBranchAccess(salesReturn.getBranchId());
+        salesDataScope.requireEmployeeAccess(salesReturn.getOrder().getEmployeeId());
         if (salesReturn.getStatus() != SalesReturnStatus.REQUESTED) {
             throw new BusinessException("Only requested returns can be approved");
         }
@@ -864,6 +883,7 @@ public class SalesService {
         SalesReturn salesReturn = returnRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sales return not found: " + id));
         branchSecurity.requireBranchAccess(salesReturn.getBranchId());
+        salesDataScope.requireEmployeeAccess(salesReturn.getOrder().getEmployeeId());
         if (salesReturn.getStatus() != SalesReturnStatus.REQUESTED) {
             throw new BusinessException("Only requested returns can be rejected");
         }
@@ -881,10 +901,18 @@ public class SalesService {
     @Transactional(readOnly = true)
     public PageResponse<SalesReturnResponse> returns(Long branchId, int page, int pageSize) {
         Long scopedBranchId = branchSecurity.scopedBranchId(branchId);
-        if (scopedBranchId == null) {
-            return PageResponse.from(returnRepository.findAll(PageRequest.of(page, pageSize)).map(SalesReturnResponse::from));
+        Long scopedEmployeeId = salesDataScope.scopedEmployeeId(null);
+        PageRequest pageRequest = PageRequest.of(page, pageSize);
+        if (scopedEmployeeId != null && scopedBranchId == null) {
+            return PageResponse.from(returnRepository.findByOrderEmployeeId(scopedEmployeeId, pageRequest).map(SalesReturnResponse::from));
         }
-        return PageResponse.from(returnRepository.findByBranchId(scopedBranchId, PageRequest.of(page, pageSize)).map(SalesReturnResponse::from));
+        if (scopedEmployeeId != null) {
+            return PageResponse.from(returnRepository.findByBranchIdAndOrderEmployeeId(scopedBranchId, scopedEmployeeId, pageRequest).map(SalesReturnResponse::from));
+        }
+        if (scopedBranchId == null) {
+            return PageResponse.from(returnRepository.findAll(pageRequest).map(SalesReturnResponse::from));
+        }
+        return PageResponse.from(returnRepository.findByBranchId(scopedBranchId, pageRequest).map(SalesReturnResponse::from));
     }
 
     @Transactional(readOnly = true)
@@ -1371,13 +1399,19 @@ public class SalesService {
     }
 
     private SalesOrder getOrderEntity(Long id) {
-        return salesOrderRepository.findById(id)
+        SalesOrder order = salesOrderRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sales order not found: " + id));
+        branchSecurity.requireBranchAccess(order.getBranchId());
+        salesDataScope.requireEmployeeAccess(order.getEmployeeId());
+        return order;
     }
 
     private Quotation getQuotationEntity(Long id) {
-        return quotationRepository.findById(id)
+        Quotation quotation = quotationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Quotation not found: " + id));
+        branchSecurity.requireBranchAccess(quotation.getBranchId());
+        salesDataScope.requireEmployeeAccess(quotation.getEmployeeId());
+        return quotation;
     }
 
     private void expireQuotations() {

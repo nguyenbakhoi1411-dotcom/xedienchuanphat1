@@ -343,6 +343,26 @@ class SalesProfessionalFlowTest {
     }
 
     @Test
+    void managerCanApproveDiscountOnOrderCreatedByAnotherSalesStaff() throws Exception {
+        long orderId = createSalesOrderWaitingDiscountApproval();
+
+        mockMvc.perform(get("/api/sales/orders/{id}", orderId)
+                        .with(discountApprover()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.employeeId").value(102))
+                .andExpect(jsonPath("$.status").value("WAITING_DISCOUNT_APPROVAL"));
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/approve-discount", orderId)
+                        .with(discountApprover())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("note", "Manager approved subordinate order"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.employeeId").value(102))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.discountApprovalStatus").value("APPROVED"));
+    }
+
+    @Test
     void creditLimitExceededWaitsForApproval() throws Exception {
         createSalesOrderWaitingCreditApproval();
     }
@@ -400,7 +420,7 @@ class SalesProfessionalFlowTest {
     }
 
     @Test
-    void orderCreatorCannotApproveOwnCreditException() throws Exception {
+    void managerCanApproveCreditExceptionOnOrderCreatedByAnotherSalesStaff() throws Exception {
         long orderId = createSalesOrderWaitingCreditApproval();
 
         mockMvc.perform(patch("/api/sales/orders/{id}/approve-credit", orderId)

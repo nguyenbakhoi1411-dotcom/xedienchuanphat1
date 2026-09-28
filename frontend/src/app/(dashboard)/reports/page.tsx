@@ -10,6 +10,8 @@ import { ReportFilters } from "@/features/reports/ReportFilters";
 import { ReportSkeleton } from "@/features/reports/ReportSkeleton";
 import { ReportTable } from "@/features/reports/ReportTable";
 import { useReport } from "@/features/reports/hooks";
+import { canFilterSalesDataByEmployee } from "@/lib/auth/salesDataScope";
+import { useCurrentUser } from "@/lib/auth/useCurrentUser";
 import type { ReportFilters as ReportFiltersType, ReportSummaryCard, ReportType } from "@/features/reports/types";
 
 const ReportChart = dynamic(
@@ -35,9 +37,15 @@ function defaultReportFilters(): ReportFiltersType {
 }
 
 export default function ReportsPage() {
+  const currentUser = useCurrentUser();
   const [reportType, setReportType] = useState<ReportType>("SALES_REPORT");
   const [filters, setFilters] = useState<ReportFiltersType>(() => defaultReportFilters());
-  const { data, isLoading, isError, refetch } = useReport(reportType, filters);
+  const canFilterByEmployee = canFilterSalesDataByEmployee(currentUser);
+  const scopedFilters = useMemo(
+    () => canFilterByEmployee ? filters : { ...filters, employeeId: "all" },
+    [canFilterByEmployee, filters]
+  );
+  const { data, isLoading, isError, refetch } = useReport(reportType, scopedFilters);
 
   const isInvalidRange = useMemo(() => filters.fromDate > filters.toDate, [filters.fromDate, filters.toDate]);
   const pagination = data?.pagination;
@@ -52,7 +60,7 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <ReportExportButtons reportType={reportType} filters={filters} disabled={isLoading || isInvalidRange || !data} />
+          <ReportExportButtons reportType={reportType} filters={scopedFilters} disabled={isLoading || isInvalidRange || !data} />
           <Button variant="secondary" onClick={() => void refetch()} disabled={isInvalidRange}>
             <RotateCcw className="h-4 w-4" />
             Lam moi
@@ -68,6 +76,7 @@ export default function ReportsPage() {
           setFilters((current) => ({ ...current, page: 0 }));
         }}
         onFiltersChange={setFilters}
+        canFilterByEmployee={canFilterByEmployee}
       />
 
       {isInvalidRange ? (

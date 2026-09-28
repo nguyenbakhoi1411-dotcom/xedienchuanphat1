@@ -232,7 +232,7 @@ function createDefaultPermissions(role: RoleCode): Record<PermissionModule, Perm
     return permissions;
   }
   if (role === "WAREHOUSE_STAFF") return grant(empty, ["dashboard", "inventory", "products", "suppliers"], ["view", "create", "update", "export"]);
-  if (role === "ACCOUNTANT") return grant(empty, ["dashboard", "accounting", "reports", "sales", "suppliers"], ["view", "create", "update", "approve", "export"]);
+  if (role === "ACCOUNTANT" || role === "CHIEF_ACCOUNTANT") return grant(empty, ["dashboard", "accounting", "reports", "sales", "suppliers"], ["view", "create", "update", "approve", "export"]);
   if (role === "TECHNICIAN") return grant(empty, ["dashboard", "warranty", "products"], ["view", "create", "update"]);
   if (role === "MARKETING_STAFF") return grant(empty, ["dashboard", "marketing", "customers", "reports"], ["view", "create", "update", "export"]);
   if (role === "HR_MANAGER") return grant(empty, ["dashboard", "hr", "audit"], ["view", "create", "update"]);
@@ -253,6 +253,7 @@ function getRoleDescription(role: RoleCode) {
     SALES_STAFF: "Ban hang va cham soc khach hang",
     WAREHOUSE_STAFF: "Nhap xuat ton va kiem kho",
     ACCOUNTANT: "Thu chi, cong no va bao cao tai chinh",
+    CHIEF_ACCOUNTANT: "Ke toan truong va bao cao toan bo nhan vien",
     TECHNICIAN: "Bao hanh va sua chua",
     MARKETING_STAFF: "Marketing va cham soc khach hang",
     HR_MANAGER: "Quan ly nhan su, tai khoan va ho so",

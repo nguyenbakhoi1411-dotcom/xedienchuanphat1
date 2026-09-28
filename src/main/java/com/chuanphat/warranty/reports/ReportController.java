@@ -4,6 +4,7 @@ import com.chuanphat.warranty.audit.dto.CreateAuditLogRequest;
 import com.chuanphat.warranty.audit.enums.AuditAction;
 import com.chuanphat.warranty.audit.enums.AuditModule;
 import com.chuanphat.warranty.audit.service.AuditLogService;
+import com.chuanphat.warranty.common.security.SalesDataScope;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.util.Map;
@@ -24,10 +25,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReportController {
     private final ReportService service;
     private final AuditLogService auditLogService;
+    private final SalesDataScope salesDataScope;
 
-    public ReportController(ReportService service, AuditLogService auditLogService) {
+    public ReportController(ReportService service, AuditLogService auditLogService, SalesDataScope salesDataScope) {
         this.service = service;
         this.auditLogService = auditLogService;
+        this.salesDataScope = salesDataScope;
     }
 
     @GetMapping("/{type}")
@@ -46,7 +49,7 @@ public class ReportController {
             @RequestParam(defaultValue = "100") int pageSize
     ) {
         DateRange range = defaultRange(fromDate, toDate);
-        return service.report(type, range.fromDate(), range.toDate(), branchId, employeeId, productId, customerId, status, productCategory, page, pageSize);
+        return service.report(type, range.fromDate(), range.toDate(), branchId, scopedEmployeeId(employeeId), productId, customerId, status, productCategory, page, pageSize);
     }
 
     @GetMapping("/{type}/export")
@@ -64,7 +67,7 @@ public class ReportController {
             HttpServletRequest request
     ) {
         DateRange range = defaultRange(fromDate, toDate);
-        ReportService.ExportFile file = service.export(type, format, range.fromDate(), range.toDate(), branchId, employeeId, productId, productCategory);
+        ReportService.ExportFile file = service.export(type, format, range.fromDate(), range.toDate(), branchId, scopedEmployeeId(employeeId), productId, productCategory);
         auditLogService.record(new CreateAuditLogRequest(
                 authentication == null ? "system" : authentication.getName(),
                 AuditAction.EXPORT_REPORT,
@@ -118,7 +121,7 @@ public class ReportController {
     @PreAuthorize("hasAuthority('REPORT_VIEW')")
     public Map<String, Object> revenueTime(@RequestParam(required = false) LocalDate fromDate, @RequestParam(required = false) LocalDate toDate, @RequestParam(required = false) Long branchId, @RequestParam(required = false) Long employeeId, @RequestParam(required = false) Long productId) {
         DateRange range = defaultRange(fromDate, toDate);
-        return service.revenueTime(range.fromDate(), range.toDate(), branchId, employeeId, productId);
+        return service.revenueTime(range.fromDate(), range.toDate(), branchId, scopedEmployeeId(employeeId), productId);
     }
 
     @GetMapping("/revenue-branch")
@@ -132,14 +135,14 @@ public class ReportController {
     @PreAuthorize("hasAuthority('REPORT_VIEW')")
     public Map<String, Object> revenueEmployee(@RequestParam(required = false) LocalDate fromDate, @RequestParam(required = false) LocalDate toDate, @RequestParam(required = false) Long branchId, @RequestParam(required = false) Long employeeId, @RequestParam(required = false) Long productId) {
         DateRange range = defaultRange(fromDate, toDate);
-        return service.revenueEmployee(range.fromDate(), range.toDate(), branchId, employeeId, productId);
+        return service.revenueEmployee(range.fromDate(), range.toDate(), branchId, scopedEmployeeId(employeeId), productId);
     }
 
     @GetMapping("/top-products")
     @PreAuthorize("hasAuthority('REPORT_VIEW')")
     public Map<String, Object> topProducts(@RequestParam(required = false) LocalDate fromDate, @RequestParam(required = false) LocalDate toDate, @RequestParam(required = false) Long branchId, @RequestParam(required = false) Long employeeId, @RequestParam(required = false) Long productId) {
         DateRange range = defaultRange(fromDate, toDate);
-        return service.topProducts(range.fromDate(), range.toDate(), branchId, employeeId, productId);
+        return service.topProducts(range.fromDate(), range.toDate(), branchId, scopedEmployeeId(employeeId), productId);
     }
 
     @GetMapping("/inventory")
@@ -174,7 +177,7 @@ public class ReportController {
             @RequestParam(required = false) Long productId
     ) {
         DateRange range = defaultRange(fromDate, toDate);
-        return service.profit(range.fromDate(), range.toDate(), branchId, employeeId, productId);
+        return service.profit(range.fromDate(), range.toDate(), branchId, scopedEmployeeId(employeeId), productId);
     }
 
     @GetMapping("/warranty-repair")
@@ -196,6 +199,10 @@ public class ReportController {
                 fromDate == null ? today.withDayOfMonth(1) : fromDate,
                 toDate == null ? today : toDate
         );
+    }
+
+    private Long scopedEmployeeId(Long employeeId) {
+        return salesDataScope.scopedEmployeeId(employeeId);
     }
 
     private record DateRange(LocalDate fromDate, LocalDate toDate) {

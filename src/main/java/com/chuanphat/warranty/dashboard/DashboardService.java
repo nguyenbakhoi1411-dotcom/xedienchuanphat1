@@ -1,6 +1,7 @@
 package com.chuanphat.warranty.dashboard;
 
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.common.security.SalesDataScope;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Date;
@@ -17,14 +18,25 @@ import org.springframework.stereotype.Service;
 public class DashboardService {
     private final JdbcTemplate jdbcTemplate;
     private final BranchSecurity branchSecurity;
+    private final SalesDataScope salesDataScope;
 
-    public DashboardService(JdbcTemplate jdbcTemplate, BranchSecurity branchSecurity) {
+    public DashboardService(JdbcTemplate jdbcTemplate, BranchSecurity branchSecurity, SalesDataScope salesDataScope) {
         this.jdbcTemplate = jdbcTemplate;
         this.branchSecurity = branchSecurity;
+        this.salesDataScope = salesDataScope;
     }
 
     public Map<String, Object> dashboard(DashboardFilter filter) {
-        DashboardFilter resolved = filter.withDefaults();
+        DashboardFilter requested = filter.withDefaults();
+        DashboardFilter resolved = new DashboardFilter(
+                requested.fromDate(),
+                requested.toDate(),
+                requested.month(),
+                requested.timeRange(),
+                requested.branchId(),
+                salesDataScope.scopedEmployeeId(requested.employeeId()),
+                requested.productCategory()
+        );
         Long scopedBranchId = branchSecurity.scopedBranchId(resolved.branchId());
         LocalDate nextDate = resolved.toDate().plusDays(1);
 
@@ -163,7 +175,7 @@ public class DashboardService {
                 "revenueByBranch", revenueByBranch(resolved.fromDate(), resolved.toDate(), scopedBranchId, resolved.employeeId(), resolved.productCategory()),
                 "profitByMonth", profitByMonth(scopedBranchId, resolved.employeeId(), resolved.productCategory()),
                 "topProducts", topProducts(resolved.fromDate(), resolved.toDate(), scopedBranchId, resolved.employeeId(), resolved.productCategory()),
-                "topEmployees", topEmployees(resolved.fromDate(), resolved.toDate(), scopedBranchId, resolved.productCategory()),
+                "topEmployees", topEmployees(resolved.fromDate(), resolved.toDate(), scopedBranchId, resolved.employeeId(), resolved.productCategory()),
                 "customerSources", customerSources(resolved.fromDate(), resolved.toDate(), scopedBranchId, resolved.employeeId(), resolved.productCategory()),
                 "warrantyStatus", warrantyStatus(resolved.fromDate(), resolved.toDate(), scopedBranchId, resolved.employeeId(), resolved.productCategory()),
                 "warrantyTickets", queryWarrantyTickets(scopedBranchId, resolved.employeeId(), resolved.productCategory())
@@ -175,27 +187,19 @@ public class DashboardService {
     }
 
     public List<Map<String, Object>> revenueByMonth(Long branchId) {
-        return revenueByMonth(branchSecurity.scopedBranchId(branchId), null, null);
+        return revenueByMonth(branchSecurity.scopedBranchId(branchId), salesDataScope.scopedEmployeeId(null), null);
     }
 
     public List<Map<String, Object>> revenueByBranch(Long branchId) {
-        return revenueByBranch(LocalDate.now().withDayOfMonth(1), LocalDate.now(), branchSecurity.scopedBranchId(branchId));
+        return revenueByBranch(LocalDate.now().withDayOfMonth(1), LocalDate.now(), branchSecurity.scopedBranchId(branchId), salesDataScope.scopedEmployeeId(null), null);
     }
 
     public List<Map<String, Object>> topProducts(Long branchId) {
-        return topProducts(LocalDate.now().withDayOfMonth(1), LocalDate.now(), branchSecurity.scopedBranchId(branchId), null, null);
+        return topProducts(LocalDate.now().withDayOfMonth(1), LocalDate.now(), branchSecurity.scopedBranchId(branchId), salesDataScope.scopedEmployeeId(null), null);
     }
 
     public List<Map<String, Object>> warrantyTickets(Long branchId) {
-        return queryWarrantyTickets(branchSecurity.scopedBranchId(branchId));
-    }
-
-    private List<Map<String, Object>> revenueByBranch(LocalDate fromDate, LocalDate toDate, Long branchId) {
-        return revenueByBranch(fromDate, toDate, branchId, null, null);
-    }
-
-    private List<Map<String, Object>> queryWarrantyTickets(Long branchId) {
-        return queryWarrantyTickets(branchId, null, null);
+        return queryWarrantyTickets(branchSecurity.scopedBranchId(branchId), salesDataScope.scopedEmployeeId(null), null);
     }
 
     private List<Map<String, Object>> revenueByMonth(Long branchId, Long employeeId, String productCategory) {
@@ -282,13 +286,14 @@ public class DashboardService {
                 "productId", "productName", "sku", "quantitySold", "revenue");
     }
 
-    private List<Map<String, Object>> topEmployees(LocalDate fromDate, LocalDate toDate, Long branchId, String productCategory) {
+    private List<Map<String, Object>> topEmployees(LocalDate fromDate, LocalDate toDate, Long branchId, Long employeeId, String productCategory) {
         return normalizeRows(jdbcTemplate.queryForList("""
                 select au.id employeeId, au.full_name employeeName, count(distinct so.id) orders, coalesce(sum(so.total_amount), 0) revenue
                 from sales_orders so
                 join app_users au on au.id = so.employee_id
                 where so.status <> 'CANCELLED' and so.order_date >= ? and so.order_date <= ?
                   and (? is null or so.branch_id = ?)
+                  and (? is null or so.employee_id = ?)
                   and (? is null or exists (
                       select 1 from sales_order_items soi join products p on p.id = soi.product_id
                       where soi.order_id = so.id and p.category = ?
@@ -296,7 +301,7 @@ public class DashboardService {
                 group by au.id, au.full_name
                 order by coalesce(sum(so.total_amount), 0) desc
                 limit 10
-                """, fromDate, toDate, branchId, branchId, productCategory, productCategory),
+                """, fromDate, toDate, branchId, branchId, employeeId, employeeId, productCategory, productCategory),
                 "employeeId", "employeeName", "orders", "revenue");
     }
 

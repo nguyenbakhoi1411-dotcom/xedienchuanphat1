@@ -9,5 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SalesReturnRepository extends JpaRepository<SalesReturn, Long> {
     Page<SalesReturn> findByBranchId(Long branchId, Pageable pageable);
+    Page<SalesReturn> findByOrderEmployeeId(Long employeeId, Pageable pageable);
+    Page<SalesReturn> findByBranchIdAndOrderEmployeeId(Long branchId, Long employeeId, Pageable pageable);
     List<SalesReturn> findByExchangeGroupId(UUID exchangeGroupId);
 }

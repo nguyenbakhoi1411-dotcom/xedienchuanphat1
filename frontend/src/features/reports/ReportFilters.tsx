@@ -8,17 +8,19 @@ type ReportFiltersProps = {
   filters: ReportFiltersType;
   onReportTypeChange: (value: ReportType) => void;
   onFiltersChange: (value: ReportFiltersType) => void;
+  canFilterByEmployee: boolean;
 };
 
 export function ReportFilters({
   reportType,
   filters,
   onReportTypeChange,
-  onFiltersChange
+  onFiltersChange,
+  canFilterByEmployee
 }: ReportFiltersProps) {
   return (
     <section className="rounded-lg border border-border bg-white p-4 shadow-soft">
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.2fr)_repeat(8,minmax(130px,1fr))]">
+      <div className={`grid gap-3 ${canFilterByEmployee ? "lg:grid-cols-[minmax(220px,1.2fr)_repeat(8,minmax(130px,1fr))]" : "lg:grid-cols-[minmax(220px,1.2fr)_repeat(7,minmax(130px,1fr))]"}`}>
         <label className="space-y-1 text-sm">
           <span className="font-medium text-text">Loai bao cao</span>
           <select
@@ -61,12 +63,14 @@ export function ReportFilters({
           onChange={(branchId) => onFiltersChange({ ...filters, branchId, page: 0 })}
         />
 
-        <SelectFilter
-          label="Nhan vien"
-          value={filters.employeeId}
-          options={employeeOptions}
-          onChange={(employeeId) => onFiltersChange({ ...filters, employeeId, page: 0 })}
-        />
+        {canFilterByEmployee ? (
+          <SelectFilter
+            label="Nhan vien"
+            value={filters.employeeId}
+            options={employeeOptions}
+            onChange={(employeeId) => onFiltersChange({ ...filters, employeeId, page: 0 })}
+          />
+        ) : null}
 
         <SelectFilter
           label="San pham"

@@ -5,6 +5,7 @@ import com.chuanphat.warranty.audit.enums.AuditAction;
 import com.chuanphat.warranty.audit.enums.AuditModule;
 import com.chuanphat.warranty.audit.service.AuditLogService;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.common.security.SalesDataScope;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class DefaultAIInsightService implements AIInsightService {
     private final JdbcTemplate jdbcTemplate;
     private final BranchSecurity branchSecurity;
+    private final SalesDataScope salesDataScope;
     private final AuditLogService auditLogService;
     private final boolean enabled;
     private final String mode;
@@ -31,12 +33,14 @@ public class DefaultAIInsightService implements AIInsightService {
     public DefaultAIInsightService(
             JdbcTemplate jdbcTemplate,
             BranchSecurity branchSecurity,
+            SalesDataScope salesDataScope,
             AuditLogService auditLogService,
             @Value("${app.ai.enabled:false}") boolean enabled,
             @Value("${app.ai.mode:mock}") String mode
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.branchSecurity = branchSecurity;
+        this.salesDataScope = salesDataScope;
         this.auditLogService = auditLogService;
         this.enabled = enabled;
         this.mode = mode;
@@ -58,53 +62,58 @@ public class DefaultAIInsightService implements AIInsightService {
             throw new BusinessException("Question is required");
         }
         Long scopedBranchId = branchSecurity.scopedBranchId(request.branchId());
+        Long scopedEmployeeId = salesDataScope.scopedEmployeeId(null);
         String normalized = normalize(question);
         String intent = detectIntent(normalized);
         AiDtos.AssistantResponse response = switch (intent) {
             case "PROFIT_RESTRICTED" -> noPermission("VIEW_PROFIT", "/reports");
-            case "REVENUE_TODAY" -> revenueToday(scopedBranchId);
-            case "BEST_BRANCH" -> bestBranch();
+            case "REVENUE_TODAY" -> revenueToday(scopedBranchId, scopedEmployeeId);
+            case "BEST_BRANCH" -> bestBranch(scopedBranchId, scopedEmployeeId);
             case "SLOW_STOCK" -> slowStock(scopedBranchId);
             case "OVERDUE_DEBT" -> overdueDebt(scopedBranchId);
             case "WARRANTY_TOP_MODEL" -> warrantyTopModel(scopedBranchId);
-            case "EMPLOYEE_CONVERSION" -> employeeConversion(scopedBranchId);
-            case "PURCHASE_SUGGESTION" -> purchaseSuggestion(scopedBranchId);
-            case "ANOMALY" -> anomalies(scopedBranchId);
+            case "EMPLOYEE_CONVERSION" -> employeeConversion(scopedBranchId, scopedEmployeeId);
+            case "PURCHASE_SUGGESTION" -> purchaseSuggestion(scopedBranchId, scopedEmployeeId);
+            case "ANOMALY" -> anomalies(scopedBranchId, scopedEmployeeId);
             case "CUSTOMER_CARE" -> customerCare(scopedBranchId);
             case "ACTION_PROPOSAL" -> actionProposal(question);
-            default -> overview(scopedBranchId);
+            default -> overview(scopedBranchId, scopedEmployeeId);
         };
         audit(question, response.intent(), response.answer());
         return response;
     }
 
-    private AiDtos.AssistantResponse revenueToday(Long branchId) {
+    private AiDtos.AssistantResponse revenueToday(Long branchId, Long employeeId) {
         LocalDate today = LocalDate.now();
         BigDecimal revenue = money("""
                 select coalesce(sum(total_amount),0)
                 from sales_orders
                 where status <> 'CANCELLED' and order_date = ? and (? is null or branch_id = ?)
-                """, today, branchId, branchId);
+                  and (? is null or employee_id = ?)
+                """, today, branchId, branchId, employeeId, employeeId);
         BigDecimal orders = money("""
                 select count(*)
                 from sales_orders
                 where status <> 'CANCELLED' and order_date = ? and (? is null or branch_id = ?)
-                """, today, branchId, branchId);
+                  and (? is null or employee_id = ?)
+                """, today, branchId, branchId, employeeId, employeeId);
         return response("REVENUE_TODAY", "Doanh thu hom nay la " + formatMoney(revenue) + " voi " + orders.toPlainString() + " don hang.",
                 List.of(metric("Doanh thu", revenue, "VND"), metric("Don hang", orders, "don")),
                 List.of(), List.of(link("Mo bao cao doanh thu", "/reports?type=SALES")), List.of("Kiem tra them doanh thu theo nhan vien neu can dieu phoi ca ban hang."), null);
     }
 
-    private AiDtos.AssistantResponse bestBranch() {
+    private AiDtos.AssistantResponse bestBranch(Long branchId, Long employeeId) {
         Map<String, Object> row = one("""
                 select coalesce(b.name, concat('Chi nhanh #', so.branch_id)) branchName, coalesce(sum(so.total_amount),0) revenue
                 from sales_orders so
                 left join branches b on b.id = so.branch_id
                 where so.status <> 'CANCELLED' and so.order_date >= ?
+                  and (? is null or so.branch_id = ?)
+                  and (? is null or so.employee_id = ?)
                 group by so.branch_id, b.name
                 order by revenue desc
                 limit 1
-                """, LocalDate.now().minusDays(30));
+                """, LocalDate.now().minusDays(30), branchId, branchId, employeeId, employeeId);
         String branch = text(row, "branchName", "Chua co du lieu");
         BigDecimal revenue = decimal(row.get("revenue"));
         return response("BEST_BRANCH", "Trong 30 ngay gan day, " + branch + " dang ban tot nhat voi doanh thu " + formatMoney(revenue) + ".",
@@ -167,7 +176,7 @@ public class DefaultAIInsightService implements AIInsightService {
                 List.of(link("Mo bao cao bao hanh", "/reports?type=WARRANTY_ANALYSIS")), List.of(), null);
     }
 
-    private AiDtos.AssistantResponse employeeConversion(Long branchId) {
+    private AiDtos.AssistantResponse employeeConversion(Long branchId, Long employeeId) {
         Map<String, Object> row = one("""
                 select coalesce(e.full_name, u.full_name, concat('Nhan vien #', so.employee_id)) employeeName,
                        count(*) orders, coalesce(sum(so.total_amount),0) revenue
@@ -175,16 +184,17 @@ public class DefaultAIInsightService implements AIInsightService {
                 left join employees e on e.id = so.employee_id
                 left join app_users u on u.id = so.employee_id
                 where so.status <> 'CANCELLED' and so.order_date >= ? and (? is null or so.branch_id = ?)
+                  and (? is null or so.employee_id = ?)
                 group by so.employee_id, e.full_name, u.full_name
                 order by orders desc, revenue desc
                 limit 1
-                """, LocalDate.now().minusDays(30), branchId, branchId);
+                """, LocalDate.now().minusDays(30), branchId, branchId, employeeId, employeeId);
         return response("EMPLOYEE_CONVERSION", text(row, "employeeName", "Chua co du lieu") + " dang co ket qua chot tot nhat 30 ngay gan day theo so don.",
                 List.of(metric("So don", decimal(row.get("orders")), "don"), metric("Doanh thu", decimal(row.get("revenue")), "VND")),
                 List.of(), List.of(link("Mo KPI nhan vien", "/hr")), List.of("Neu co du lieu lead/bao gia, nen doi chieu ty le chuyen doi that."), null);
     }
 
-    private AiDtos.AssistantResponse purchaseSuggestion(Long branchId) {
+    private AiDtos.AssistantResponse purchaseSuggestion(Long branchId, Long employeeId) {
         List<Map<String, Object>> rows = list("""
                 select p.id productId, p.product_name productName,
                        coalesce(sum(s.quantity_on_hand),0) stockQty,
@@ -193,11 +203,12 @@ public class DefaultAIInsightService implements AIInsightService {
                 left join inventory_stocks s on s.product_id = p.id and (? is null or s.branch_id = ?)
                 left join sales_order_items soi on soi.product_id = p.id
                 left join sales_orders so on so.id = soi.order_id and so.status <> 'CANCELLED' and (? is null or so.branch_id = ?)
+                  and (? is null or so.employee_id = ?)
                 group by p.id, p.product_name
                 having coalesce(sum(case when so.order_date >= ? then soi.quantity else 0 end),0) > coalesce(sum(s.quantity_on_hand),0)
                 order by soldQty desc
                 limit 5
-                """, LocalDate.now().minusDays(30), branchId, branchId, branchId, branchId, LocalDate.now().minusDays(30));
+                """, LocalDate.now().minusDays(30), branchId, branchId, branchId, branchId, employeeId, employeeId, LocalDate.now().minusDays(30));
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("items", rows);
         return response("PURCHASE_SUGGESTION", rows.isEmpty() ? "Chua co mat hang nao can goi y nhap them theo toc do ban 30 ngay." : "Nen xem xet nhap them: " + joinNames(rows, "productName") + ".",
@@ -206,9 +217,9 @@ public class DefaultAIInsightService implements AIInsightService {
                 new AiDtos.ProposedAction("CREATE_PURCHASE_RECOMMENDATION", "De xuat nhap hang", "AI chi tao de xuat tham khao. Nguoi dung phai xac nhan truoc khi lap PO.", payload, true));
     }
 
-    private AiDtos.AssistantResponse anomalies(Long branchId) {
+    private AiDtos.AssistantResponse anomalies(Long branchId, Long employeeId) {
         List<String> warnings = new ArrayList<>();
-        BigDecimal cancelled = money("select count(*) from sales_orders where status = 'CANCELLED' and order_date >= ? and (? is null or branch_id = ?)", LocalDate.now().minusDays(7), branchId, branchId);
+        BigDecimal cancelled = money("select count(*) from sales_orders where status = 'CANCELLED' and order_date >= ? and (? is null or branch_id = ?) and (? is null or employee_id = ?)", LocalDate.now().minusDays(7), branchId, branchId, employeeId, employeeId);
         BigDecimal negativeStock = money("select count(*) from inventory_stocks where quantity_on_hand < 0 and (? is null or branch_id = ?)", branchId, branchId);
         BigDecimal warrantyCost = money("select coalesce(sum(warranty_cost),0) from service_tickets where received_date >= ? and (? is null or branch_id = ?)", LocalDate.now().minusDays(30), branchId, branchId);
         if (cancelled.compareTo(new BigDecimal("5")) > 0) warnings.add("Don huy 7 ngay gan day cao: " + cancelled.toPlainString());
@@ -237,8 +248,8 @@ public class DefaultAIInsightService implements AIInsightService {
                 new AiDtos.ProposedAction("REQUIRES_USER_CONFIRMATION", "Can xac nhan thu cong", "Khong co thay doi du lieu nao duoc thuc hien.", payload, true));
     }
 
-    private AiDtos.AssistantResponse overview(Long branchId) {
-        BigDecimal revenue = money("select coalesce(sum(total_amount),0) from sales_orders where status <> 'CANCELLED' and order_date >= ? and (? is null or branch_id = ?)", LocalDate.now().minusDays(30), branchId, branchId);
+    private AiDtos.AssistantResponse overview(Long branchId, Long employeeId) {
+        BigDecimal revenue = money("select coalesce(sum(total_amount),0) from sales_orders where status <> 'CANCELLED' and order_date >= ? and (? is null or branch_id = ?) and (? is null or employee_id = ?)", LocalDate.now().minusDays(30), branchId, branchId, employeeId, employeeId);
         BigDecimal lowStock = money("select count(*) from inventory_stocks where quantity_on_hand <= min_quantity and (? is null or branch_id = ?)", branchId, branchId);
         return response("OVERVIEW", "Toi co the tra loi nhanh ve doanh thu, ton kho, cong no, bao hanh, KPI va canh bao bat thuong. Trong 30 ngay gan day doanh thu la " + formatMoney(revenue) + ".",
                 List.of(metric("Doanh thu 30 ngay", revenue, "VND"), metric("Mat hang sap het", lowStock, "dong")),
