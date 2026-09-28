@@ -52,7 +52,7 @@ export function SerialDetailModal({ serial, onClose, onUpdated }: Props) {
 
   const transferMut = useMutation({
     mutationFn: (payload: TransferSerialPayload) => serialsApi.transfer(serial.id, payload),
-    onSuccess: (updated) => { onUpdated(updated); invalidate(); toast.success("Đã chuyển kho"); setMode("idle"); },
+    onSuccess: (updated) => { onUpdated(updated); invalidate(); toast.success("Phiếu chuyển kho đã gửi chờ duyệt"); setMode("idle"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -256,7 +256,7 @@ export function SerialDetailModal({ serial, onClose, onUpdated }: Props) {
                     disabled={transferMut.isPending}
                     className="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                   >
-                    {transferMut.isPending ? "Đang chuyển..." : "Xác nhận chuyển kho"}
+                    {transferMut.isPending ? "Đang gửi..." : "Gửi phiếu chờ duyệt"}
                   </button>
                   <button onClick={() => setMode("idle")} className="rounded-lg border px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Huỷ</button>
                 </div>

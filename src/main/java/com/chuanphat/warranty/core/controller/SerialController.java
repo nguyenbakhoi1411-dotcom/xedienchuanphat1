@@ -11,6 +11,7 @@ import com.chuanphat.warranty.core.dto.TransferSerialRequest;
 import com.chuanphat.warranty.core.dto.UpdateSerialStatusRequest;
 import com.chuanphat.warranty.core.enums.SerialStatus;
 import com.chuanphat.warranty.core.service.SerialService;
+import com.chuanphat.warranty.core.service.InventoryTransferService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,9 +39,11 @@ import org.springframework.web.bind.annotation.*;
 public class SerialController {
 
     private final SerialService serialService;
+    private final InventoryTransferService transferService;
 
-    public SerialController(SerialService serialService) {
+    public SerialController(SerialService serialService, InventoryTransferService transferService) {
         this.serialService = serialService;
+        this.transferService = transferService;
     }
 
     @GetMapping
@@ -99,7 +102,8 @@ public class SerialController {
             @PathVariable Long id,
             @Valid @RequestBody TransferSerialRequest request
     ) {
-        return serialService.transfer(id, request);
+        transferService.transferSerial(id, request.toBranchId(), request.toWarehouseId(), request.reason());
+        return serialService.get(id);
     }
 
     @PostMapping("/{id}/mark-defective")

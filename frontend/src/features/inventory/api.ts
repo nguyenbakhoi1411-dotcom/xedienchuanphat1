@@ -177,32 +177,16 @@ export const inventoryApi = {
   },
 
   async transferStock(payload: TransferStockPayload): Promise<void> {
-    if (!enableMock) {
-      await api.post("/api/inventory/transfer", {
-        fromBranchId: payload.fromBranchId,
-        fromWarehouseId: payload.fromWarehouseId,
-        toBranchId: payload.toBranchId,
-        toWarehouseId: payload.toWarehouseId,
-        productId: payload.productId,
-        quantity: payload.quantity,
-        transactionDate: payload.transactionDate,
-        note: payload.note
-      });
-      return;
-    }
-    await wait();
-    const from = findStock(payload.fromBranchId, payload.productId);
-    if (!from || from.availableQuantity < payload.quantity) {
-      throw new Error("Ton kho nguon khong du de chuyen");
-    }
-    const to = ensureStock(payload.toBranchId, payload.productId, from.averageCost);
-    from.quantityOnHand -= payload.quantity;
-    to.quantityOnHand += payload.quantity;
-    from.availableQuantity = from.quantityOnHand - from.reservedQuantity;
-    to.availableQuantity = to.quantityOnHand - to.reservedQuantity;
-    from.updatedAt = payload.transactionDate;
-    to.updatedAt = payload.transactionDate;
-    addTransaction("TRANSFER_OUT", payload.transactionNo, payload.transactionDate, payload.productId, payload.fromBranchId, payload.toBranchId, payload.quantity, payload.note);
+    await api.post("/api/inventory/transfer", {
+      fromBranchId: payload.fromBranchId,
+      fromWarehouseId: payload.fromWarehouseId,
+      toBranchId: payload.toBranchId,
+      toWarehouseId: payload.toWarehouseId,
+      productId: payload.productId,
+      quantity: payload.quantity,
+      transactionDate: payload.transactionDate,
+      note: payload.note
+    });
   },
 
   async stockCount(payload: StockCountPayload): Promise<void> {

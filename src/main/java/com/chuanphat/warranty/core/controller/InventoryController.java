@@ -10,6 +10,9 @@ import com.chuanphat.warranty.core.dto.InventoryTransferRequest;
 import com.chuanphat.warranty.core.dto.WarehouseDto;
 import com.chuanphat.warranty.core.enums.InventoryTransactionType;
 import com.chuanphat.warranty.core.service.InventoryService;
+import com.chuanphat.warranty.core.service.InventoryTransferService;
+import com.chuanphat.warranty.core.dto.InventoryTransferResponse;
+import com.chuanphat.warranty.core.dto.RejectInventoryTransferRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -18,9 +21,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/inventory")
 public class InventoryController {
     private final InventoryService service;
+    private final InventoryTransferService transferService;
 
-    public InventoryController(InventoryService service) {
+    public InventoryController(InventoryService service, InventoryTransferService transferService) {
         this.service = service;
+        this.transferService = transferService;
     }
 
     @GetMapping("/stocks")
@@ -64,8 +69,44 @@ public class InventoryController {
 
     @PostMapping("/transfer")
     @PreAuthorize("hasAuthority('INVENTORY_TRANSFER')")
-    public void transfer(@Valid @RequestBody InventoryTransferRequest request) {
-        service.transfer(request);
+    public InventoryTransferResponse transfer(@Valid @RequestBody InventoryTransferRequest request) {
+        return transferService.createAndSubmit(request);
+    }
+
+    @GetMapping("/transfers")
+    @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
+    public java.util.List<InventoryTransferResponse> transfers() {
+        return transferService.list();
+    }
+
+    @PostMapping("/transfers")
+    @PreAuthorize("hasAuthority('INVENTORY_TRANSFER')")
+    public InventoryTransferResponse createTransfer(@Valid @RequestBody InventoryTransferRequest request) {
+        return transferService.create(request);
+    }
+
+    @PostMapping("/transfers/{id}/submit")
+    @PreAuthorize("hasAuthority('INVENTORY_TRANSFER')")
+    public InventoryTransferResponse submitTransfer(@PathVariable Long id) {
+        return transferService.submit(id);
+    }
+
+    @PostMapping("/transfers/{id}/approve")
+    @PreAuthorize("hasAuthority('INVENTORY_TRANSFER_APPROVE')")
+    public InventoryTransferResponse approveTransfer(@PathVariable Long id) {
+        return transferService.approve(id);
+    }
+
+    @PostMapping("/transfers/{id}/reject")
+    @PreAuthorize("hasAuthority('INVENTORY_TRANSFER_APPROVE')")
+    public InventoryTransferResponse rejectTransfer(@PathVariable Long id, @Valid @RequestBody RejectInventoryTransferRequest request) {
+        return transferService.reject(id, request.reason());
+    }
+
+    @PostMapping("/transfers/{id}/cancel")
+    @PreAuthorize("hasAuthority('INVENTORY_TRANSFER')")
+    public InventoryTransferResponse cancelTransfer(@PathVariable Long id) {
+        return transferService.cancel(id);
     }
 
     @PostMapping("/stocktake")

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.List;
 
 public interface InventoryTransferRepository extends JpaRepository<InventoryTransfer, Long> {
     Page<InventoryTransfer> findByFromBranchIdOrToBranchId(Long fromBranchId, Long toBranchId, Pageable pageable);
@@ -18,4 +19,6 @@ public interface InventoryTransferRepository extends JpaRepository<InventoryTran
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select transfer from InventoryTransfer transfer where transfer.id = :id")
     Optional<InventoryTransfer> findWithLockById(Long id);
+
+    List<InventoryTransfer> findByFromWarehouse_IdInOrToWarehouse_IdInOrderByCreatedAtDesc(List<Long> fromIds, List<Long> toIds);
 }
