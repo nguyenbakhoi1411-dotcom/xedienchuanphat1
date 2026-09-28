@@ -5,18 +5,28 @@ import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.chuanphat.warranty.accounting.enums.PaymentMethod;
 import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.SalesOrder;
 import com.chuanphat.warranty.core.entity.SalesOrderItem;
+import com.chuanphat.warranty.core.entity.SalesPayment;
+import com.chuanphat.warranty.core.entity.SalesReturn;
+import com.chuanphat.warranty.core.entity.SalesReturnItem;
 import com.chuanphat.warranty.core.enums.PaymentStatus;
+import com.chuanphat.warranty.core.enums.ReturnSerialDisposition;
 import com.chuanphat.warranty.core.enums.SalesOrderStatus;
+import com.chuanphat.warranty.core.enums.SalesReturnReasonCode;
+import com.chuanphat.warranty.core.enums.SalesReturnStatus;
 import com.chuanphat.warranty.core.repository.ProductRepository;
 import com.chuanphat.warranty.core.repository.SalesOrderItemRepository;
 import com.chuanphat.warranty.core.repository.SalesOrderRepository;
+import com.chuanphat.warranty.core.repository.SalesPaymentRepository;
+import com.chuanphat.warranty.core.repository.SalesReturnRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -58,6 +68,12 @@ class SalesDataScopeIntegrationTest {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private SalesPaymentRepository salesPaymentRepository;
+
+    @Autowired
+    private SalesReturnRepository salesReturnRepository;
 
     @Test
     void salesStaffDashboardOnlyShowsOwnRevenue() throws Exception {
@@ -242,12 +258,45 @@ class SalesDataScopeIntegrationTest {
     }
 
     @Test
-    void salesUserCannotReadAnotherEmployeesOrderInSameBranch() throws Exception {
-        SalesOrder otherEmployeesOrder = createOrder(COWORKER_ID, BigDecimal.TEN);
+    void salesStaffCannotViewOrApproveAnotherStaffOrderEvenByDirectId() throws Exception {
+        SalesOrder otherEmployeesOrder = createOrder(106L, BigDecimal.TEN);
+        otherEmployeesOrder.setStatus(SalesOrderStatus.WAITING_DISCOUNT_APPROVAL);
+        salesOrderRepository.save(otherEmployeesOrder);
 
         mockMvc.perform(get("/api/sales/orders/{id}", otherEmployeesOrder.getId())
                         .with(salesUser()))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/approve-discount", otherEmployeesOrder.getId())
+                        .with(salesUserWithApprovalPermissions())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("note", "Forged discount approval"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/sales/orders/{id}/approve-credit", otherEmployeesOrder.getId())
+                        .with(salesUserWithApprovalPermissions())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("note", "Forged credit approval"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void managerCanApproveSalesReturnCreatedByAnotherSalesStaff() throws Exception {
+        Product product = productRepository.findById(31L).orElseThrow();
+        SalesOrder originalOrder = createDeliveredOrderWithItem(SALES_USER_ID, product);
+        SalesReturn salesReturn = createRequestedReturn(originalOrder, "sales1");
+
+        mockMvc.perform(patch("/api/sales/returns/{id}/approve", salesReturn.getId())
+                        .with(managerUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "disposition", "REFUND_TO_INVENTORY",
+                                "note", "Manager approved subordinate return"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(originalOrder.getId()))
+                .andExpect(jsonPath("$.status").value("REFUNDED"))
+                .andExpect(jsonPath("$.disposition").value("REFUND_TO_INVENTORY"));
     }
 
     @Test
@@ -332,6 +381,40 @@ class SalesDataScopeIntegrationTest {
         return salesOrderRepository.save(order);
     }
 
+    private SalesReturn createRequestedReturn(SalesOrder order, String createdBy) {
+        SalesPayment payment = new SalesPayment();
+        payment.setOrder(order);
+        payment.setPaymentMethod(PaymentMethod.CASH);
+        payment.setAmount(order.getTotalAmount());
+        payment.setPaymentDate(LocalDate.now());
+        payment.setReferenceNo("SCOPE-PAY-" + System.nanoTime());
+        salesPaymentRepository.save(payment);
+
+        SalesOrderItem orderItem = order.getItems().get(0);
+        SalesReturn salesReturn = new SalesReturn();
+        salesReturn.setReturnNo("SCOPE-RETURN-" + System.nanoTime());
+        salesReturn.setOrder(order);
+        salesReturn.setBranchId(order.getBranchId());
+        salesReturn.setCustomerId(order.getCustomerId());
+        salesReturn.setReturnDate(LocalDate.now());
+        salesReturn.setReturnAmount(orderItem.getLineTotal());
+        salesReturn.setRefundAmount(BigDecimal.ZERO);
+        salesReturn.setReasonCode(SalesReturnReasonCode.WRONG_ITEM);
+        salesReturn.setReasonNote("Return created by subordinate sales staff");
+        salesReturn.setStatus(SalesReturnStatus.REQUESTED);
+        salesReturn.setCreatedBy(createdBy);
+
+        SalesReturnItem returnItem = new SalesReturnItem();
+        returnItem.setOrderItem(orderItem);
+        returnItem.setProduct(orderItem.getProduct());
+        returnItem.setQuantity(1);
+        returnItem.setUnitPrice(orderItem.getUnitPrice());
+        returnItem.setLineAmount(orderItem.getUnitPrice());
+        returnItem.setSerialDisposition(ReturnSerialDisposition.RETURNED);
+        salesReturn.addItem(returnItem);
+        return salesReturnRepository.save(salesReturn);
+    }
+
     private BigDecimal expectedRevenue(Long employeeId, LocalDate from, LocalDate to) {
         return jdbcTemplate.queryForObject("""
                 select coalesce(sum(total_amount), 0)
@@ -364,11 +447,21 @@ class SalesDataScopeIntegrationTest {
                 new SimpleGrantedAuthority("ROLE_USER"),
                 new SimpleGrantedAuthority("SALES_VIEW"),
                 new SimpleGrantedAuthority("SALES_CREATE"),
+                new SimpleGrantedAuthority("SALES_RETURN"),
                 new SimpleGrantedAuthority("DASHBOARD_VIEW"),
                 new SimpleGrantedAuthority("REPORT_VIEW"),
                 new SimpleGrantedAuthority("AI_ASSISTANT_USE"),
                 new SimpleGrantedAuthority("CUSTOMER_VIEW"),
                 new SimpleGrantedAuthority("PRODUCT_VIEW")
+        ));
+    }
+
+    private RequestPostProcessor salesUserWithApprovalPermissions() {
+        return user("sales1").authorities(List.of(
+                new SimpleGrantedAuthority("ROLE_USER"),
+                new SimpleGrantedAuthority("SALES_VIEW"),
+                new SimpleGrantedAuthority("SALES_DISCOUNT_APPROVE"),
+                new SimpleGrantedAuthority("SALES_CREDIT_APPROVE")
         ));
     }
 
@@ -385,6 +478,7 @@ class SalesDataScopeIntegrationTest {
                 new SimpleGrantedAuthority("SALES_VIEW"),
                 new SimpleGrantedAuthority("SALES_CREATE"),
                 new SimpleGrantedAuthority("SALES_RETURN"),
+                new SimpleGrantedAuthority("SALES_RETURN_APPROVE"),
                 new SimpleGrantedAuthority("CUSTOMER_VIEW"),
                 new SimpleGrantedAuthority("PRODUCT_VIEW")
         ));

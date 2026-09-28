@@ -343,7 +343,7 @@ class SalesProfessionalFlowTest {
     }
 
     @Test
-    void managerCanApproveOrViewSubordinateSalesOrderRegardlessOfEmployeeScope() throws Exception {
+    void managerCanApproveDiscountOnOrderCreatedByAnotherSalesStaff() throws Exception {
         long orderId = createSalesOrderWaitingDiscountApproval();
 
         mockMvc.perform(get("/api/sales/orders/{id}", orderId)
@@ -420,7 +420,7 @@ class SalesProfessionalFlowTest {
     }
 
     @Test
-    void orderCreatorCannotApproveOwnCreditException() throws Exception {
+    void managerCanApproveCreditExceptionOnOrderCreatedByAnotherSalesStaff() throws Exception {
         long orderId = createSalesOrderWaitingCreditApproval();
 
         mockMvc.perform(patch("/api/sales/orders/{id}/approve-credit", orderId)
