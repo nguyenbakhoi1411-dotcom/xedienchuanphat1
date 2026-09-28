@@ -161,7 +161,7 @@ class SalesReturnServiceBusinessTest {
     }
 
     @Test
-    void refundToInventoryRestoresStockAndPreservesOriginalExpiryDate() {
+    void refundToInventoryCallsAggregateStockRestoreForBatchTaggedReturnItem() {
         SalesReturn salesReturn = requestedReturn("sales1", SalesReturnDisposition.REFUND_TO_INVENTORY);
         salesReturn.getItems().get(0).setBatchId(700L);
         mockApproval(salesReturn, new BigDecimal("3000000"), new BigDecimal("3000000"));

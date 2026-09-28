@@ -168,7 +168,7 @@ class PurchaseReturnServiceBusinessTest {
     }
 
     @Test
-    void purchaseReturnExitsCorrectBatchNotDifferentBatchOfSameProduct() {
+    void purchaseReturnRejectsReceiptItemFromDifferentReceipt() {
         Fixture fixture = fixture(ProductCategory.SPARE_PART, 2, null, SupplierInvoicePaymentStatus.UNPAID);
         PurchaseReceipt otherReceipt = receipt(301L, fixture.supplier(), fixture.warehouse(), fixture.receiptItem());
         PurchaseReceiptItem otherReceiptItem = receiptItem(401L, otherReceipt, fixture.product(), 2, null);
