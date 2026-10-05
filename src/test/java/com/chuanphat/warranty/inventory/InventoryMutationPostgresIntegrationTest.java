@@ -114,6 +114,7 @@ class InventoryMutationPostgresIntegrationTest {
 
     @Test
     void mutationResultingInNegativeStockIsRejectedByDefault() {
+        long transactionsBefore = transactionRepository.count();
         assertThatThrownBy(() -> mutationService.apply(
                 mutation(-11, InventoryMutationType.SALES_ISSUE, "ORDER", "too-large")))
                 .hasMessageContaining("negative");
@@ -121,7 +122,7 @@ class InventoryMutationPostgresIntegrationTest {
         assertThat(stockRepository.findByBranchIdAndWarehouseIdAndProductId(
                 fixture.branch().getId(), fixture.warehouse().getId(), fixture.product().getId())
                 .orElseThrow().getQuantityOnHand()).isEqualTo(10);
-        assertThat(transactionRepository.findAll()).isEmpty();
+        assertThat(transactionRepository.count()).isEqualTo(transactionsBefore);
     }
 
     @Test
@@ -171,6 +172,7 @@ class InventoryMutationPostgresIntegrationTest {
 
     @Test
     void ledgerInsertFailureRollsBackStockMutationOnPostgres() {
+        long transactionsBefore = transactionRepository.count();
         jdbcTemplate.execute("""
                 CREATE OR REPLACE FUNCTION reject_inventory_ledger_insert_for_test()
                 RETURNS trigger AS $$
@@ -192,7 +194,7 @@ class InventoryMutationPostgresIntegrationTest {
             InventoryStock stock = stockRepository.findByBranchIdAndWarehouseIdAndProductId(
                     fixture.branch().getId(), fixture.warehouse().getId(), fixture.product().getId()).orElseThrow();
             assertThat(stock.getQuantityOnHand()).isEqualTo(10);
-            assertThat(transactionRepository.findAll()).isEmpty();
+            assertThat(transactionRepository.count()).isEqualTo(transactionsBefore);
         } finally {
             jdbcTemplate.execute("DROP TRIGGER IF EXISTS reject_inventory_ledger_insert_for_test ON inventory_transactions");
             jdbcTemplate.execute("DROP FUNCTION IF EXISTS reject_inventory_ledger_insert_for_test()");
