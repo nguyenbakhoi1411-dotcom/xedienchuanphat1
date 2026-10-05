@@ -775,9 +775,9 @@ public class SalesService {
                 serial.setReservationUntil(null);
             }
             if (disposition == SalesReturnDisposition.REFUND_TO_INVENTORY) {
-                inventoryService.processSalesReturn(order.getBranchId(), orderItem.getWarehouse() == null ? null : orderItem.getWarehouse().getId(), orderItem.getProduct(), item.getQuantity(), salesReturn.getReturnNo());
+                inventoryService.processSalesReturn(order.getBranchId(), orderItem.getWarehouse() == null ? null : orderItem.getWarehouse().getId(), orderItem.getProduct(), item.getQuantity(), salesReturn.getId(), salesReturn.getReturnNo());
             } else {
-                inventoryService.recordWriteOff(order.getBranchId(), orderItem.getWarehouse() == null ? null : orderItem.getWarehouse().getId(), orderItem.getProduct(), item.getQuantity(), salesReturn.getReturnNo());
+                inventoryService.writeOffSalesReturn(order.getBranchId(), orderItem.getWarehouse() == null ? null : orderItem.getWarehouse().getId(), orderItem.getProduct(), item.getQuantity(), salesReturn.getId(), salesReturn.getReturnNo());
             }
         }
         salesReturn.setReceivedAt(OffsetDateTime.now());
@@ -1196,13 +1196,8 @@ public class SalesService {
                 throw new BusinessException("Serial is no longer available for order " + order.getOrderNo());
             }
             Warehouse warehouse = item.getWarehouse();
-            if (warehouse == null) {
-                inventoryService.decrease(order.getBranchId(), item.getProduct().getId(), item.getQuantity());
-                inventoryService.recordSale(order.getBranchId(), item.getProduct(), item.getQuantity(), order.getOrderNo());
-            } else {
-                inventoryService.decrease(order.getBranchId(), warehouse.getId(), item.getProduct().getId(), item.getQuantity());
-                inventoryService.recordSale(order.getBranchId(), warehouse.getId(), item.getProduct(), item.getQuantity(), order.getOrderNo());
-            }
+            inventoryService.issueSalesOrder(order.getBranchId(), warehouse == null ? null : warehouse.getId(),
+                    item.getProduct(), item.getQuantity(), order.getId(), order.getOrderNo());
             if (serial != null) {
                 serial.setStatus(SerialStatus.SOLD);
                 serial.setReservedOrderNo(null);

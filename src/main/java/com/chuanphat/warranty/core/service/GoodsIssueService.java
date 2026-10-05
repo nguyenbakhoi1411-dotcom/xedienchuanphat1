@@ -176,19 +176,11 @@ public class GoodsIssueService {
                 validateSerialForIssue(serial, issue.getIssueType());
                 serial.setStatus(mapIssueTypeToSerialStatus(issue.getIssueType()));
                 serialRepo.save(serial);
-                // Giam ton 1 don vi
-                if (warehouseId != null) {
-                    inventoryService.decrease(issue.getBranchId(), warehouseId, item.getProduct().getId(), 1);
-                } else {
-                    inventoryService.decrease(issue.getBranchId(), item.getProduct().getId(), 1);
-                }
+                inventoryService.issueGoodsItem(issue.getBranchId(), warehouseId, item.getProduct(), 1,
+                        issue.getIssueType().name(), issue.getId(), issue.getIssueNo());
             } else {
-                // Phu tung: giam ton theo so luong
-                if (warehouseId != null) {
-                    inventoryService.decrease(issue.getBranchId(), warehouseId, item.getProduct().getId(), item.getQuantity());
-                } else {
-                    inventoryService.decrease(issue.getBranchId(), item.getProduct().getId(), item.getQuantity());
-                }
+                inventoryService.issueGoodsItem(issue.getBranchId(), warehouseId, item.getProduct(), item.getQuantity(),
+                        issue.getIssueType().name(), issue.getId(), issue.getIssueNo());
             }
         }
 

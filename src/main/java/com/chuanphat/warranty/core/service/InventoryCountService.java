@@ -38,7 +38,6 @@ public class InventoryCountService {
     private final InventoryCountRepository countRepo;
     private final ProductRepository productRepo;
     private final WarehouseRepository warehouseRepo;
-    private final InventoryStockRepository stockRepo;
     private final InventoryService inventoryService;
     private final BranchSecurity branchSecurity;
     private final WarehouseAccessService warehouseAccessService;
@@ -47,7 +46,6 @@ public class InventoryCountService {
             InventoryCountRepository countRepo,
             ProductRepository productRepo,
             WarehouseRepository warehouseRepo,
-            InventoryStockRepository stockRepo,
             InventoryService inventoryService,
             BranchSecurity branchSecurity,
             WarehouseAccessService warehouseAccessService
@@ -55,7 +53,6 @@ public class InventoryCountService {
         this.countRepo = countRepo;
         this.productRepo = productRepo;
         this.warehouseRepo = warehouseRepo;
-        this.stockRepo = stockRepo;
         this.inventoryService = inventoryService;
         this.branchSecurity = branchSecurity;
         this.warehouseAccessService = warehouseAccessService;
@@ -124,13 +121,9 @@ public class InventoryCountService {
         List<InventoryStock> stocks;
         final Long finalWarehouseId = warehouseId;
         if (finalWarehouseId != null) {
-            stocks = stockRepo.findAll().stream()
-                    .filter(s -> finalWarehouseId.equals(s.getWarehouse() != null ? s.getWarehouse().getId() : null))
-                    .toList();
+            stocks = inventoryService.stockSnapshotForWarehouse(finalWarehouseId);
         } else {
-            stocks = stockRepo.findAll().stream()
-                    .filter(s -> req.branchId().equals(s.getBranchId()))
-                    .toList();
+            stocks = inventoryService.stockSnapshotForBranch(req.branchId());
         }
 
         // Filter theo product neu co
@@ -237,20 +230,8 @@ public class InventoryCountService {
 
             Product product = item.getProduct();
 
-            if (variance > 0) {
-                // Thua: tang kho
-                inventoryService.increase(count.getBranchId(),
-                        count.getWarehouse() != null ? count.getWarehouse()
-                                : resolveMainWarehouse(count.getBranchId()),
-                        product, variance, BigDecimal.ZERO);
-            } else {
-                // Thieu: giam kho (kiem tra khong am)
-                if (warehouseId != null) {
-                    inventoryService.decrease(count.getBranchId(), warehouseId, product.getId(), -variance);
-                } else {
-                    inventoryService.decrease(count.getBranchId(), product.getId(), -variance);
-                }
-            }
+            inventoryService.adjustInventoryCount(count.getBranchId(), warehouseId, product, variance,
+                    count.getId(), count.getCountNo());
             item.setAdjustmentApplied(true);
         }
 

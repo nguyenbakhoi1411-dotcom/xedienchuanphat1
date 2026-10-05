@@ -2,7 +2,6 @@ package com.chuanphat.warranty.core;
 
 import static com.chuanphat.warranty.BusinessCriticalTestSupport.withId;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,23 +9,22 @@ import static org.mockito.Mockito.when;
 import com.chuanphat.warranty.common.security.BranchSecurity;
 import com.chuanphat.warranty.core.dto.InventoryExportRequest;
 import com.chuanphat.warranty.core.dto.InventoryImportRequest;
-import com.chuanphat.warranty.core.entity.InventoryAverageCost;
-import com.chuanphat.warranty.core.entity.InventoryStock;
+import com.chuanphat.warranty.core.dto.InventoryMutationRequest;
 import com.chuanphat.warranty.core.entity.InventoryTransaction;
 import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.Warehouse;
+import com.chuanphat.warranty.core.enums.InventoryMutationType;
 import com.chuanphat.warranty.core.enums.InventoryTransactionType;
 import com.chuanphat.warranty.core.enums.ProductCategory;
 import com.chuanphat.warranty.core.enums.RecordStatus;
 import com.chuanphat.warranty.core.enums.WarehouseType;
 import com.chuanphat.warranty.core.repository.InventoryAverageCostRepository;
-import com.chuanphat.warranty.core.repository.InventoryStockRepository;
 import com.chuanphat.warranty.core.repository.InventoryTransactionRepository;
 import com.chuanphat.warranty.core.repository.WarehouseRepository;
+import com.chuanphat.warranty.core.service.InventoryMutationService;
 import com.chuanphat.warranty.core.service.InventoryService;
 import com.chuanphat.warranty.core.service.ProductService;
 import com.chuanphat.warranty.core.service.WarehouseAccessService;
-import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -39,67 +37,64 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class InventoryServiceBusinessTest {
-    @Mock InventoryStockRepository stockRepository;
     @Mock InventoryTransactionRepository transactionRepository;
     @Mock InventoryAverageCostRepository averageCostRepository;
     @Mock WarehouseRepository warehouseRepository;
     @Mock ProductService productService;
     @Mock BranchSecurity branchSecurity;
     @Mock WarehouseAccessService warehouseAccessService;
+    @Mock InventoryMutationService mutationService;
 
-    InventoryService service;
-    Product product;
-    Warehouse warehouse;
+    private InventoryService service;
+    private Product product;
+    private Warehouse warehouse;
 
     @BeforeEach
     void setUp() {
-        service = new InventoryService(stockRepository, transactionRepository, averageCostRepository, warehouseRepository, productService, branchSecurity, warehouseAccessService);
+        service = new InventoryService(transactionRepository, averageCostRepository, warehouseRepository,
+                productService, branchSecurity, warehouseAccessService, mutationService);
         product = product(7L);
         warehouse = warehouse(3L, 2L);
     }
 
     @Test
-    void importStockCreatesStockAndAverageCost() {
+    void importStockDelegatesQuantityAndLedgerToMutationService() {
         when(productService.get(7L)).thenReturn(product);
         when(warehouseRepository.findById(3L)).thenReturn(Optional.of(warehouse));
-        when(stockRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(2L, 3L, 7L)).thenReturn(Optional.empty());
-        when(averageCostRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(2L, 3L, 7L)).thenReturn(Optional.empty());
-        when(transactionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mutationService.apply(any())).thenReturn(transaction(InventoryTransactionType.IMPORT));
 
-        service.importStock(new InventoryImportRequest(2L, 3L, 7L, 5, new BigDecimal("1100000"), LocalDate.of(2026, 6, 13), "initial"));
+        service.importStock(new InventoryImportRequest(2L, 3L, 7L, 5, new BigDecimal("1100000"), LocalDate.of(2026, 6, 13), "opening"));
 
-        ArgumentCaptor<InventoryStock> stockCaptor = ArgumentCaptor.forClass(InventoryStock.class);
-        verify(stockRepository).save(stockCaptor.capture());
-        assertThat(stockCaptor.getValue().getQuantityOnHand()).isEqualTo(5);
-
-        ArgumentCaptor<InventoryAverageCost> costCaptor = ArgumentCaptor.forClass(InventoryAverageCost.class);
-        verify(averageCostRepository).save(costCaptor.capture());
-        assertThat(costCaptor.getValue().getAverageCost()).isEqualByComparingTo("1100000.00");
+        ArgumentCaptor<InventoryMutationRequest> captor = ArgumentCaptor.forClass(InventoryMutationRequest.class);
+        verify(mutationService).apply(captor.capture());
+        assertThat(captor.getValue().deltaQuantity()).isEqualTo(5);
+        assertThat(captor.getValue().transactionType()).isEqualTo(InventoryMutationType.IMPORT);
+        assertThat(captor.getValue().referenceType()).isEqualTo("INVENTORY_IMPORT");
     }
 
     @Test
-    void exportStockRejectsNegativeInventoryAndRecordsExportWhenEnoughStock() {
-        InventoryStock lowStock = stock(product, warehouse, 1, 0);
+    void exportStockDelegatesNegativeDeltaToMutationService() {
         when(productService.get(7L)).thenReturn(product);
         when(warehouseRepository.findById(3L)).thenReturn(Optional.of(warehouse));
-        when(averageCostRepository.findByBranchIdAndWarehouseIdAndProductId(2L, 3L, 7L)).thenReturn(Optional.empty());
-        when(stockRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(2L, 3L, 7L)).thenReturn(Optional.of(lowStock));
+        when(mutationService.apply(any())).thenReturn(transaction(InventoryTransactionType.EXPORT));
 
-        assertThatThrownBy(() -> service.exportStock(new InventoryExportRequest(2L, 3L, 7L, 2, LocalDate.now(), "sale")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Not enough stock");
+        service.exportStock(new InventoryExportRequest(2L, 3L, 7L, 2, LocalDate.now(), "usage"));
 
-        InventoryStock enoughStock = stock(product, warehouse, 3, 0);
-        when(stockRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(2L, 3L, 7L)).thenReturn(Optional.of(enoughStock));
-        when(transactionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        ArgumentCaptor<InventoryMutationRequest> captor = ArgumentCaptor.forClass(InventoryMutationRequest.class);
+        verify(mutationService).apply(captor.capture());
+        assertThat(captor.getValue().deltaQuantity()).isEqualTo(-2);
+        assertThat(captor.getValue().transactionType()).isEqualTo(InventoryMutationType.EXPORT);
+    }
 
-        service.exportStock(new InventoryExportRequest(2L, 3L, 7L, 2, LocalDate.now(), "sale"));
-
-        assertThat(enoughStock.getQuantityOnHand()).isEqualTo(1);
-        ArgumentCaptor<InventoryTransaction> transactionCaptor = ArgumentCaptor.forClass(InventoryTransaction.class);
-        verify(transactionRepository).save(transactionCaptor.capture());
-        assertThat(transactionCaptor.getValue().getType()).isEqualTo(InventoryTransactionType.EXPORT);
-        assertThat(transactionCaptor.getValue().getCreatedBy()).isEqualTo("system");
+    private InventoryTransaction transaction(InventoryTransactionType type) {
+        InventoryTransaction transaction = new InventoryTransaction();
+        transaction.setType(type);
+        transaction.setProduct(product);
+        transaction.setTransactionDate(LocalDate.now());
+        transaction.setQuantity(2);
+        transaction.setUnitCost(BigDecimal.ONE);
+        transaction.setTotalCost(BigDecimal.valueOf(2));
+        return transaction;
     }
 
     private Product product(Long id) {
@@ -121,15 +116,5 @@ class InventoryServiceBusinessTest {
         warehouse.setType(WarehouseType.MAIN);
         warehouse.setStatus(RecordStatus.ACTIVE);
         return warehouse;
-    }
-
-    private InventoryStock stock(Product product, Warehouse warehouse, int onHand, int reserved) {
-        InventoryStock stock = new InventoryStock();
-        stock.setBranchId(warehouse.getBranchId());
-        stock.setWarehouse(warehouse);
-        stock.setProduct(product);
-        stock.setQuantityOnHand(onHand);
-        stock.setReservedQuantity(reserved);
-        return stock;
     }
 }

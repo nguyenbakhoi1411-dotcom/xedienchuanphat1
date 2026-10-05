@@ -60,6 +60,9 @@ public class InventoryTransaction {
     @Column(length = 80)
     private String referenceNo;
 
+    @Column(name = "source_document_id", length = 80)
+    private String referenceId;
+
     @Column(length = 500)
     private String note;
 
@@ -96,6 +99,8 @@ public class InventoryTransaction {
     public void setReferenceType(String referenceType) { this.referenceType = referenceType; }
     public String getReferenceNo() { return referenceNo; }
     public void setReferenceNo(String referenceNo) { this.referenceNo = referenceNo; }
+    public String getReferenceId() { return referenceId; }
+    public void setReferenceId(String referenceId) { this.referenceId = referenceId; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
     public String getCreatedBy() { return createdBy; }

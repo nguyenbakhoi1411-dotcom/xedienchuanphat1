@@ -141,7 +141,8 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
         assertThat(orderItem.getReceivedQuantity()).isEqualTo(2);
         assertThat(order.getStatus()).isEqualTo(PurchaseOrderStatus.PARTIALLY_RECEIVED);
         assertThat(order.isStockReceived()).isFalse();
-        verify(inventoryService).increase(eq(1L), eq(warehouse), eq(product), eq(2), eq(new BigDecimal("1000000")));
+        verify(inventoryService).receivePurchaseReceiptItem(eq(1L), eq(warehouse), eq(product), eq(2),
+                eq(new BigDecimal("1000000")), eq(300L), eq("GNK00001"));
     }
 
     @Test
@@ -160,7 +161,8 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
         assertThat(orderItem.getReceivedQuantity()).isEqualTo(2);
         assertThat(order.getStatus()).isEqualTo(PurchaseOrderStatus.FULLY_RECEIVED);
         assertThat(order.isStockReceived()).isTrue();
-        verify(inventoryService).increase(eq(1L), eq(warehouse), eq(product), eq(2), eq(new BigDecimal("1000000")));
+        verify(inventoryService).receivePurchaseReceiptItem(eq(1L), eq(warehouse), eq(product), eq(2),
+                eq(new BigDecimal("1000000")), eq(300L), eq("GNK00001"));
     }
 
     @Test
@@ -214,7 +216,7 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("po update failed");
 
-        verify(inventoryService, never()).increase(any(), any(), any(), eq(2), any());
+        verify(inventoryService, never()).receivePurchaseReceiptItem(any(), any(), any(), eq(2), any(), any(), any());
         verify(receiptRepo, never()).save(any(PurchaseReceipt.class));
     }
 
@@ -229,7 +231,8 @@ class PurchaseReceiptPurchaseOrderLinkBusinessTest {
         when(receiptRepo.findById(300L)).thenReturn(Optional.of(receipt));
         when(purchaseOrderRepository.findById(200L)).thenReturn(Optional.of(order));
         doThrow(new DataIntegrityViolationException("inventory update failed"))
-                .when(inventoryService).increase(eq(1L), eq(warehouse), eq(product), eq(2), eq(new BigDecimal("1000000")));
+                .when(inventoryService).receivePurchaseReceiptItem(eq(1L), eq(warehouse), eq(product), eq(2),
+                        eq(new BigDecimal("1000000")), eq(300L), eq("GNK00001"));
 
         assertThatThrownBy(() -> service.confirm(300L))
                 .isInstanceOf(DataIntegrityViolationException.class)

@@ -10,23 +10,27 @@ import static org.mockito.Mockito.when;
 
 import com.chuanphat.warranty.audit.service.AuditLogService;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.core.service.InventoryService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import static org.mockito.Mockito.never;
 
 class DataIoServiceUnitTest {
     private JdbcTemplate jdbcTemplate;
     private BranchSecurity branchSecurity;
+    private InventoryService inventoryService;
     private DataIoService service;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
         branchSecurity = mock(BranchSecurity.class);
-        service = new DataIoService(jdbcTemplate, mock(AuditLogService.class), branchSecurity, "build/test-uploads");
+        inventoryService = mock(InventoryService.class);
+        service = new DataIoService(jdbcTemplate, mock(AuditLogService.class), branchSecurity, inventoryService, "build/test-uploads");
     }
 
     @Test
@@ -59,6 +63,19 @@ class DataIoServiceUnitTest {
             assertThat(error.rowNumber()).isEqualTo(2);
             assertThat(error.field()).isEqualTo("phone");
         });
+    }
+
+    @Test
+    void dataIoInitialInventoryGoesThroughMutationServiceNotDirectSql() {
+        MockMultipartFile file = csv("opening.csv",
+                "branchId,productId,quantityOnHand,minQuantity,averageCost\n2,7,12,3,250000\n");
+
+        DataIoDtos.ImportResult result = service.importData("INITIAL_INVENTORY", file, false);
+
+        assertThat(result.importedRows()).isEqualTo(1);
+        verify(inventoryService).importOpeningBalance(eq(2L), eq(7L), eq(12), eq(3),
+                eq(new java.math.BigDecimal("250000")), anyString());
+        verify(jdbcTemplate, never()).update(org.mockito.ArgumentMatchers.contains("inventory_stocks"), any(Object[].class));
     }
 
     @Test

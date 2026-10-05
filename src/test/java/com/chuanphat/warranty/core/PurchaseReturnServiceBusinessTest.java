@@ -144,7 +144,7 @@ class PurchaseReturnServiceBusinessTest {
         PurchaseReturn result = service.shipBack(700L);
 
         assertThat(result.getStatus()).isEqualTo(PurchaseReturnStatus.CREDITED);
-        verify(inventoryService).recordPurchaseReturn(eq(1L), eq(20L), eq(fixture.product()), eq(2), eq("THNCC-00001"));
+        verify(inventoryService).issuePurchaseReturn(eq(1L), eq(20L), eq(fixture.product()), eq(2), eq(700L), eq("THNCC-00001"));
         verify(purchasePaymentService).applyReturnCredit(eq(fixture.invoice()), eq(new BigDecimal("200.00")), eq("THNCC-00001"));
         verify(supplierReceivableRepository, never()).save(any(SupplierReceivable.class));
     }
@@ -191,7 +191,7 @@ class PurchaseReturnServiceBusinessTest {
         PurchaseReturn result = service.reject(700L, "NCC khong chap nhan");
 
         assertThat(result.getStatus()).isEqualTo(PurchaseReturnStatus.REJECTED);
-        verify(inventoryService, never()).recordPurchaseReturn(any(), any(), any(), any(Integer.class), any());
+        verify(inventoryService, never()).issuePurchaseReturn(any(), any(), any(), any(Integer.class), any(), any());
         verify(purchasePaymentService, never()).applyReturnCredit(any(), any(), any());
         verify(supplierReceivableRepository, never()).save(any(SupplierReceivable.class));
     }

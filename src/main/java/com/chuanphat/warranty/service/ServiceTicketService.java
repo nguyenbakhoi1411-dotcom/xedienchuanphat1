@@ -5,15 +5,13 @@ import com.chuanphat.warranty.common.dto.PageRequestFactory;
 import com.chuanphat.warranty.accounting.service.AccountingService;
 import com.chuanphat.warranty.common.dto.PageResponse;
 import com.chuanphat.warranty.common.security.BranchSecurity;
-import com.chuanphat.warranty.core.entity.InventoryStock;
-import com.chuanphat.warranty.core.entity.InventoryTransaction;
 import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.ProductSerial;
-import com.chuanphat.warranty.core.enums.InventoryTransactionType;
-import com.chuanphat.warranty.core.repository.InventoryStockRepository;
-import com.chuanphat.warranty.core.repository.InventoryTransactionRepository;
+import com.chuanphat.warranty.core.dto.InventoryMutationRequest;
+import com.chuanphat.warranty.core.enums.InventoryMutationType;
 import com.chuanphat.warranty.core.repository.ProductRepository;
 import com.chuanphat.warranty.core.repository.ProductSerialRepository;
+import com.chuanphat.warranty.core.service.InventoryMutationService;
 import com.chuanphat.warranty.core.service.CustomerService;
 import com.chuanphat.warranty.dto.AddServiceTicketItemRequest;
 import com.chuanphat.warranty.dto.AssignTechnicianRequest;
@@ -56,8 +54,7 @@ public class ServiceTicketService {
     private final ProductSerialRepository serialRepository;
     private final BranchSecurity branchSecurity;
     private final ProductRepository productRepository;
-    private final InventoryStockRepository stockRepository;
-    private final InventoryTransactionRepository transactionRepository;
+    private final InventoryMutationService inventoryMutationService;
     private final RepairQuotationRepository quotationRepository;
     private final ServiceInvoiceRepository invoiceRepository;
     private final ServiceTicketTimelineRepository timelineRepository;
@@ -71,8 +68,7 @@ public class ServiceTicketService {
             ProductSerialRepository serialRepository,
             BranchSecurity branchSecurity,
             ProductRepository productRepository,
-            InventoryStockRepository stockRepository,
-            InventoryTransactionRepository transactionRepository,
+            InventoryMutationService inventoryMutationService,
             RepairQuotationRepository quotationRepository,
             ServiceInvoiceRepository invoiceRepository,
             ServiceTicketTimelineRepository timelineRepository,
@@ -85,8 +81,7 @@ public class ServiceTicketService {
         this.serialRepository = serialRepository;
         this.branchSecurity = branchSecurity;
         this.productRepository = productRepository;
-        this.stockRepository = stockRepository;
-        this.transactionRepository = transactionRepository;
+        this.inventoryMutationService = inventoryMutationService;
         this.quotationRepository = quotationRepository;
         this.invoiceRepository = invoiceRepository;
         this.timelineRepository = timelineRepository;
@@ -424,29 +419,11 @@ public class ServiceTicketService {
                 .orElseThrow(() -> new NotFoundException("Product not found: " + request.productId()));
         ProductSerial serial = serialRepository.findById(ticket.getVehicleId())
                 .orElseThrow(() -> new NotFoundException("Serial not found: " + ticket.getVehicleId()));
-        InventoryStock stock = stockRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(serial.getBranchId(), request.warehouseId(), request.productId())
-                .orElseThrow(() -> new BusinessException("Service stock not found for part " + request.productId()));
-        if (stock.getAvailableQuantity() < request.quantity()) {
-            throw new BusinessException("Not enough service stock for part " + product.getProductName());
-        }
-        stock.setQuantity(stock.getQuantity() - request.quantity());
-        stockRepository.save(stock);
-
         BigDecimal unitCost = request.unitCost() == null ? product.getImportPrice() : request.unitCost();
-        InventoryTransaction tx = new InventoryTransaction();
-        tx.setType(InventoryTransactionType.SERVICE_USE);
-        tx.setTransactionNo("SU-" + System.currentTimeMillis());
-        tx.setTransactionDate(LocalDate.now());
-        tx.setProduct(product);
-        tx.setFromBranchId(serial.getBranchId());
-        tx.setFromWarehouseId(request.warehouseId());
-        tx.setQuantity(request.quantity());
-        tx.setUnitCost(unitCost);
-        tx.setTotalCost(unitCost.multiply(BigDecimal.valueOf(request.quantity())));
-        tx.setReferenceType("SERVICE_TICKET");
-        tx.setReferenceNo("SC-" + ticket.getId());
-        tx.setNote("Service parts usage");
-        transactionRepository.save(tx);
+        inventoryMutationService.apply(new InventoryMutationRequest(
+                request.warehouseId(), request.productId(), -request.quantity(), InventoryMutationType.SERVICE_USE,
+                "Service ticket part consumption", "SERVICE_TICKET", String.valueOf(ticket.getId()),
+                "SC-" + ticket.getId(), branchSecurity.currentUser().getUsername(), LocalDate.now(), unitCost));
     }
 
     private void addTimeline(Long ticketId, String title, String description) {

@@ -5,6 +5,7 @@ import com.chuanphat.warranty.audit.enums.AuditAction;
 import com.chuanphat.warranty.audit.enums.AuditModule;
 import com.chuanphat.warranty.audit.service.AuditLogService;
 import com.chuanphat.warranty.common.security.BranchSecurity;
+import com.chuanphat.warranty.core.service.InventoryService;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -44,17 +45,20 @@ public class DataIoService {
     private final JdbcTemplate jdbcTemplate;
     private final AuditLogService auditLogService;
     private final BranchSecurity branchSecurity;
+    private final InventoryService inventoryService;
     private final Path uploadDir;
 
     public DataIoService(
             JdbcTemplate jdbcTemplate,
             AuditLogService auditLogService,
             BranchSecurity branchSecurity,
+            InventoryService inventoryService,
             @Value("${app.files.upload-dir:uploads}") String uploadDir
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.auditLogService = auditLogService;
         this.branchSecurity = branchSecurity;
+        this.inventoryService = inventoryService;
         this.uploadDir = Path.of(uploadDir).toAbsolutePath().normalize();
     }
 
@@ -193,13 +197,7 @@ public class DataIoService {
         int quantity = intValue(row, "quantityOnHand", 0);
         int minQuantity = intValue(row, "minQuantity", 0);
         BigDecimal averageCost = money(row, "averageCost");
-        if (exists("select count(*) from inventory_stocks where branch_id = ? and product_id = ?", branchId, productId)) {
-            jdbcTemplate.update("update inventory_stocks set quantity_on_hand = ?, min_quantity = ?, average_cost = ? where branch_id = ? and product_id = ?",
-                    quantity, minQuantity, averageCost, branchId, productId);
-            return;
-        }
-        jdbcTemplate.update("insert into inventory_stocks(branch_id, product_id, quantity_on_hand, reserved_quantity, min_quantity, average_cost) values(?,?,?,?,?,?)",
-                branchId, productId, quantity, 0, minQuantity, averageCost);
+        inventoryService.importOpeningBalance(branchId, productId, quantity, minQuantity, averageCost, UUID.randomUUID().toString());
     }
 
     private List<Map<String, String>> readRows(MultipartFile file) {

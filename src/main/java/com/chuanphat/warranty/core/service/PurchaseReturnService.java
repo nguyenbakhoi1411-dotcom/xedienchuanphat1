@@ -166,8 +166,8 @@ public class PurchaseReturnService {
         for (PurchaseReturnItem item : ret.getItems()) {
             PurchaseReceiptItem receiptItem = requireReceiptItemForSavedReturn(ret, item);
             Long warehouseId = receiptItem.getReceipt().getWarehouse() == null ? null : receiptItem.getReceipt().getWarehouse().getId();
-            inventoryService.recordPurchaseReturn(ret.getBranchId(), warehouseId,
-                    item.getProduct(), item.getQuantity(), ret.getReturnCode());
+            inventoryService.issuePurchaseReturn(ret.getBranchId(), warehouseId,
+                    item.getProduct(), item.getQuantity(), ret.getId(), ret.getReturnCode());
             if (item.getSerial() != null) {
                 ProductSerial serial = serialRepo.findWithLockById(item.getSerial().getId())
                         .orElseThrow(() -> new BusinessException("Serial khong ton tai: " + item.getSerial().getId()));

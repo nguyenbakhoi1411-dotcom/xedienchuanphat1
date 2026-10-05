@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - security-role-guard-split
+      - inventory-single-mutation-point
   pull_request:
     paths:
       - "pom.xml"
@@ -11,6 +12,10 @@ on:
       - "src/main/resources/**"
       - "src/test/java/com/chuanphat/warranty/security/**"
       - "src/test/java/com/chuanphat/warranty/PostgresIntegrationTest.java"
+      - "src/test/java/com/chuanphat/warranty/inventory/InventoryMutationPostgresIntegrationTest.java"
+      - "src/test/java/com/chuanphat/warranty/inventory/InventoryMutationMigrationPostgresTest.java"
+      - "src/main/java/com/chuanphat/warranty/core/service/InventoryMutationService.java"
+      - "src/main/resources/db/migration/V65__inventory_single_mutation_point.sql"
       - ".github/workflows/security-guard-tests.yml"
   workflow_dispatch:
 
@@ -40,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest" test
+          ./mvnw "-Dtest=SecurityAnnotationTest,ProductFieldSecurityTest,InventoryMutationArchitectureTest" test
           status=$?
           if [ "$status" -ne 0 ] && [ -d target/surefire-reports ]; then
             echo "::group::Surefire failure reports"
@@ -64,3 +69,62 @@ jobs:
         with:
           name: surefire-security-guard-tests
           path: target/surefire-reports/
+
+  inventory-postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Show Docker version
+        run: docker version
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Run PostgreSQL inventory mutation tests
+        run: ./mvnw "-Dtest=InventoryMutationPostgresIntegrationTest,InventoryMutationMigrationPostgresTest" test
+
+      - name: Require all PostgreSQL tests to run without skips
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob
+          import sys
+          import xml.etree.ElementTree as ET
+
+          expected = {
+              "InventoryMutationPostgresIntegrationTest": 6,
+              "InventoryMutationMigrationPostgresTest": 1,
+          }
+          for class_name, expected_tests in expected.items():
+              report = f"target/surefire-reports/TEST-com.chuanphat.warranty.inventory.{class_name}.xml"
+              try:
+                  suite = ET.parse(report).getroot()
+              except (OSError, ET.ParseError) as error:
+                  sys.exit(f"Missing or invalid Surefire report for {class_name}: {error}")
+
+              tests = int(suite.attrib.get("tests", 0))
+              skipped = int(suite.attrib.get("skipped", 0))
+              failures = int(suite.attrib.get("failures", 0))
+              errors = int(suite.attrib.get("errors", 0))
+              print(f"{class_name}: tests={tests} skipped={skipped} failures={failures} errors={errors}")
+              if tests != expected_tests or skipped != 0 or failures != 0 or errors != 0:
+                  sys.exit(f"{class_name} must execute exactly {expected_tests} tests with zero skips/failures/errors")
+          PY
+
+      - name: Upload PostgreSQL Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-inventory-postgres-${{ github.sha }}
+          path: target/surefire-reports/
+          if-no-files-found: error

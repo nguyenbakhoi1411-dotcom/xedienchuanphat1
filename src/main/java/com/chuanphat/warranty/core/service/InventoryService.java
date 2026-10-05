@@ -7,6 +7,8 @@ import com.chuanphat.warranty.core.dto.InventoryImportRequest;
 import com.chuanphat.warranty.core.dto.InventoryStockDto;
 import com.chuanphat.warranty.core.dto.InventoryStocktakeRequest;
 import com.chuanphat.warranty.core.dto.InventoryTransactionDto;
+import com.chuanphat.warranty.core.dto.InventoryMutationRequest;
+import com.chuanphat.warranty.core.dto.InventoryStockConfigurationRequest;
 import com.chuanphat.warranty.core.dto.InventoryTransferRequest;
 import com.chuanphat.warranty.core.dto.WarehouseDto;
 import com.chuanphat.warranty.core.entity.InventoryStock;
@@ -15,15 +17,14 @@ import com.chuanphat.warranty.core.entity.Product;
 import com.chuanphat.warranty.core.entity.Warehouse;
 import com.chuanphat.warranty.core.entity.InventoryAverageCost;
 import com.chuanphat.warranty.core.enums.InventoryTransactionType;
+import com.chuanphat.warranty.core.enums.InventoryMutationType;
 import com.chuanphat.warranty.core.enums.RecordStatus;
 import com.chuanphat.warranty.core.enums.WarehouseType;
 import com.chuanphat.warranty.core.repository.InventoryAverageCostRepository;
-import com.chuanphat.warranty.core.repository.InventoryStockRepository;
 import com.chuanphat.warranty.core.repository.InventoryTransactionRepository;
 import com.chuanphat.warranty.core.repository.WarehouseRepository;
 import com.chuanphat.warranty.exception.BusinessException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.List;
@@ -34,30 +35,30 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InventoryService {
-    private final InventoryStockRepository stockRepository;
     private final InventoryTransactionRepository transactionRepository;
     private final InventoryAverageCostRepository averageCostRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductService productService;
     private final BranchSecurity branchSecurity;
     private final WarehouseAccessService warehouseAccessService;
+    private final InventoryMutationService mutationService;
 
     public InventoryService(
-            InventoryStockRepository stockRepository,
             InventoryTransactionRepository transactionRepository,
             InventoryAverageCostRepository averageCostRepository,
             WarehouseRepository warehouseRepository,
             ProductService productService,
             BranchSecurity branchSecurity,
-            WarehouseAccessService warehouseAccessService
+            WarehouseAccessService warehouseAccessService,
+            InventoryMutationService mutationService
     ) {
-        this.stockRepository = stockRepository;
         this.transactionRepository = transactionRepository;
         this.averageCostRepository = averageCostRepository;
         this.warehouseRepository = warehouseRepository;
         this.productService = productService;
         this.branchSecurity = branchSecurity;
         this.warehouseAccessService = warehouseAccessService;
+        this.mutationService = mutationService;
     }
 
     @Transactional(readOnly = true)
@@ -68,18 +69,18 @@ public class InventoryService {
             Warehouse warehouse = warehouseRepository.findById(warehouseId).orElseThrow(() -> new BusinessException("Warehouse not found"));
             branchSecurity.requireBranchAccess(warehouse.getBranchId());
             warehouseAccessService.requireView(warehouseId);
-            return PageResponse.from(stockRepository.findByWarehouse_Id(warehouseId, pageRequest).map(this::stockDto));
+            return PageResponse.from(mutationService.findByWarehouseId(warehouseId, pageRequest).map(this::stockDto));
         }
         if (warehouseAccessService.isPrivileged()) {
             if (scopedBranchId == null) {
-                return PageResponse.from(stockRepository.findAll(pageRequest).map(this::stockDto));
+                return PageResponse.from(mutationService.findAll(pageRequest).map(this::stockDto));
             }
-            return PageResponse.from(stockRepository.findByBranchId(scopedBranchId, pageRequest).map(this::stockDto));
+            return PageResponse.from(mutationService.findByBranchId(scopedBranchId, pageRequest).map(this::stockDto));
         }
         List<Long> warehouseIds = warehouseAccessService.currentAccessibleWarehouseIds(scopedBranchId);
         return PageResponse.from(warehouseIds.isEmpty()
                 ? Page.<InventoryStock>empty(pageRequest).map(this::stockDto)
-                : stockRepository.findByWarehouse_IdIn(warehouseIds, pageRequest).map(this::stockDto));
+                : mutationService.findByWarehouseIds(warehouseIds, pageRequest).map(this::stockDto));
     }
 
     @Transactional(readOnly = true)
@@ -101,18 +102,11 @@ public class InventoryService {
     @Transactional
     public InventoryStockDto upsert(InventoryStockDto request) {
         branchSecurity.requireBranchAccess(request.branchId());
-        Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
         warehouseAccessService.requireOperate(warehouse.getId());
-        InventoryStock stock = stockRepository.findByBranchIdAndWarehouseIdAndProductId(request.branchId(), warehouse.getId(), request.productId()).orElseGet(InventoryStock::new);
-        stock.setBranchId(request.branchId());
-        stock.setWarehouse(warehouse);
-        stock.setProduct(product);
-        stock.setQuantityOnHand(request.quantityOnHand());
-        stock.setReservedQuantity(request.reservedQuantity());
-        stock.setMinQuantity(request.minQuantity());
-        stock.setMaxStockLevel(request.maxQuantity());
-        return stockDto(stockRepository.save(stock));
+        return stockDto(mutationService.configure(new InventoryStockConfigurationRequest(
+                request.branchId(), warehouse.getId(), request.productId(), request.quantityOnHand(),
+                request.reservedQuantity(), request.minQuantity(), request.maxQuantity()), currentUsername()));
     }
 
     @Transactional(readOnly = true)
@@ -145,19 +139,99 @@ public class InventoryService {
         Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
         warehouseAccessService.requireOperate(warehouse.getId());
-        BigDecimal averageCost = increase(request.branchId(), warehouse, product, request.quantity(), request.unitCost());
-        return InventoryTransactionDto.from(record(
-                InventoryTransactionType.IMPORT,
-                product,
-                null,
-                request.branchId(),
-                null,
-                warehouse.getId(),
-                request.quantity(),
-                averageCost,
-                request.transactionDate(),
-                request.note()
-        ));
+        return InventoryTransactionDto.from(mutate(warehouse.getId(), product.getId(), request.quantity(),
+                InventoryMutationType.IMPORT, request.note(), "INVENTORY_IMPORT", null,
+                request.note(), currentUsername(), request.transactionDate(), request.unitCost()));
+    }
+
+    @Transactional
+    public InventoryTransaction importOpeningBalance(Long branchId, Long productId, int targetQuantity,
+                                                      int minQuantity, BigDecimal unitCost, String importRef) {
+        branchSecurity.requireBranchAccess(branchId);
+        Warehouse warehouse = resolveWarehouse(branchId, null);
+        warehouseAccessService.requireOperate(warehouse.getId());
+        return mutationService.setQuantity(new InventoryMutationRequest(
+                warehouse.getId(), productId, 0, InventoryMutationType.OPENING_BALANCE,
+                "Opening balance import", "DATA_IO_IMPORT", importRef, importRef,
+                currentUsername(), LocalDate.now(), unitCost), targetQuantity, minQuantity);
+    }
+
+    @Transactional
+    public InventoryTransaction issueSalesOrder(Long branchId, Long warehouseId, Product product, int quantity,
+                                               Long orderId, String orderNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        return mutate(warehouse.getId(), product.getId(), -quantity, InventoryMutationType.SALES_ISSUE,
+                "Sale order " + orderNo, "SALES_ORDER", String.valueOf(orderId), orderNo,
+                currentUsername(), LocalDate.now(), null);
+    }
+
+    @Transactional
+    public InventoryTransaction issueGoodsItem(Long branchId, Long warehouseId, Product product, int quantity,
+                                               String issueType, Long issueId, String issueNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        InventoryMutationType type = switch (issueType) {
+            case "WRITE_OFF" -> InventoryMutationType.WRITE_OFF;
+            case "SALE" -> InventoryMutationType.SALES_ISSUE;
+            default -> InventoryMutationType.GOODS_ISSUE;
+        };
+        return mutate(warehouse.getId(), product.getId(), -quantity, type,
+                "Goods issue " + issueNo, "GOODS_ISSUE", String.valueOf(issueId), issueNo,
+                currentUsername(), LocalDate.now(), null);
+    }
+
+    @Transactional
+    public InventoryTransaction receivePurchaseReceiptItem(Long branchId, Warehouse warehouse, Product product,
+                                                           int quantity, BigDecimal unitCost, Long receiptId,
+                                                           String receiptNo) {
+        return mutate(warehouse.getId(), product.getId(), quantity, InventoryMutationType.PURCHASE_RECEIPT,
+                "Purchase receipt " + receiptNo, "PURCHASE_RECEIPT", String.valueOf(receiptId), receiptNo,
+                currentUsername(), LocalDate.now(), unitCost);
+    }
+
+    @Transactional
+    public InventoryTransaction adjustInventoryCount(Long branchId, Long warehouseId, Product product, int delta,
+                                                     Long countId, String countNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        return mutate(warehouse.getId(), product.getId(), delta, InventoryMutationType.COUNT_ADJUSTMENT,
+                "Inventory count " + countNo, "INVENTORY_COUNT", String.valueOf(countId), countNo,
+                currentUsername(), LocalDate.now(), null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InventoryStock> stockSnapshotForWarehouse(Long warehouseId) {
+        return mutationService.snapshotForWarehouse(warehouseId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InventoryStock> stockSnapshotForBranch(Long branchId) {
+        return mutationService.snapshotForBranch(branchId);
+    }
+
+    @Transactional
+    public InventoryTransaction issuePurchaseReturn(Long branchId, Long warehouseId, Product product, int quantity,
+                                                    Long returnId, String returnNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        return mutate(warehouse.getId(), product.getId(), -quantity, InventoryMutationType.PURCHASE_RETURN,
+                "Purchase return " + returnNo, "PURCHASE_RETURN", String.valueOf(returnId), returnNo,
+                currentUsername(), LocalDate.now(), null);
+    }
+
+    @Transactional
+    public InventoryTransaction processSalesReturn(Long branchId, Long warehouseId, Product product, int quantity,
+                                                   Long returnId, String returnNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        return mutate(warehouse.getId(), product.getId(), quantity, InventoryMutationType.SALES_RETURN,
+                "Sales return " + returnNo, "SALES_RETURN", String.valueOf(returnId), returnNo,
+                currentUsername(), LocalDate.now(), averageCost(branchId, warehouse.getId(), product.getId()));
+    }
+
+    @Transactional
+    public InventoryTransaction writeOffSalesReturn(Long branchId, Long warehouseId, Product product, int quantity,
+                                                   Long returnId, String returnNo) {
+        Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
+        return record(InventoryTransactionType.WRITE_OFF, product, branchId, null,
+                warehouse.getId(), null, quantity, averageCost(branchId, warehouse.getId(), product.getId()),
+                LocalDate.now(), "Sales return write-off " + returnNo, "SALES_RETURN", String.valueOf(returnId));
     }
 
     @Transactional
@@ -166,20 +240,9 @@ public class InventoryService {
         Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
         warehouseAccessService.requireOperate(warehouse.getId());
-        BigDecimal averageCost = averageCost(request.branchId(), warehouse.getId(), request.productId());
-        decrease(request.branchId(), warehouse.getId(), request.productId(), request.quantity());
-        return InventoryTransactionDto.from(record(
-                InventoryTransactionType.EXPORT,
-                product,
-                request.branchId(),
-                null,
-                warehouse.getId(),
-                null,
-                request.quantity(),
-                averageCost,
-                request.transactionDate(),
-                request.note()
-        ));
+        return InventoryTransactionDto.from(mutate(warehouse.getId(), product.getId(), -request.quantity(),
+                InventoryMutationType.EXPORT, request.note(), "INVENTORY_EXPORT", null,
+                request.note(), currentUsername(), request.transactionDate(), null));
     }
 
     @Transactional
@@ -195,10 +258,11 @@ public class InventoryService {
         warehouseAccessService.requireOperate(fromWarehouse.getId());
         warehouseAccessService.requireOperate(toWarehouse.getId());
         BigDecimal movingCost = averageCost(request.fromBranchId(), fromWarehouse.getId(), request.productId());
-        decrease(request.fromBranchId(), fromWarehouse.getId(), request.productId(), request.quantity());
-        increase(request.toBranchId(), toWarehouse, product, request.quantity(), movingCost);
-        record(InventoryTransactionType.TRANSFER_OUT, product, request.fromBranchId(), request.toBranchId(), fromWarehouse.getId(), toWarehouse.getId(), request.quantity(), movingCost, request.transactionDate(), request.note());
-        record(InventoryTransactionType.TRANSFER_IN, product, request.fromBranchId(), request.toBranchId(), fromWarehouse.getId(), toWarehouse.getId(), request.quantity(), movingCost, request.transactionDate(), request.note());
+        String transferRef = UUID.randomUUID().toString();
+        mutate(fromWarehouse.getId(), product.getId(), -request.quantity(), InventoryMutationType.TRANSFER_OUT,
+                request.note(), "INVENTORY_TRANSFER", transferRef, request.note(), currentUsername(), request.transactionDate(), movingCost);
+        mutate(toWarehouse.getId(), product.getId(), request.quantity(), InventoryMutationType.TRANSFER_IN,
+                request.note(), "INVENTORY_TRANSFER", transferRef, request.note(), currentUsername(), request.transactionDate(), movingCost);
     }
 
     @Transactional
@@ -207,15 +271,16 @@ public class InventoryService {
         Product product = productService.get(request.productId());
         Warehouse warehouse = resolveWarehouse(request.branchId(), request.warehouseId());
         warehouseAccessService.requireOperate(warehouse.getId());
-        InventoryStock stock = stockRepository.findByBranchIdAndWarehouseIdAndProductId(request.branchId(), warehouse.getId(), request.productId()).orElseGet(InventoryStock::new);
-        int currentQuantity = stock.getQuantityOnHand();
-        stock.setBranchId(request.branchId());
-        stock.setWarehouse(warehouse);
-        stock.setProduct(product);
-        stock.setQuantityOnHand(request.countedQuantity());
-        stockRepository.save(stock);
-        InventoryTransactionType type = request.countedQuantity() >= currentQuantity ? InventoryTransactionType.ADJUSTMENT_IN : InventoryTransactionType.ADJUSTMENT_OUT;
-        return InventoryTransactionDto.from(record(type, product, null, request.branchId(), null, warehouse.getId(), Math.abs(request.countedQuantity() - currentQuantity), averageCost(request.branchId(), warehouse.getId(), request.productId()), request.transactionDate(), request.note()));
+        InventoryTransaction transaction = mutationService.setQuantity(new InventoryMutationRequest(
+                warehouse.getId(), product.getId(), 0, InventoryMutationType.COUNT_ADJUSTMENT,
+                request.note() == null ? "Inventory stocktake" : request.note(), "STOCKTAKE", null,
+                request.note(), currentUsername(), request.transactionDate(), null), request.countedQuantity());
+        if (transaction == null) {
+            return InventoryTransactionDto.from(record(InventoryTransactionType.STOCKTAKE, product, null,
+                    request.branchId(), null, warehouse.getId(), 0,
+                    averageCost(request.branchId(), warehouse.getId(), request.productId()), request.transactionDate(), request.note()));
+        }
+        return InventoryTransactionDto.from(transaction);
     }
 
     @Transactional
@@ -226,14 +291,8 @@ public class InventoryService {
 
     @Transactional
     public void decrease(Long branchId, Long warehouseId, Long productId, int quantity) {
-        InventoryStock stock = stockRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(branchId, warehouseId, productId)
-                .orElseThrow(() -> new BusinessException("Product is out of stock"));
-        if (stock.getAvailableQuantity() < quantity) {
-            throw new BusinessException("Not enough stock");
-        }
-        stock.setQuantityOnHand(stock.getQuantityOnHand() - quantity);
-        stockRepository.save(stock);
-        decreaseAverageCostQuantity(branchId, warehouseId, productId, quantity);
+        mutate(warehouseId, productId, -quantity, InventoryMutationType.MANUAL_CORRECTION,
+                "Inventory decrease", "MANUAL_INVENTORY_MUTATION", null, null, currentUsername(), LocalDate.now(), null);
     }
 
     @Transactional
@@ -244,43 +303,41 @@ public class InventoryService {
 
     @Transactional
     public void recordSale(Long branchId, Long warehouseId, Product product, int quantity, String orderNo) {
-        record(InventoryTransactionType.SALE, product, branchId, null, warehouseId, null, quantity, averageCost(branchId, warehouseId, product.getId()), LocalDate.now(), "Sale order " + orderNo);
+        mutate(warehouseId, product.getId(), -quantity, InventoryMutationType.SALES_ISSUE,
+                "Sale order " + orderNo, "SALES_ORDER", orderNo, orderNo, currentUsername(), LocalDate.now(), null);
     }
 
     @Transactional
     public void recordPurchaseReturn(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
-        BigDecimal averageCost = averageCost(branchId, warehouse.getId(), product.getId());
-        decrease(branchId, warehouse.getId(), product.getId(), quantity);
-        record(InventoryTransactionType.PURCHASE_RETURN, product, branchId, null, warehouse.getId(), null, quantity,
-                averageCost, LocalDate.now(), "Purchase return " + returnNo);
+        mutate(warehouse.getId(), product.getId(), -quantity, InventoryMutationType.PURCHASE_RETURN,
+                "Purchase return " + returnNo, "PURCHASE_RETURN", returnNo, returnNo, currentUsername(), LocalDate.now(), null);
     }
 
     @Transactional
     public void returnStock(Long branchId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
-        increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));
-        record(InventoryTransactionType.RETURN, product, null, branchId, null, warehouse.getId(), quantity, averageCost(branchId, warehouse.getId(), product.getId()), LocalDate.now(), "Sales return " + returnNo);
+        processSalesReturn(branchId, warehouse.getId(), product, quantity, returnNo);
     }
 
     @Transactional
     public void processSalesReturn(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
-        BigDecimal averageCost = increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));
-        record(InventoryTransactionType.RETURN, product, null, branchId, null, warehouse.getId(), quantity, averageCost, LocalDate.now(), "Sales return " + returnNo);
+        mutate(warehouse.getId(), product.getId(), quantity, InventoryMutationType.SALES_RETURN,
+                "Sales return " + returnNo, "SALES_RETURN", returnNo, returnNo, currentUsername(), LocalDate.now(), averageCost(branchId, warehouse.getId(), product.getId()));
     }
 
     @Transactional
     public void recordWriteOff(Long branchId, Long warehouseId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, warehouseId);
-        record(InventoryTransactionType.WRITE_OFF, product, branchId, null, warehouse.getId(), null, quantity, averageCost(branchId, warehouse.getId(), product.getId()), LocalDate.now(), "Sales return write-off " + returnNo);
+        record(InventoryTransactionType.WRITE_OFF, product, branchId, null, warehouse.getId(), null, quantity,
+                averageCost(branchId, warehouse.getId(), product.getId()), LocalDate.now(), "Sales return write-off " + returnNo);
     }
 
     @Transactional
     public void increaseForReturn(Long branchId, Product product, int quantity, String returnNo) {
         Warehouse warehouse = resolveWarehouse(branchId, null);
-        BigDecimal averageCost = increase(branchId, warehouse, product, quantity, averageCost(branchId, warehouse.getId(), product.getId()));
-        record(InventoryTransactionType.RETURN, product, null, branchId, null, warehouse.getId(), quantity, averageCost, LocalDate.now(), "Sales return " + returnNo);
+        processSalesReturn(branchId, warehouse.getId(), product, quantity, returnNo);
     }
 
     @Transactional
@@ -301,16 +358,10 @@ public class InventoryService {
     }
 
     public BigDecimal increase(Long branchId, Warehouse warehouse, Product product, int quantity, BigDecimal unitCost) {
-        InventoryStock stock = stockRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(branchId, warehouse.getId(), product.getId()).orElseGet(InventoryStock::new);
-        stock.setBranchId(branchId);
-        stock.setWarehouse(warehouse);
-        stock.setProduct(product);
-        stock.setQuantityOnHand(stock.getQuantityOnHand() + quantity);
-        if (stock.getMinQuantity() == 0) {
-            stock.setMinQuantity(1);
-        }
-        stockRepository.save(stock);
-        return updateAverageCost(branchId, warehouse, product, quantity, unitCost);
+        InventoryTransaction transaction = mutate(warehouse.getId(), product.getId(), quantity,
+                InventoryMutationType.MANUAL_CORRECTION, "Inventory increase", "MANUAL_INVENTORY_MUTATION",
+                null, null, currentUsername(), LocalDate.now(), unitCost);
+        return transaction.getUnitCost();
     }
 
     private InventoryStockDto stockDto(InventoryStock stock) {
@@ -330,33 +381,24 @@ public class InventoryService {
                 .orElseThrow(() -> new BusinessException("Main warehouse is required for branch " + branchId));
     }
 
-    private BigDecimal updateAverageCost(Long branchId, Warehouse warehouse, Product product, int importQuantity, BigDecimal importUnitCost) {
-        BigDecimal unitCost = importUnitCost == null ? product.getImportPrice() : importUnitCost;
-        InventoryAverageCost cost = averageCostRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(branchId, warehouse.getId(), product.getId()).orElseGet(InventoryAverageCost::new);
-        int oldQuantity = cost.getQuantity();
-        BigDecimal oldValue = cost.getAverageCost().multiply(BigDecimal.valueOf(oldQuantity));
-        BigDecimal importValue = unitCost.multiply(BigDecimal.valueOf(importQuantity));
-        int newQuantity = oldQuantity + importQuantity;
-        cost.setBranchId(branchId);
-        cost.setWarehouse(warehouse);
-        cost.setProduct(product);
-        cost.setQuantity(newQuantity);
-        cost.setAverageCost(newQuantity == 0 ? BigDecimal.ZERO : oldValue.add(importValue).divide(BigDecimal.valueOf(newQuantity), 2, RoundingMode.HALF_UP));
-        averageCostRepository.save(cost);
-        return cost.getAverageCost();
-    }
-
-    private void decreaseAverageCostQuantity(Long branchId, Long warehouseId, Long productId, int quantity) {
-        averageCostRepository.findWithLockByBranchIdAndWarehouseIdAndProductId(branchId, warehouseId, productId).ifPresent(cost -> {
-            cost.setQuantity(Math.max(0, cost.getQuantity() - quantity));
-            averageCostRepository.save(cost);
-        });
-    }
-
     private BigDecimal averageCost(Long branchId, Long warehouseId, Long productId) {
         return averageCostRepository.findByBranchIdAndWarehouseIdAndProductId(branchId, warehouseId, productId)
                 .map(InventoryAverageCost::getAverageCost)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    private InventoryTransaction mutate(Long warehouseId, Long productId, int delta,
+                                        InventoryMutationType type, String reason, String referenceType,
+                                        String referenceId, String referenceNo, String actor,
+                                        LocalDate date, BigDecimal unitCost) {
+        return mutationService.apply(new InventoryMutationRequest(warehouseId, productId, delta, type,
+                reason == null || reason.isBlank() ? type.name() : reason,
+                referenceType, referenceId, referenceNo, actor, date, unitCost));
+    }
+
+    private String currentUsername() {
+        try { return branchSecurity.currentUser().getUsername(); }
+        catch (Exception exception) { return "system"; }
     }
 
     private InventoryTransaction record(
@@ -371,6 +413,24 @@ public class InventoryService {
             LocalDate transactionDate,
             String note
     ) {
+        return record(type, product, fromBranchId, toBranchId, fromWarehouseId, toWarehouseId, quantity,
+                unitCost, transactionDate, note, "INVENTORY_OPERATION", UUID.randomUUID().toString());
+    }
+
+    private InventoryTransaction record(
+            InventoryTransactionType type,
+            Product product,
+            Long fromBranchId,
+            Long toBranchId,
+            Long fromWarehouseId,
+            Long toWarehouseId,
+            int quantity,
+            BigDecimal unitCost,
+            LocalDate transactionDate,
+            String note,
+            String referenceType,
+            String referenceId
+    ) {
         InventoryTransaction transaction = new InventoryTransaction();
         transaction.setType(type);
         transaction.setTransactionNo(type.name() + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
@@ -384,7 +444,9 @@ public class InventoryService {
         transaction.setUnitCost(unitCost);
         transaction.setTotalCost((unitCost == null ? BigDecimal.ZERO : unitCost).multiply(BigDecimal.valueOf(quantity)));
         transaction.setNote(note);
-        transaction.setCreatedBy("system");
+        transaction.setReferenceType(referenceType);
+        transaction.setReferenceId(referenceId);
+        transaction.setCreatedBy(currentUsername());
         return transactionRepository.save(transaction);
     }
 }

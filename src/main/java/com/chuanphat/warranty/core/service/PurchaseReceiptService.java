@@ -192,8 +192,8 @@ public class PurchaseReceiptService {
                 confirmVehicleItem(receipt, item, product, effectiveWarehouse);
             } else {
                 // Phu tung / phu kien: tang so luong
-                inventoryService.increase(receipt.getBranchId(), effectiveWarehouse, product,
-                        item.getQuantity(), item.getUnitCost());
+                inventoryService.receivePurchaseReceiptItem(receipt.getBranchId(), effectiveWarehouse, product,
+                        item.getQuantity(), item.getUnitCost(), receipt.getId(), receipt.getReceiptNo());
             }
         }
 
@@ -271,7 +271,8 @@ public class PurchaseReceiptService {
         item.setSerialNumber(serialNumber);
 
         // Tang ton kho 1 don vi cho xe (theo serial, khong theo quantity)
-        inventoryService.increase(receipt.getBranchId(), warehouse, product, 1, item.getUnitCost());
+        inventoryService.receivePurchaseReceiptItem(receipt.getBranchId(), warehouse, product, 1,
+                item.getUnitCost(), receipt.getId(), receipt.getReceiptNo());
     }
 
     private Warehouse resolveEffectiveWarehouse(PurchaseReceipt receipt) {

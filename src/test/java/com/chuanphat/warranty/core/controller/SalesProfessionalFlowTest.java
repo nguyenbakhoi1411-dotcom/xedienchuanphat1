@@ -10,17 +10,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chuanphat.warranty.auth.entity.AppUser;
+import com.chuanphat.warranty.auth.repository.AppUserRepository;
 import com.chuanphat.warranty.core.entity.Customer;
 import com.chuanphat.warranty.core.enums.SerialStatus;
 import com.chuanphat.warranty.core.repository.CustomerRepository;
 import com.chuanphat.warranty.core.repository.ProductSerialRepository;
+import com.chuanphat.warranty.hr.entity.Employee;
+import com.chuanphat.warranty.hr.repository.EmployeeRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -43,6 +49,34 @@ class SalesProfessionalFlowTest {
 
     @Autowired
     private CustomerRepository customerRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AppUserRepository appUserRepository;
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @BeforeEach
+    void grantSalesFixtureWarehouseAccess() {
+        AppUser salesUser = appUserRepository.findByUsernameIgnoreCase("sales1").orElseThrow();
+        Employee employee = employeeRepository.findByUserId(salesUser.getId()).orElseGet(() -> {
+            Employee created = new Employee();
+            created.setEmployeeCode("TEST-SALES-" + salesUser.getId());
+            created.setFullName("Sales test user");
+            created.setBranchId(1L);
+            created.setUserId(salesUser.getId());
+            return employeeRepository.saveAndFlush(created);
+        });
+        jdbcTemplate.update("delete from employee_warehouses where employee_id = ? and warehouse_id = 1", employee.getId());
+        jdbcTemplate.update("""
+                insert into employee_warehouses(employee_id, warehouse_id, access_level, active, created_at)
+                select ?, 1, 'OPERATE', true, current_timestamp
+                where exists (select 1 from warehouses where id = 1)
+                """, employee.getId());
+    }
 
     @Test
     void quotationPaymentInvoiceAndReturnFlow() throws Exception {

@@ -168,8 +168,8 @@ class SalesReturnServiceBusinessTest {
 
         service.approveReturn(55L, new ApproveSalesReturnRequest(SalesReturnDisposition.REFUND_TO_INVENTORY, "sellable"));
 
-        verify(inventoryService).processSalesReturn(1L, 3L, product, 1, salesReturn.getReturnNo());
-        verify(inventoryService, never()).recordWriteOff(anyLong(), any(), any(Product.class), anyInt(), anyString());
+        verify(inventoryService).processSalesReturn(1L, 3L, product, 1, 55L, salesReturn.getReturnNo());
+        verify(inventoryService, never()).writeOffSalesReturn(anyLong(), any(), any(Product.class), anyInt(), anyLong(), anyString());
         assertThat(salesReturn.getItems().get(0).getBatchId()).isEqualTo(700L);
     }
 
@@ -180,8 +180,8 @@ class SalesReturnServiceBusinessTest {
 
         service.approveReturn(55L, new ApproveSalesReturnRequest(SalesReturnDisposition.WRITE_OFF, "damaged"));
 
-        verify(inventoryService, never()).processSalesReturn(anyLong(), any(), any(Product.class), anyInt(), anyString());
-        verify(inventoryService).recordWriteOff(1L, 3L, product, 1, salesReturn.getReturnNo());
+        verify(inventoryService, never()).processSalesReturn(anyLong(), any(), any(Product.class), anyInt(), anyLong(), anyString());
+        verify(inventoryService).writeOffSalesReturn(1L, 3L, product, 1, 55L, salesReturn.getReturnNo());
     }
 
     @Test
@@ -221,8 +221,8 @@ class SalesReturnServiceBusinessTest {
         service.rejectReturn(55L, new RejectSalesReturnRequest("not eligible"));
 
         assertThat(salesReturn.getStatus()).isEqualTo(SalesReturnStatus.REJECTED);
-        verify(inventoryService, never()).processSalesReturn(anyLong(), any(), any(Product.class), anyInt(), anyString());
-        verify(inventoryService, never()).recordWriteOff(anyLong(), any(), any(Product.class), anyInt(), anyString());
+        verify(inventoryService, never()).processSalesReturn(anyLong(), any(), any(Product.class), anyInt(), anyLong(), anyString());
+        verify(inventoryService, never()).writeOffSalesReturn(anyLong(), any(), any(Product.class), anyInt(), anyLong(), anyString());
         verify(accountingService, never()).recordSalesReturnReversal(any(), any(), any(), any(), any(), any(), any());
     }
 
